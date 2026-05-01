@@ -15,7 +15,11 @@
     <dependencies>
         <dependency>
             <groupId>org.solarframework.mu</groupId>
-            <artifactId>core</artifactId>
+            <artifactId>Database</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
         <dependency>

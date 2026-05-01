@@ -21,11 +21,11 @@
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="AI" options="-parameters" />
-      <module name="AstralCore" options="-parameters" />
       <module name="Database" options="-parameters" />
       <module name="Discord" options="-parameters" />
       <module name="Excel" options="-parameters" />
       <module name="SSLServer" options="-parameters" />
+      <module name="SolarFramework" options="-parameters" />
       <module name="core" options="-parameters" />
     </option>
   </component>
