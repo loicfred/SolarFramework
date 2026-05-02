@@ -1,35 +1,44 @@
 package org.solarframework.discord.obj;
 
 import club.minnced.discord.webhook.send.WebhookMessageBuilder;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.middleman.StandardGuildMessageChannel;
 import net.dv8tion.jda.api.exceptions.ErrorHandler;
 import net.dv8tion.jda.api.requests.ErrorResponse;
 import org.solarframework.db.spring.DatabaseObject;
+import org.solarframework.discord.obj.other.ActionServerID;
 
 import java.util.concurrent.TimeUnit;
 
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 import static org.solarframework.discord.utils.WebhookUtils.getWebhookOfChannel;
 
-@Table
+@Entity
+@Table(name = "discord_messageinfo")
+@IdClass(ActionServerID.class)
 public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
     private transient Guild Guild;
     private transient StandardGuildMessageChannel C = null;
     private transient Message M = null;
 
     @Id
+    @Column(name = "Action", length = 32, nullable = false)
     public String Action;
     @Id
+    @Column(name = "ServerID", nullable = false)
     public Long ServerID;
 
+    @Column(name = "ChannelID", nullable = false)
     public Long ChannelID;
+    @Column(name = "MessageID", nullable = false)
     public Long MessageID;
+
+    @Column(name = "ChannelAction", length = 32, nullable = false)
     public String ChannelAction;
 
+    public Discord_MessageInfo() {}
     public Discord_MessageInfo(String channelAction, Long serverId, Long channelId) {
         this.ServerID = serverId;
         this.ChannelID = channelId;

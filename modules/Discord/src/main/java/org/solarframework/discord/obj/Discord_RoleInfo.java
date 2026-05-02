@@ -1,26 +1,32 @@
 package org.solarframework.discord.obj;
 
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Role;
 import org.solarframework.db.spring.DatabaseObject;
+import org.solarframework.discord.obj.other.ActionServerID;
 
 import static org.solarframework.db.spring.DatabaseService.dbService;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 
-@Table
+@Entity
+@Table(name = "discord_roleinfo")
+@IdClass(ActionServerID.class)
 public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
     private transient Guild G;
     private transient Role R;
 
     @Id
+    @Column(name = "Action", length = 32, nullable = false)
     private String Action;
     @Id
+    @Column(name = "ServerID", nullable = false)
     private Long ServerID;
 
+    @Column(name = "RoleID", nullable = false)
     private Long RoleID;
 
+    public Discord_RoleInfo() {}
     public Discord_RoleInfo(Guild G, Role role, String action) {
         this.G = G;
         this.R = role;
@@ -62,4 +68,5 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
     private Guild getGuild() {
         return G == null ? G = DiscordAccount.getGuildById(ServerID) : G;
     }
+
 }

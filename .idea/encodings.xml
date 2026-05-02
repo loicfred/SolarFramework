@@ -2,14 +2,19 @@
 <project version="4">
   <component name="Encoding">
     <file url="file://C:/Windows/System32/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/File/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/AI/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/modules/Database-API/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/Database/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/Discord/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/Excel/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/Excels/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/modules/JSON/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/modules/Plugin/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/SSLServer/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/modules/ZIP/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/untitled/src/main/java" charset="UTF-8" />

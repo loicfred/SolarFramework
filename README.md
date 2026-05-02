@@ -278,10 +278,11 @@ public class Main {
 Add this Maven dependency to your Spring project:
 
 ```xml
+
 <parent>
-    <groupId>org.solarframework.mu</groupId>
-    <artifactId>SolarFramework</artifactId>
-    <version>1.0</version>
+  <groupId>org.solarframework.pluginorg.solarframework.plugin</groupId>
+  <artifactId>SolarFramework</artifactId>
+  <version>1.0</version>
 </parent>
 ```
 Available Modules:  

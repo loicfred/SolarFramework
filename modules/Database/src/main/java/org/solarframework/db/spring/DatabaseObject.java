@@ -1,5 +1,6 @@
 package org.solarframework.db.spring;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
 import org.springframework.jdbc.core.RowMapper;
@@ -12,7 +13,7 @@ import java.util.stream.Collectors;
 import static org.solarframework.db.spring.DatabaseService.dbService;
 import static org.solarframework.db.spring.DatabaseUtils.getTableName;
 import static org.solarframework.db.spring.DatabaseUtils.mapResultSetToObject;
-import static org.solarframework.core.json.JSONItem.GSON;
+import static org.solarframework.json.JSONItem.GSON;
 import static org.solarframework.core.util.ClassUtils.*;
 
 @SuppressWarnings("all")
@@ -233,6 +234,7 @@ public abstract class DatabaseObject<T> {
     @MappedSuperclass
     public static class ID_OBJ<IDTYPE, T> extends DatabaseObject<T> {
         @Id
+        @Column(name = "ID")
         public IDTYPE ID;
 
         public IDTYPE getID() {

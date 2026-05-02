@@ -1,6 +1,5 @@
 package org.solarframework.discord.obj;
 
-import club.minnced.discord.webhook.send.WebhookMessageBuilder;
 import jakarta.persistence.*;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
@@ -8,13 +7,16 @@ import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.requests.restaction.MessageCreateAction;
 import org.solarframework.db.spring.DatabaseObject;
+import org.solarframework.discord.obj.other.ActionServerID;
 
 import java.util.List;
 
 import static org.solarframework.db.spring.DatabaseService.dbService;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 
-@Table(name = "discord_channelinfo", uniqueConstraints = @UniqueConstraint(columnNames = {"ServerID", "ChannelID"}))
+@Entity
+@Table(name = "discord_channelinfo")
+@IdClass(ActionServerID.class)
 public class Discord_ChannelInfo extends DatabaseObject.ID_OBJ<Long, Discord_ChannelInfo> {
     @OneToMany
     @JoinColumn(referencedColumnName = "ID", name = "ServerID")
@@ -24,12 +26,16 @@ public class Discord_ChannelInfo extends DatabaseObject.ID_OBJ<Long, Discord_Cha
     private transient GuildChannel C;
 
     @Id
+    @Column(name = "Action", length = 32, nullable = false)
     private String Action;
     @Id
+    @Column(name = "ServerID", nullable = false)
     private Long ServerID;
 
+    @Column(name = "ChannelID", nullable = false)
     private Long ChannelID;
 
+    public Discord_ChannelInfo() {}
     public Discord_ChannelInfo(Guild G, GuildChannel channel, String action) {
         this.G = G;
         this.C = channel;

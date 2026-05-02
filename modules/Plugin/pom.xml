@@ -10,25 +10,20 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>Discord</artifactId>
+    <artifactId>Plugin</artifactId>
 
     <dependencies>
         <dependency>
-            <groupId>org.solarframework.mu</groupId>
-            <artifactId>Database</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>com.github.MinnDevelopment</groupId>
-            <artifactId>discord-webhooks</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
         <dependency>
-            <groupId>net.dv8tion</groupId>
-            <artifactId>JDA</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.github.classgraph</groupId>
-            <artifactId>classgraph</artifactId>
+            <groupId>org.pf4j</groupId>
+            <artifactId>pf4j-spring</artifactId>
         </dependency>
     </dependencies>
 </project>

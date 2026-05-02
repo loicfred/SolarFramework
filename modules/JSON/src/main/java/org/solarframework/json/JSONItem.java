@@ -1,4 +1,4 @@
-package org.solarframework.core.json;
+package org.solarframework.json;
 
 import com.google.gson.*;
 
@@ -12,7 +12,7 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 
 public class JSONItem implements Serializable {
-    public transient static final Gson GSON = new GsonBuilder()
+    public static final Gson GSON = new GsonBuilder()
             .registerTypeAdapter(LocalDate.class, new LocalDateAdapter())
             .registerTypeAdapter(LocalTime.class, new LocalTimeAdapter())
             .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())

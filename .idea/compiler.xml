@@ -6,26 +6,36 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="core" />
+        <module name="Excel" />
         <module name="AI" />
         <module name="Database" />
-        <module name="core" />
+        <module name="JSON" />
         <module name="Discord" />
-        <module name="Excel" />
         <module name="SSLServer" />
+        <module name="Plugin" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
       <module name="AstralCore-Framework" target="25" />
+      <module name="Database-API" target="25" />
+      <module name="File" target="25" />
+      <module name="ZIP" target="25" />
     </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="AI" options="-parameters" />
       <module name="Database" options="-parameters" />
+      <module name="Database-API" options="-parameters" />
       <module name="Discord" options="-parameters" />
       <module name="Excel" options="-parameters" />
+      <module name="File" options="-parameters" />
+      <module name="JSON" options="-parameters" />
+      <module name="Plugin" options="-parameters" />
       <module name="SSLServer" options="-parameters" />
       <module name="SolarFramework" options="-parameters" />
+      <module name="ZIP" options="-parameters" />
       <module name="core" options="-parameters" />
     </option>
   </component>

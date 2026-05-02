@@ -32,7 +32,7 @@ public class ClassUtils {
         return fields;
     }
     public static List<Field> getSerializableFieldsOfClassFamily(Class<?> clazz) {
-        return getAllFieldsOfClassFamily(clazz).stream().filter(f -> !Modifier.isTransient(f.getModifiers()) && !Modifier.isStatic(f.getModifiers()) && !f.getType().equals(byte[].class)).toList();
+        return getAllFieldsOfClassFamily(clazz).stream().filter(f -> !Modifier.isTransient(f.getModifiers()) && !Modifier.isStatic(f.getModifiers()) && !f.getType().equals(byte[].class) && !f.getType().equals(Byte[].class)).toList();
     }
 
     public static boolean isClassRelated(Object obj, Object obj2) {

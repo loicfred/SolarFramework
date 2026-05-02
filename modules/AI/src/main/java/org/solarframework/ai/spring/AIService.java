@@ -24,8 +24,8 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import static org.solarframework.ai.spring.AIConst.*;
-import static org.solarframework.core.json.JSONItem.GSON;
-import static org.solarframework.core.util.ClassUtils.getAllFieldsOfClassFamily;
+import static org.solarframework.json.JSONItem.GSON;
+import static org.solarframework.core.util.ClassUtils.getSerializableFieldsOfClassFamily;
 
 @Service
 @SuppressWarnings("all")
@@ -117,8 +117,8 @@ public class AIService {
         int i = 0;
         boolean isPrimitive = items.get(0).getClass().isPrimitive() || items.get(0).getClass().equals(String.class);
         for (T item : items) {
-            if (!isPrimitive) for (Field f : getAllFieldsOfClassFamily(item.getClass())) try {
-                if (f.getType().equals(byte[].class) || f.getType().equals(Byte[].class)) f.set(item, null);
+            if (!isPrimitive) for (Field f : getSerializableFieldsOfClassFamily(item.getClass())) try {
+                f.set(item, null);
             } catch (IllegalAccessException ignored) {}
             s.put(i++ + "", item);
         }

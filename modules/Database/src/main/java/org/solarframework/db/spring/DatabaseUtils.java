@@ -11,12 +11,11 @@ import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.solarframework.db.spring.DatabaseService.dbService;
-import static org.solarframework.core.json.JSONItem.GSON;
+import static org.solarframework.json.JSONItem.GSON;
 import static org.solarframework.core.util.ClassUtils.*;
 
 public class DatabaseUtils {
@@ -344,7 +343,7 @@ public class DatabaseUtils {
         }
     }
 
-    protected static String getTableName(Class<?> clazz) {
+    public static String getTableName(Class<?> clazz) {
         Table annotation = clazz.getAnnotation(Table.class);
         if (annotation != null && !annotation.name().isEmpty()) return annotation.name().toLowerCase();
         return clazz.getSimpleName().toLowerCase();
@@ -443,17 +442,43 @@ public class DatabaseUtils {
             this.newParams = newParams.toArray();
         }
     }
-    protected static class DatabaseStats {
+    public static class DatabaseStats {
         public int totalTables = 0;
         public int totalViews = 0;
         public long totalRows = 0;
         public List<String> tableNames = new ArrayList<>();
         public List<String> viewNames = new ArrayList<>();
+
+        public int getTotalTables() {
+            return totalTables;
+        }
+        public int getTotalViews() {
+            return totalViews;
+        }
+        public long getTotalRows() {
+            return totalRows;
+        }
+        public List<String> getTableNames() {
+            return tableNames;
+        }
+        public List<String> getViewNames() {
+            return viewNames;
+        }
     }
-    protected static class TableStats {
+    public static class TableStats {
         public String tableName;
         public long totalRows = 0;
         public List<String> columnNames = new ArrayList<>();
+
+        public String getTableName() {
+            return tableName;
+        }
+        public long getTotalRows() {
+            return totalRows;
+        }
+        public List<String> getColumnNames() {
+            return columnNames;
+        }
     }
 
 }

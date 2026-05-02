@@ -1,5 +1,13 @@
 package org.solarframework.db.spring;
 
+import org.hibernate.SessionFactory;
+import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.registry.StandardServiceRegistry;
+import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.pf4j.PluginManager;
+import org.pf4j.PluginWrapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cache.Cache;
@@ -11,14 +19,12 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
 import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.ClassUtils.*;
@@ -27,6 +33,8 @@ import static org.solarframework.db.spring.DatabaseUtils.*;
 @Service
 @SuppressWarnings("all")
 public class DatabaseService {
+    private static final Logger log = LoggerFactory.getLogger(DatabaseService.class);
+
     public static DatabaseService dbService;
     @EventListener(ApplicationReadyEvent.class)
     public void setStaticReference() {
@@ -35,12 +43,13 @@ public class DatabaseService {
 
     protected final ApplicationContext context;
     protected final CacheManager dbCacheManager;
-
+    protected final DataSource dataSource;
     protected final JdbcTemplate jdbcTemplate;
 
-    public DatabaseService(ApplicationContext context, @Qualifier("databaseCacheManager") CacheManager dbCacheManager, JdbcTemplate jdbcTemplate) {
+    public DatabaseService(ApplicationContext context, @Qualifier("databaseCacheManager") CacheManager dbCacheManager, JdbcTemplate jdbcTemplate, DataSource dataSource) {
         this.context = context;
         this.dbCacheManager = dbCacheManager;
+        this.dataSource = dataSource;
         this.jdbcTemplate = jdbcTemplate;
     }
 
@@ -322,5 +331,63 @@ public class DatabaseService {
         }
         sql += "\n);";
         return doUpdate(sql) > 0;
+    }
+
+    public void createSchema(List<Class<?>> clz) {
+        try (SessionFactory sess = getSessionFactory(clz, "create")) {
+            log.info("Created tables for classes:\n" + clz.stream().map((Class c ) -> "- " + c.getSimpleName()).collect(Collectors.joining("\n")));
+        }
+    }
+    public void updateSchema(List<Class<?>> clz) {
+        try (SessionFactory sess = getSessionFactory(clz, "update")) {
+            log.info("Updated tables for classes:\n" + clz.stream().map((Class c ) -> "- " + c.getSimpleName()).collect(Collectors.joining("\n")));
+        }
+    }
+    private SessionFactory getSessionFactory(List<Class<?>> clz, String hb2ddl) {
+        List<ClassLoader> loaders = new ArrayList<>();
+        loaders.add(Thread.currentThread().getContextClassLoader());
+
+        try {
+            PluginManager pluginManager = (PluginManager) context.getBean(Class.forName("org.pf4j.PluginManager"));
+            if (pluginManager != null) for (PluginWrapper c : pluginManager.getPlugins()) loaders.add(c.getPluginClassLoader());
+        } catch (Exception ignored) {}
+
+        StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
+                .applySetting("hibernate.connection.datasource", dataSource)
+                .applySetting("hibernate.dialect", "org.hibernate.dialect.MariaDBDialect")
+                .applySetting("hibernate.hbm2ddl.auto", "update")
+                .applySetting("hibernate.classLoaders", loaders).build();
+        MetadataSources metadata = new MetadataSources(registry);
+        for (Class<?> c : clz) metadata.addAnnotatedClass(c);
+        return metadata.buildMetadata().buildSessionFactory();
+    }
+
+    public void updateSchemaTest(List<Class<?>> clz) {
+        for (Class<?> c : clz) {
+            try (SessionFactory sess = getSessionFactoryTest(c, "create")) {
+                log.info("Updated tables for class: " + c.getSimpleName());
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    private SessionFactory getSessionFactoryTest(Class<?> clz, String hb2ddl) {
+        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(clz.getClassLoader());
+            StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
+                    .applySetting("hibernate.connection.datasource", dataSource)
+                    .applySetting("hibernate.dialect", "org.hibernate.dialect.MariaDBDialect")
+                    .applySetting("hibernate.hbm2ddl.auto", hb2ddl)
+                    .build();
+            MetadataSources metadata = new MetadataSources(registry);
+            metadata.addAnnotatedClass(clz);
+            return metadata.buildMetadata().buildSessionFactory();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        } finally {
+            Thread.currentThread().setContextClassLoader(original);
+        }
     }
 }

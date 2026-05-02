@@ -1,10 +1,10 @@
 package org.solarframework.discord.obj;
 
 import club.minnced.discord.webhook.send.WebhookMessageBuilder;
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import jakarta.persistence.*;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.*;
+import org.hibernate.annotations.ColumnDefault;
 import org.solarframework.core.lang.Nationalities;
 import org.solarframework.db.spring.DatabaseObject;
 
@@ -15,11 +15,9 @@ import static org.solarframework.core.util.ImageUtils.getDominantColor;
 import static org.solarframework.core.util.OtherUtils.getHexValue;
 import static org.solarframework.db.spring.DatabaseService.dbService;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
-import static org.solarframework.discord.core.DefaultListener.LogCommand;
-import static org.solarframework.discord.utils.UserUtils.getUserByID;
 
+@Entity
 @Table(name = "discord_guildinfo")
-@JsonAutoDetect(fieldVisibility = JsonAutoDetect.Visibility.ANY, getterVisibility = JsonAutoDetect.Visibility.NONE, isGetterVisibility = JsonAutoDetect.Visibility.NONE)
 public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_GuildInfo> {
     private transient Guild Guild;
 
@@ -30,23 +28,64 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     @JoinColumn(referencedColumnName = "ID", name = "ServerID")
     private transient List<Discord_ChannelInfo> Channels;
 
-    public long OwnerID;
-    public int MemberCount = 0;
-    public String Name;
-    public String Description;
-    public String Story;
-    public String DominantColorcode;
-    public String InviteLink;
-    public String IconUrl;
-    public Nationalities Nationality;
-    public String WebsiteURL;
-    public String TwitterURL;
-    public String TwitchURL;
-    public String YouTubeURL;
-    public String InstagramURL;
-    public String TiktokURL;
-    public boolean Public;
-    public boolean Trusted;
+
+    @Column(name = "OwnerID", nullable = false)
+    private Long ownerID;
+
+    @ColumnDefault("0")
+    @Column(name = "MemberCount", nullable = false)
+    private Integer memberCount;
+
+    @Column(name = "Name", nullable = false, length = 256)
+    private String name;
+
+    @Column(name = "Description", nullable = false, length = 2048)
+    private String description;
+
+    @Column(name = "Story", length = 2048)
+    private String story;
+
+    @ColumnDefault("'#808080'")
+    @Column(name = "DominantColorcode", nullable = false, length = 7)
+    private String dominantColorcode;
+
+    @Column(name = "InviteLink", length = 128)
+    private String inviteLink;
+
+    @Column(name = "IconUrl", nullable = false, length = 256)
+    private String iconUrl;
+
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'International'")
+    @Column(name = "Nationality", nullable = false, length = 32)
+    private Nationalities nationality = Nationalities.International;
+
+    @Column(name = "WebsiteURL", length = 256)
+    private String websiteURL;
+
+    @Column(name = "TwitterURL", length = 256)
+    private String twitterURL;
+
+    @Column(name = "TwitchURL", length = 256)
+    private String twitchURL;
+
+    @Column(name = "YouTubeURL", length = 256)
+    private String youTubeURL;
+
+    @Column(name = "InstagramURL", length = 256)
+    private String instagramURL;
+
+    @Column(name = "TiktokURL", length = 256)
+    private String tiktokURL;
+
+    @ColumnDefault("0")
+    @Column(name = "Public", nullable = false)
+    private Boolean publicField;
+
+    @ColumnDefault("0")
+    @Column(name = "Trusted", nullable = false)
+    private Boolean trusted;
+
 
     public Guild getGuild() {
         return Guild == null ? Guild = DiscordAccount.getGuildById(ID) : Guild;
@@ -58,112 +97,131 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         return Channels;
     }
 
-    public long getOwnerID() {
-        return OwnerID;
+    public Long getOwnerID() {
+        return ownerID;
     }
-    public int getMemberCount() {
-        return MemberCount;
+    public void setOwnerID(Long ownerID) {
+        this.ownerID = ownerID;
     }
+
+    public Integer getMemberCount() {
+        return memberCount;
+    }
+    public void setMemberCount(Integer memberCount) {
+        this.memberCount = memberCount;
+    }
+
     public String getName() {
-        return Name;
+        return name;
     }
+    public void setName(String name) {
+        this.name = name;
+    }
+
     public String getDescription() {
-        return Description;
+        return description;
     }
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
     public String getStory() {
-        return Story;
+        return story;
     }
+    public void setStory(String story) {
+        this.story = story;
+    }
+
     public String getDominantColorcode() {
-        return DominantColorcode;
+        return dominantColorcode;
     }
+    public void setDominantColorcode(String dominantColorcode) {
+        this.dominantColorcode = dominantColorcode;
+    }
+
     public String getInviteLink() {
-        return InviteLink;
+        return inviteLink;
     }
+    public void setInviteLink(String inviteLink) {
+        this.inviteLink = inviteLink;
+    }
+
     public String getIconUrl() {
-        return IconUrl;
+        return iconUrl;
     }
+    public void setIconUrl(String iconUrl) {
+        this.iconUrl = iconUrl;
+    }
+
     public Nationalities getNationality() {
-        return Nationality;
+        return nationality;
     }
+    public void setNationality(Nationalities nationality) {
+        this.nationality = nationality;
+    }
+
     public String getWebsiteURL() {
-        return WebsiteURL;
+        return websiteURL;
     }
+    public void setWebsiteURL(String websiteURL) {
+        this.websiteURL = websiteURL;
+    }
+
     public String getTwitterURL() {
-        return TwitterURL;
+        return twitterURL;
     }
+    public void setTwitterURL(String twitterURL) {
+        this.twitterURL = twitterURL;
+    }
+
     public String getTwitchURL() {
-        return TwitchURL;
+        return twitchURL;
     }
+    public void setTwitchURL(String twitchURL) {
+        this.twitchURL = twitchURL;
+    }
+
     public String getYouTubeURL() {
-        return YouTubeURL;
+        return youTubeURL;
     }
+    public void setYouTubeURL(String youTubeURL) {
+        this.youTubeURL = youTubeURL;
+    }
+
     public String getInstagramURL() {
-        return InstagramURL;
+        return instagramURL;
     }
+    public void setInstagramURL(String instagramURL) {
+        this.instagramURL = instagramURL;
+    }
+
     public String getTiktokURL() {
-        return TiktokURL;
+        return tiktokURL;
     }
-    public boolean isPublic() {
-        return Public;
+    public void setTiktokURL(String tiktokURL) {
+        this.tiktokURL = tiktokURL;
     }
-    public boolean isTrusted() {
-        return Trusted;
+
+    public Boolean getPublicField() {
+        return publicField;
+    }
+    public void setPublicField(Boolean publicField) {
+        this.publicField = publicField;
+    }
+
+    public Boolean getTrusted() {
+        return trusted;
+    }
+    public void setTrusted(Boolean trusted) {
+        this.trusted = trusted;
     }
 
     public Color getColor() {
-        return Color.decode(DominantColorcode);
-    }
-
-    public void setOwnerID(long ownerID) {
-        OwnerID = ownerID;
-    }
-    public void setMemberCount(int memberCount) {
-        MemberCount = memberCount;
-    }
-    public void setName(String name) {
-        Name = name;
-    }
-    public void setDescription(String description) {
-        Description = description;
-    }
-    public void setStory(String story) {
-        Story = story;
-    }
-    public void setDominantColorcode(String dominantColorcode) {
-        DominantColorcode = dominantColorcode;
-    }
-    public void setInviteLink(String inviteLink) {
-        InviteLink = inviteLink;
-    }
-    public void setIconUrl(String iconUrl) {
-        IconUrl = iconUrl;
-    }
-    public void setNationality(Nationalities nationality) {
-        Nationality = nationality;
-    }
-    public void setWebsiteURL(String websiteURL) {
-        WebsiteURL = websiteURL;
-    }
-    public void setTwitterURL(String twitterURL) {
-        TwitterURL = twitterURL;
-    }
-    public void setTwitchURL(String twitchURL) {
-        TwitchURL = twitchURL;
-    }
-    public void setYouTubeURL(String youTubeURL) {
-        YouTubeURL = youTubeURL;
-    }
-    public void setInstagramURL(String instagramURL) {
-        InstagramURL = instagramURL;
-    }
-    public void setTiktokURL(String tiktokURL) {
-        TiktokURL = tiktokURL;
-    }
-    public void setPublic(boolean aPublic) {
-        Public = aPublic;
-    }
-    public void setTrusted(boolean trusted) {
-        Trusted = trusted;
+        try {
+            return Color.decode(getDominantColorcode());
+        } catch (Exception e) {
+            return Color.GRAY;
+        }
     }
 
     public EmbedBuilder makeServerEmbed() {
@@ -178,7 +236,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     }
 
 
-    protected Discord_GuildInfo() {}
+    public Discord_GuildInfo() {}
     public Discord_GuildInfo(Guild guild) {
         this.Guild = guild;
         if (this.Guild == null || getGuild().isDetached()) throw new NullPointerException("No Guild with given id.");
@@ -200,7 +258,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
             setMemberCount(getGuild().getMemberCount());
             setDescription(getGuild().getDescription());
             setIconUrl(getGuild().getIconUrl());
-            if (getGuild().getFeatures().contains("COMMUNITY") && Nationality == Nationalities.International) setNationality(Nationalities.get(getGuild().getLocale().getLanguageName()));
+            if (getGuild().getFeatures().contains("COMMUNITY") && getNationality() == Nationalities.International) setNationality(Nationalities.get(getGuild().getLocale().getLanguageName()));
             if (getGuild().getVanityCode() != null) setInviteLink("https://discord.gg/" + getGuild().getVanityCode());
             setDominantColorcode(getHexValue(getDominantColor(getGuild().getIconUrl())));
         } catch (Exception ignored) {}

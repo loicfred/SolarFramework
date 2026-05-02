@@ -20,6 +20,8 @@
         <module>modules/Discord</module>
         <module>modules/Excel</module>
         <module>modules/SSLServer</module>
+        <module>modules/Plugin</module>
+        <module>modules/JSON</module>
     </modules>
 
     <repositories>
@@ -39,20 +41,9 @@
 
     <dependencies>
         <dependency>
-            <groupId>com.google.code.gson</groupId>
-            <artifactId>gson</artifactId>
-        </dependency>
-        <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.json</groupId>
-            <artifactId>json</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
+            <optional>true</optional>
         </dependency>
     </dependencies>
 
@@ -66,6 +57,11 @@
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
                 <artifactId>Database</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>Database-API</artifactId>
                 <version>1.0</version>
             </dependency>
             <dependency>
@@ -86,6 +82,16 @@
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
                 <artifactId>SSLServer</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>JSON</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>Plugin</artifactId>
                 <version>1.0</version>
             </dependency>
 
