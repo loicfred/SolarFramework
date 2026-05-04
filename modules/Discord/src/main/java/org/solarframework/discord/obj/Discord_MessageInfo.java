@@ -25,18 +25,18 @@ public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
 
     @Id
     @Column(name = "Action", length = 32, nullable = false)
-    public String Action;
+    private String Action;
     @Id
     @Column(name = "ServerID", nullable = false)
-    public Long ServerID;
+    private Long ServerID;
 
     @Column(name = "ChannelID", nullable = false)
-    public Long ChannelID;
+    private Long ChannelID;
     @Column(name = "MessageID", nullable = false)
-    public Long MessageID;
+    private Long MessageID;
 
     @Column(name = "ChannelAction", length = 32, nullable = false)
-    public String ChannelAction;
+    private String ChannelAction;
 
     public Discord_MessageInfo() {}
     public Discord_MessageInfo(String channelAction, Long serverId, Long channelId) {

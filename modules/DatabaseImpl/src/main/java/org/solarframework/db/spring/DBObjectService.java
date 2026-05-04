@@ -1,8 +1,6 @@
 package org.solarframework.db.spring;
 
-import jakarta.persistence.Column;
 import jakarta.persistence.Id;
-import jakarta.persistence.MappedSuperclass;
 import org.springframework.jdbc.core.RowMapper;
 
 import java.lang.reflect.Field;
@@ -10,24 +8,33 @@ import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.solarframework.db.spring.DatabaseService.dbService;
+import static org.solarframework.core.util.ClassUtils.*;
+import static org.solarframework.core.util.ClassUtils.getAllFieldsOfClassFamily;
+import static org.solarframework.core.util.ClassUtils.setFieldValue;
 import static org.solarframework.db.spring.DatabaseUtils.getTableName;
 import static org.solarframework.db.spring.DatabaseUtils.mapResultSetToObject;
+import static org.solarframework.db.spring.Provider.dbService;
 import static org.solarframework.json.JSONItem.GSON;
-import static org.solarframework.core.util.ClassUtils.*;
 
 @SuppressWarnings("all")
-public abstract class DatabaseObject<T> {
+public class DBObjectService<T> implements IDBObjectService<T> {
     protected transient Class<T> entityClass;
     protected transient List<Field> cachedFields = new ArrayList<>();
-    protected transient RowMapper<T> rowMapper;
     protected transient String tableName;
     protected transient List<String> idFields = new ArrayList<>();
     protected transient List<String> cacheHashes = new ArrayList<>();
+    protected transient RowMapper<T> rowMapper;
+    protected DatabaseObject<T> dbObject;
 
 
-    protected DatabaseObject() {
-        this.entityClass = (Class<T>) getClass();
+    public List<String> getCacheHashes() {
+        return cacheHashes;
+    }
+
+
+    public DBObjectService(DatabaseObject<T> obj) {
+        dbObject = obj;
+        this.entityClass = (Class<T>) dbObject.getClass();
         this.tableName = getTableName(entityClass);
 
         this.cachedFields.addAll(getSerializableFieldsOfClassFamily(entityClass).stream().collect(Collectors.toList()));
@@ -37,17 +44,17 @@ public abstract class DatabaseObject<T> {
         this.rowMapper = (rs, rowNum) -> mapResultSetToObject(rs, entityClass);
     }
 
-    protected String getHashedIdentifier() {
+    public String getHashedIdentifier() {
         List<Object> ids = cachedFields.stream().filter(f -> idFields.contains(f.getName().toLowerCase())).map(f -> getFieldValue(f, this)).toList();
         return entityClass.getName() + String.valueOf(ids.stream().map(Object::toString).collect(Collectors.joining("/")).hashCode());
     }
 
-
+    @Override
     public String toJSON() {
         return GSON.toJson(this);
     }
 
-
+    @Override
     public int Write() {
         try {
             ParameterManager parameterManager = getResult(false);
@@ -56,9 +63,10 @@ public abstract class DatabaseObject<T> {
         } catch (Exception e) {
             throw new RuntimeException("Failed to write object", e);
         } finally {
-            dbService.resetCacheFor(this);
+            dbService.resetCacheFor(dbObject);
         }
     }
+    @Override
     public Optional<T> WriteThenReturn() {
         try {
             ParameterManager parameterManager = getResult(false);
@@ -71,6 +79,7 @@ public abstract class DatabaseObject<T> {
         }
     }
 
+    @Override
     public int Upsert() {
         try {
             ParameterManager parameterManager = getResult(true);
@@ -82,6 +91,7 @@ public abstract class DatabaseObject<T> {
             dbService.resetCacheFor(this);
         }
     }
+    @Override
     public Optional<T> UpsertThenReturn() {
         try {
             ParameterManager parameterManager = getResult(true);
@@ -95,6 +105,7 @@ public abstract class DatabaseObject<T> {
     }
 
 
+    @Override
     public int IncrementColumn(String column, int amount) {
         try {
             for (Field f : cachedFields) {
@@ -122,6 +133,7 @@ public abstract class DatabaseObject<T> {
             dbService.resetCacheFor(this);
         }
     }
+    @Override
     public int IncrementColumns(Map<String, Object> parameters) {
         try {
             String setClause = parameters.entrySet().stream().map(f -> f.getKey() + " = " + f.getKey() + " + ?").collect(Collectors.joining(", "));
@@ -144,6 +156,7 @@ public abstract class DatabaseObject<T> {
     }
 
 
+    @Override
     public int Update() {
         try {
             String setClause = cachedFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(", "));
@@ -165,6 +178,7 @@ public abstract class DatabaseObject<T> {
             dbService.resetCacheFor(this);
         }
     }
+    @Override
     public int UpdateOnly(String... columns) {
         try {
             List<Field> fieldsList = Arrays.stream(columns).noneMatch(c -> cachedFields.stream().anyMatch(f -> Objects.equals(c, f.getName()))) ?
@@ -190,6 +204,7 @@ public abstract class DatabaseObject<T> {
     }
 
 
+    @Override
     public int Delete() {
         try {
             List<Object> whereValues = idFields.stream().map(ID -> getFieldValue(cachedFields.stream().filter(f -> f.getName().equalsIgnoreCase(ID)).findFirst().orElseThrow(), this)).collect(Collectors.toList());
@@ -204,17 +219,21 @@ public abstract class DatabaseObject<T> {
     }
 
 
-    public <T> T refetchAttribute(String attributeName, Class<T> attributeType) {
+    @Override
+    public <A> A refetchAttribute(String attributeName, Class<A> attributeType) {
         Field attribute = getAllFieldsOfClassFamily(this.getClass()).stream().filter(f -> f.getName().equalsIgnoreCase(attributeName)).findFirst().orElse(null);
         if (attribute == null) return null;
         String whereClause = idFields.stream().map(ID -> ID + " = ?").collect(Collectors.joining(" AND "));
         List<Object> whereValues = idFields.stream().map(ID -> getFieldValue(cachedFields.stream().filter(f -> f.getName().equalsIgnoreCase(ID)).findFirst().orElseThrow(), this)).collect(Collectors.toList());
-        T val = dbService.getSingleColumnOfTableWhere(attribute.getName(), attributeType, entityClass, whereClause, whereValues.toArray()).orElse(null);
+        A val = dbService.getSingleColumnOfTableWhere(attribute.getName(), attributeType, entityClass, whereClause, whereValues.toArray()).orElse(null);
         setFieldValue(attribute,this, val);
         return val;
     }
 
-
+    @Override
+    public DatabaseObject<T> getDBObject() {
+        return dbObject;
+    }
 
 
     private record ParameterManager(String columnsSeparatedByComma, String questionMarksSeparatedByComma, Object[] currentValuesList, String duplicateKeyUpdateClause) {}
@@ -229,21 +248,5 @@ public abstract class DatabaseObject<T> {
         if (!update) return new ParameterManager(columnsSeparatedByComma, questionMarksSeparatedByComma, currentValuesList.toArray(), null);
         String duplicateKeyUpdateClause = cachedFields.stream().map(f -> f.getName() + " = VALUES(" + f.getName() + ")").collect(Collectors.joining(", "));
         return new ParameterManager(columnsSeparatedByComma, questionMarksSeparatedByComma, currentValuesList.toArray(), duplicateKeyUpdateClause);
-    }
-
-    @MappedSuperclass
-    public static class ID_OBJ<IDTYPE, T> extends DatabaseObject<T> {
-        @Id
-        @Column(name = "ID")
-        public IDTYPE ID;
-
-        public IDTYPE getID() {
-            return ID;
-        }
-        public void setID(IDTYPE ID) {
-            this.ID = ID;
-        }
-
-        protected ID_OBJ() {}
     }
 }

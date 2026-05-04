@@ -95,11 +95,8 @@ public class ImageUtils {
     }
     public static BufferedImage replaceAllMatchingColor(BufferedImage image, Color oldColor, Color newColor, int tolerance) throws IOException {
         if (image == null) throw new IOException("Invalid image.");
-        int width = image.getWidth();
-        int height = image.getHeight();
-        int targetR = oldColor.getRed();
-        int targetG = oldColor.getGreen();
-        int targetB = oldColor.getBlue();
+        int width = image.getWidth(), height = image.getHeight();
+        int targetR = oldColor.getRed(), targetG = oldColor.getGreen(), targetB = oldColor.getBlue();
         int newRGBA = newColor.getRGB();
 
         BufferedImage result = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
@@ -120,6 +117,113 @@ public class ImageUtils {
         }
         return result;
     }
+
+
+
+    public static BufferedImage reducePixelColor(File input, Color rgbRemove, boolean isZeroTransparent) throws IOException {
+        return reducePixelColor(ImageIO.read(input), rgbRemove, isZeroTransparent);
+    }
+    public static BufferedImage reducePixelColor(String url, Color rgbRemove, boolean isZeroTransparent) throws IOException {
+        return reducePixelColor(ImageIO.read(URI.create(url).toURL()), rgbRemove, isZeroTransparent);
+    }
+    public static BufferedImage reducePixelColor(InputStream image, Color rgbRemove, boolean isZeroTransparent) throws IOException {
+        return reducePixelColor(ImageIO.read(image), rgbRemove, isZeroTransparent);
+    }
+    public static BufferedImage reducePixelColor(byte[] imageBytes, Color rgbRemove, boolean isZeroTransparent) throws IOException {
+        try (InputStream is = new ByteArrayInputStream(imageBytes)) {
+            return reducePixelColor(ImageIO.read(is), rgbRemove, isZeroTransparent);
+        }
+    }
+    public static BufferedImage reducePixelColor(BufferedImage image, Color rgbRemove, boolean isZeroTransparent) throws IOException {
+        if (image == null) throw new IOException("Invalid image.");
+        int width = image.getWidth();
+        int height = image.getHeight();
+
+        int removeR = rgbRemove.getRed();
+        int removeG = rgbRemove.getGreen();
+        int removeB = rgbRemove.getBlue();
+        int removeA = rgbRemove.getAlpha();
+
+        BufferedImage result = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+
+                int pixel = image.getRGB(x, y);
+
+                int a = (pixel >> 24) & 0xff;
+                int r = (pixel >> 16) & 0xff;
+                int g = (pixel >> 8) & 0xff;
+                int b = pixel & 0xff;
+
+                r = Math.max(0, r - removeR);
+                g = Math.max(0, g - removeG);
+                b = Math.max(0, b - removeB);
+                a = Math.max(0, a - removeA);
+
+                // optional rule: fully transparent if black
+                if (isZeroTransparent && r == 0 && g == 0 && b == 0) a = 0;
+                int newPixel = (a << 24) | (r << 16) | (g << 8) | b;
+                result.setRGB(x, y, newPixel);
+            }
+        }
+        return result;
+    }
+
+
+   public static BufferedImage reducePixelColorWithRoof(File input, Color rgbRemove, Color roof, boolean isZeroTransparent) throws IOException {
+        return reducePixelColorWithRoof(ImageIO.read(input), rgbRemove, roof, isZeroTransparent);
+    }
+    public static BufferedImage reducePixelColorWithRoof(String url, Color rgbRemove, Color roof, boolean isZeroTransparent) throws IOException {
+        return reducePixelColorWithRoof(ImageIO.read(URI.create(url).toURL()), rgbRemove, roof, isZeroTransparent);
+    }
+    public static BufferedImage reducePixelColorWithRoof(InputStream image, Color rgbRemove, Color roof, boolean isZeroTransparent) throws IOException {
+        return reducePixelColorWithRoof(ImageIO.read(image), rgbRemove, roof, isZeroTransparent);
+    }
+    public static BufferedImage reducePixelColorWithRoof(byte[] imageBytes, Color rgbRemove, Color roof, boolean isZeroTransparent) throws IOException {
+        try (InputStream is = new ByteArrayInputStream(imageBytes)) {
+            return reducePixelColorWithRoof(ImageIO.read(is), rgbRemove, roof, isZeroTransparent);
+        }
+    }
+    public static BufferedImage reducePixelColorWithRoof(BufferedImage image, Color rgbRemove, Color roof, boolean isZeroTransparent) throws IOException {
+        if (image == null) throw new IOException("Invalid image.");
+        int width = image.getWidth();
+        int height = image.getHeight();
+
+        int removeR = rgbRemove.getRed();
+        int removeG = rgbRemove.getGreen();
+        int removeB = rgbRemove.getBlue();
+        int removeA = rgbRemove.getAlpha();
+
+        BufferedImage result = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+
+                int pixel = image.getRGB(x, y);
+
+                int a = (pixel >> 24) & 0xff;
+                int r = (pixel >> 16) & 0xff;
+                int g = (pixel >> 8) & 0xff;
+                int b = pixel & 0xff;
+
+                if (r <= roof.getRed() && g <= roof.getGreen() && b <= roof.getBlue() && a <= roof.getAlpha()) {
+                    r = Math.max(0, r - removeR);
+                    g = Math.max(0, g - removeG);
+                    b = Math.max(0, b - removeB);
+                    a = Math.max(0, a - removeA);
+                    if (isZeroTransparent && r == 0 && g == 0 && b == 0) a = 0;
+                }
+
+                // optional rule: fully transparent if black
+                int newPixel = (a << 24) | (r << 16) | (g << 8) | b;
+                result.setRGB(x, y, newPixel);
+            }
+        }
+        return result;
+    }
+
+
 
     public static BufferedImage fillImageWhiteBlack(BufferedImage input, Color white, Color black) throws IOException {
         if (input == null) throw new IOException("Invalid image.");

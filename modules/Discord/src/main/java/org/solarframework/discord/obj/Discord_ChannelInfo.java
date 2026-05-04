@@ -11,13 +11,13 @@ import org.solarframework.discord.obj.other.ActionServerID;
 
 import java.util.List;
 
-import static org.solarframework.db.spring.DatabaseService.dbService;
+import static org.solarframework.db.spring.Provider.dbService;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 
 @Entity
 @Table(name = "discord_channelinfo")
 @IdClass(ActionServerID.class)
-public class Discord_ChannelInfo extends DatabaseObject.ID_OBJ<Long, Discord_ChannelInfo> {
+public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
     @OneToMany
     @JoinColumn(referencedColumnName = "ID", name = "ServerID")
     private transient List<Discord_MessageInfo> Messages;
@@ -88,7 +88,7 @@ public class Discord_ChannelInfo extends DatabaseObject.ID_OBJ<Long, Discord_Cha
     }
 
     public List<Discord_MessageInfo> getMessages() {
-        return Messages == null ? Messages = dbService.getAllWhere(Discord_MessageInfo.class, "ChannelID = ? AND ChannelAction = ?", getID(), getAction()) : Messages;
+        return Messages == null ? Messages = dbService.getAllWhere(Discord_MessageInfo.class, "ChannelID = ? AND ChannelAction = ?", getChannelID(), getAction()) : Messages;
     }
 
     public Discord_MessageInfo newEmptyMessage() {

@@ -15,13 +15,14 @@
     <packaging>pom</packaging>
     <modules>
         <module>core</module>
-        <module>modules/Database</module>
+        <module>modules/DatabaseImpl</module>
         <module>modules/AI</module>
         <module>modules/Discord</module>
         <module>modules/Excel</module>
         <module>modules/SSLServer</module>
         <module>modules/Plugin</module>
         <module>modules/JSON</module>
+        <module>modules/DatabaseAPI</module>
     </modules>
 
     <repositories>
@@ -56,12 +57,12 @@
             </dependency>
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
-                <artifactId>Database</artifactId>
+                <artifactId>DatabaseImpl</artifactId>
                 <version>1.0</version>
             </dependency>
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
-                <artifactId>Database-API</artifactId>
+                <artifactId>DatabaseAPI</artifactId>
                 <version>1.0</version>
             </dependency>
             <dependency>

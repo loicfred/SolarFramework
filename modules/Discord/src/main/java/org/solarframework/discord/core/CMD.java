@@ -21,7 +21,7 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.TimeUtils.getNow;
-import static org.solarframework.db.spring.DatabaseService.dbService;
+import static org.solarframework.db.spring.Provider.dbService;
 import static org.solarframework.discord.core.BotBuilder.LogChannel;
 import static org.solarframework.discord.lang.L10N.SYSL;
 import static org.solarframework.discord.lang.L10N.SYSLG;

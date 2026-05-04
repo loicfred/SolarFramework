@@ -4,7 +4,6 @@ import club.minnced.discord.webhook.send.WebhookMessageBuilder;
 import jakarta.persistence.*;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.*;
-import org.hibernate.annotations.ColumnDefault;
 import org.solarframework.core.lang.Nationalities;
 import org.solarframework.db.spring.DatabaseObject;
 
@@ -13,7 +12,7 @@ import java.util.List;
 
 import static org.solarframework.core.util.ImageUtils.getDominantColor;
 import static org.solarframework.core.util.OtherUtils.getHexValue;
-import static org.solarframework.db.spring.DatabaseService.dbService;
+import static org.solarframework.db.spring.Provider.dbService;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 
 @Entity
@@ -32,7 +31,6 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     @Column(name = "OwnerID", nullable = false)
     private Long ownerID;
 
-    @ColumnDefault("0")
     @Column(name = "MemberCount", nullable = false)
     private Integer memberCount;
 
@@ -45,7 +43,6 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     @Column(name = "Story", length = 2048)
     private String story;
 
-    @ColumnDefault("'#808080'")
     @Column(name = "DominantColorcode", nullable = false, length = 7)
     private String dominantColorcode;
 
@@ -56,7 +53,6 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     private String iconUrl;
 
     @Enumerated(EnumType.STRING)
-    @ColumnDefault("'International'")
     @Column(name = "Nationality", nullable = false, length = 32)
     private Nationalities nationality = Nationalities.International;
 
@@ -78,11 +74,9 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     @Column(name = "TiktokURL", length = 256)
     private String tiktokURL;
 
-    @ColumnDefault("0")
     @Column(name = "Public", nullable = false)
     private Boolean publicField;
 
-    @ColumnDefault("0")
     @Column(name = "Trusted", nullable = false)
     private Boolean trusted;
 

@@ -8,6 +8,9 @@ import org.pf4j.PluginManager;
 import org.pf4j.PluginWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.solarframework.db.spring.dto.DatabaseStats;
+import org.solarframework.db.spring.dto.Row;
+import org.solarframework.db.spring.dto.TableStats;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cache.Cache;
@@ -24,21 +27,22 @@ import java.lang.reflect.Field;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.ClassUtils.*;
 import static org.solarframework.db.spring.DatabaseUtils.*;
+import static org.solarframework.db.spring.Provider.dbService;
 
 @Service
 @SuppressWarnings("all")
-public class DatabaseService {
+public class DatabaseService implements IDatabaseService {
     private static final Logger log = LoggerFactory.getLogger(DatabaseService.class);
 
-    public static DatabaseService dbService;
     @EventListener(ApplicationReadyEvent.class)
     public void setStaticReference() {
-        DatabaseService.dbService = context.getBean(DatabaseService.class);
+        dbService = context.getBean(DatabaseService.class);
     }
 
     protected final ApplicationContext context;
@@ -55,6 +59,11 @@ public class DatabaseService {
 
     public CacheManager getDbCacheManager() {
         return dbCacheManager;
+    }
+
+    @Override
+    public <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject) {
+        return new DBObjectService<>(dbobject);
     }
 
     // ====== SHORT CUTS ======
@@ -223,19 +232,25 @@ public class DatabaseService {
         Cache cache = dbCacheManager.getCache(cacheName);
         if (cache != null) cache.clear();
     }
+
+
+    @Override
+    public void resetCacheFor(IDBObjectService<?> dbobject) {
+        resetCacheFor(dbobject.getDBObject());
+    }
     public void resetCacheFor(DatabaseObject<?> dbobject) {
         Cache cache = dbCacheManager.getCache("DBObject");
         if (cache == null) return;
         com.github.benmanes.caffeine.cache.Cache<Object, Object> nativeCache = (com.github.benmanes.caffeine.cache.Cache<Object, Object>) cache.getNativeCache();
         nativeCache.asMap().forEach((key, cacheItem) -> {
             if (cacheItem instanceof DatabaseObject<?> V) {
-                if (V.cacheHashes.contains(dbobject.getHashedIdentifier())) {
+                if (V.getService().getCacheHashes().contains(dbobject.getHashedIdentifier())) {
                     copyObject(V, dbobject);
                 }
             } else if (cacheItem instanceof List<?> V2) { // If the item cached is a list
                 if (V2.isEmpty()) cache.evict(key);
                 if (V2.getFirst() instanceof DatabaseObject<?>) { // Check if the datatype of the cache list is the same as the current item
-                    Object found = V2.stream().filter(dbo -> ((DatabaseObject<?>)dbo).cacheHashes.contains(dbobject.getHashedIdentifier())).findFirst().orElseGet(() -> {
+                    Object found = V2.stream().filter(dbo -> ((DatabaseObject<?>)dbo).getService().getCacheHashes().contains(dbobject.getHashedIdentifier())).findFirst().orElseGet(() -> {
                         cache.evict(key);
                         return null;
                     });
@@ -283,13 +298,16 @@ public class DatabaseService {
                 }
             }
 
-            stats.totalRows = jdbcTemplate.queryForObject("""
-            SELECT SUM(TABLE_ROWS) AS total_rows
-            FROM information_schema.tables
-            WHERE table_schema = DATABASE()
-            AND TABLE_TYPE = 'BASE TABLE';
-            """, Long.class).intValue();
-
+            try {
+                stats.totalRows = jdbcTemplate.queryForObject("""
+                SELECT SUM(TABLE_ROWS) AS total_rows
+                FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                AND TABLE_TYPE = 'BASE TABLE';
+                """, Long.class).intValue();
+            } catch (Exception e) {
+                stats.totalRows = 0;
+            }
             return null;
         });
         return stats;
@@ -333,16 +351,7 @@ public class DatabaseService {
         return doUpdate(sql) > 0;
     }
 
-    public void createSchema(List<Class<?>> clz) {
-        try (SessionFactory sess = getSessionFactory(clz, "create")) {
-            log.info("Created tables for classes:\n" + clz.stream().map((Class c ) -> "- " + c.getSimpleName()).collect(Collectors.joining("\n")));
-        }
-    }
-    public void updateSchema(List<Class<?>> clz) {
-        try (SessionFactory sess = getSessionFactory(clz, "update")) {
-            log.info("Updated tables for classes:\n" + clz.stream().map((Class c ) -> "- " + c.getSimpleName()).collect(Collectors.joining("\n")));
-        }
-    }
+
     private SessionFactory getSessionFactory(List<Class<?>> clz, String hb2ddl) {
         List<ClassLoader> loaders = new ArrayList<>();
         loaders.add(Thread.currentThread().getContextClassLoader());
@@ -362,10 +371,11 @@ public class DatabaseService {
         return metadata.buildMetadata().buildSessionFactory();
     }
 
-    public void updateSchemaTest(List<Class<?>> clz) {
+    public void createSchemaTest(List<Class<?>> clz) {
         for (Class<?> c : clz) {
             try (SessionFactory sess = getSessionFactoryTest(c, "create")) {
                 log.info("Updated tables for class: " + c.getSimpleName());
+                System.err.println("Updated tables for class: " + c.getSimpleName() + " with " + c.getClassLoader());
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -386,6 +396,42 @@ public class DatabaseService {
         } catch (Exception e) {
             e.printStackTrace();
             return null;
+        } finally {
+            Thread.currentThread().setContextClassLoader(original);
+        }
+    }
+
+
+    public void createSchema(List<Class<?>> clz) {
+        appendSchema(clz, "create");
+    }
+    public void updateSchema(List<Class<?>> clz) {
+        appendSchema(clz, "update");
+    }
+
+    private void appendSchema(List<Class<?>> clz, String action) {
+        List<ClassLoader> loaders = clz.stream().map(Class::getClassLoader).distinct().collect(Collectors.toList());
+        for (ClassLoader cl : loaders) {
+            List<Class<?>> clz2 = clz.stream().filter(c -> c.getClassLoader() == cl).collect(Collectors.toList());
+            try (SessionFactory sess = getSessionFactory(cl, clz2, action)) {
+                log.info("Updated tables for class: \n" + clz.stream().map((Class c ) -> "- " + c.getSimpleName()).collect(Collectors.joining("\n")));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    private SessionFactory getSessionFactory(ClassLoader loader, List<Class<?>> clz, String hb2ddl) {
+        ClassLoader original = Thread.currentThread().getContextClassLoader();
+        try {
+            Thread.currentThread().setContextClassLoader(loader);
+            StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
+                    .applySetting("hibernate.connection.datasource", dataSource)
+                    .applySetting("hibernate.dialect", "org.hibernate.dialect.MariaDBDialect")
+                    .applySetting("hibernate.hbm2ddl.auto", hb2ddl)
+                    .build();
+            MetadataSources metadata = new MetadataSources(registry);
+            for (Class<?> c : clz) metadata.addAnnotatedClass(c);
+            return metadata.buildMetadata().buildSessionFactory();
         } finally {
             Thread.currentThread().setContextClassLoader(original);
         }

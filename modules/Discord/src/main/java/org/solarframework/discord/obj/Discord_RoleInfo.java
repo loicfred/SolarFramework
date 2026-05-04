@@ -6,7 +6,7 @@ import net.dv8tion.jda.api.entities.Role;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.discord.obj.other.ActionServerID;
 
-import static org.solarframework.db.spring.DatabaseService.dbService;
+import static org.solarframework.db.spring.Provider.dbService;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 
 @Entity

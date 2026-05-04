@@ -8,7 +8,7 @@ import java.util.Objects;
 @Embeddable
 public class ActionServerID implements Serializable {
     private String Action;
-    private Integer ServerID;
+    private Long ServerID;
 
     public String getAction() {
         return Action;
@@ -17,10 +17,10 @@ public class ActionServerID implements Serializable {
         Action = action;
     }
 
-    public Integer getServerID() {
+    public Long getServerID() {
         return ServerID;
     }
-    public void setServerID(Integer serverID) {
+    public void setServerID(Long serverID) {
         ServerID = serverID;
     }
 

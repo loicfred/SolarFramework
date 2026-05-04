@@ -1,4 +1,4 @@
-package org.solarframework.db.spring;
+package org.solarframework.db.spring.dto;
 
 import java.time.Instant;
 import java.time.LocalDate;

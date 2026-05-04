@@ -2,6 +2,7 @@ package org.solarframework.db.spring;
 
 import com.google.gson.*;
 import jakarta.persistence.*;
+import org.solarframework.db.spring.dto.Row;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -14,7 +15,7 @@ import java.sql.Timestamp;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.solarframework.db.spring.DatabaseService.dbService;
+import static org.solarframework.db.spring.Provider.dbService;
 import static org.solarframework.json.JSONItem.GSON;
 import static org.solarframework.core.util.ClassUtils.*;
 
@@ -48,7 +49,7 @@ public class DatabaseUtils {
                 Object value = rs.get(f.getName());
                 setValueWhileConvertingDBToObject(item, value, f);
             }
-            if (item instanceof DatabaseObject<?> i) i.cacheHashes.add(i.getHashedIdentifier());
+            if (item instanceof DatabaseObject<?> i) i.getService().getCacheHashes().add(i.getHashedIdentifier());
             return item;
         } catch (Exception e) {
             throw new RuntimeException("Failed to map ResultSet to " + clazz.getSimpleName(), e);
@@ -179,7 +180,7 @@ public class DatabaseUtils {
             for (Field mainObjectField : mainObjectFields) {
                 setValueWhileConvertingDBToObject(mainItem, singleRow.get("MAIN." + mainObjectField.getName().toLowerCase()).orElse(null), mainObjectField);
             }
-            if (mainItem instanceof DatabaseObject<?> mI) mI.cacheHashes.add(mI.getHashedIdentifier());
+            if (mainItem instanceof DatabaseObject<?> mI) mI.getService().getCacheHashes().add(mI.getHashedIdentifier());
             for (Field mainJoinField : mainFieldsUsedForJoin) {
                 Object JoinItem;
                 if (isClassRelated(mainJoinField.getType(), Collection.class)) {
@@ -210,7 +211,7 @@ public class DatabaseUtils {
                     assignMainToJoinItem(mainJoinField, JoinItem, mainItem);
                 }
                 if (JoinItem instanceof DatabaseObject<?> dbItem) {
-                    dbService.getDbCacheManager().getCache("DBObject").put(dbItem.getHashedIdentifier(), dbItem);
+                    ((DatabaseService) dbService).getDbCacheManager().getCache("DBObject").put(dbItem.getHashedIdentifier(), dbItem);
                 }
                 mainJoinField.set(mainItem, JoinItem);
             }
@@ -266,7 +267,7 @@ public class DatabaseUtils {
         if (result == null) return Optional.empty();
         T mainItem = GSON.fromJson(cleanJson(result.getAsString(clazz.getSimpleName()), mainObjectFields), clazz);
         if (mainItem == null) return Optional.empty();
-        if (mainItem instanceof DatabaseObject<?> mI) mI.cacheHashes.add(mI.getHashedIdentifier());
+        if (mainItem instanceof DatabaseObject<?> mI) mI.getService().getCacheHashes().add(mI.getHashedIdentifier());
         for (Field mainJoinField : mainFieldsUsedForJoin) {
             try {
                 Object JoinItem;
@@ -286,7 +287,7 @@ public class DatabaseUtils {
                     assignMainToJoinItem(mainJoinField, JoinItem, mainItem);
                 }
                 if (JoinItem instanceof DatabaseObject<?> dbItem) {
-                    dbService.getDbCacheManager().getCache("DBObject").put(dbItem.getHashedIdentifier(), dbItem);
+                    ((DatabaseService) dbService).getDbCacheManager().getCache("DBObject").put(dbItem.getHashedIdentifier(), dbItem);
                 }
                 mainJoinField.set(mainItem, JoinItem);
             } catch (IllegalAccessException ignored) {}
@@ -296,10 +297,10 @@ public class DatabaseUtils {
 
     protected static <T> void assignMainToJoinItem(Field mainJoinField, Object joinListItem, T mainItem) throws IllegalAccessException {
         if (joinListItem instanceof DatabaseObject<?> joinItem) {
-            joinItem.cacheHashes.add(joinItem.getHashedIdentifier());
+            joinItem.getService().getCacheHashes().add(joinItem.getHashedIdentifier());
             if (mainItem instanceof DatabaseObject<?> mI) {
-                joinItem.cacheHashes.add(mI.getHashedIdentifier());
-                mI.cacheHashes.add(joinItem.getHashedIdentifier());
+                joinItem.getService().getCacheHashes().add(mI.getHashedIdentifier());
+                mI.getService().getCacheHashes().add(joinItem.getHashedIdentifier());
             }
             for (Field joinItemField : getAllFieldsOfClassFamily(joinItem.getClass())) {
                 if (mainJoinField.isAnnotationPresent(JoinColumn.class) && joinItemField.isAnnotationPresent(JoinColumn.class) && joinItemField.getAnnotation(JoinColumn.class).name().equals(mainJoinField.getAnnotation(JoinColumn.class).name())) {
@@ -440,44 +441,6 @@ public class DatabaseUtils {
 
             this.newSQL = newSql.toString();
             this.newParams = newParams.toArray();
-        }
-    }
-    public static class DatabaseStats {
-        public int totalTables = 0;
-        public int totalViews = 0;
-        public long totalRows = 0;
-        public List<String> tableNames = new ArrayList<>();
-        public List<String> viewNames = new ArrayList<>();
-
-        public int getTotalTables() {
-            return totalTables;
-        }
-        public int getTotalViews() {
-            return totalViews;
-        }
-        public long getTotalRows() {
-            return totalRows;
-        }
-        public List<String> getTableNames() {
-            return tableNames;
-        }
-        public List<String> getViewNames() {
-            return viewNames;
-        }
-    }
-    public static class TableStats {
-        public String tableName;
-        public long totalRows = 0;
-        public List<String> columnNames = new ArrayList<>();
-
-        public String getTableName() {
-            return tableName;
-        }
-        public long getTotalRows() {
-            return totalRows;
-        }
-        public List<String> getColumnNames() {
-            return columnNames;
         }
     }
 

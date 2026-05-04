@@ -10,9 +10,14 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>Database</artifactId>
+    <artifactId>DatabaseImpl</artifactId>
 
     <dependencies>
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
+            <artifactId>DatabaseAPI</artifactId>
+        </dependency>
+
         <dependency>
             <groupId>org.solarframework.mu</groupId>
             <artifactId>core</artifactId>
