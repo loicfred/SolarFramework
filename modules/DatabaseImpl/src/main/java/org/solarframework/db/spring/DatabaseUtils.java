@@ -2,7 +2,9 @@ package org.solarframework.db.spring;
 
 import com.google.gson.*;
 import jakarta.persistence.*;
-import org.solarframework.db.spring.dto.Row;
+import org.solarframework.db.api.*;
+import org.solarframework.db.api.dto.*;
+import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -12,14 +14,21 @@ import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.Time;
 import java.sql.Timestamp;
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.solarframework.db.spring.Provider.dbService;
 import static org.solarframework.json.JSONItem.GSON;
 import static org.solarframework.core.util.ClassUtils.*;
 
+@Component
 public class DatabaseUtils {
+    private final DatabaseService dbService;
+
+    public DatabaseUtils(DatabaseService dbService) {
+        this.dbService = dbService;
+    }
 
     protected static <T> T mapResultSetToObject(ResultSet rs, Class<T> clazz) {
         List<Field> fs = getSerializableFieldsOfClassFamily(clazz);
@@ -123,8 +132,12 @@ public class DatabaseUtils {
     }
 
 
+    protected static List<Object> cleanParameterList(List<Object> currentValuesList) {
+        for (Object c : currentValuesList.stream().filter(c -> c.getClass().isEnum()).toList()) currentValuesList.set(currentValuesList.indexOf(c), ((Enum<?>) c).name());
+        return currentValuesList;
+    }
 
-    protected static <T> Optional<T> Join_BasicApproach(Class<T> clazz, String whereClause, Object[] args) {
+    protected static <T> Optional<T> Join_BasicApproach(IDatabaseService dbService, Class<T> clazz, String whereClause, Object[] args) {
         String tableName = getTableName(clazz);
 
         List<Field> mainObjectFields = getSerializableFieldsOfClassFamily(clazz);
@@ -220,7 +233,7 @@ public class DatabaseUtils {
             return Optional.empty();
         }
     }
-    protected static <T> Optional<T> Join_JSONApproach(Class<T> clazz, String whereClause, Object[] args) {
+    protected static <T> Optional<T> Join_JSONApproach(IDatabaseService dbService, Class<T> clazz, String whereClause, Object[] args) {
         String tableName = getTableName(clazz);
 
         List<Field> mainObjectFields = getSerializableFieldsOfClassFamily(clazz);
@@ -319,7 +332,15 @@ public class DatabaseUtils {
         final boolean b = f.getType() == boolean.class || f.getType() == Boolean.class;
         switch (value) {
             case Date D -> f.set(item, D.toLocalDate());
-            case Timestamp D -> f.set(item, D.toLocalDateTime());
+            case Timestamp D -> {
+                if (f.getType() == LocalDateTime.class) {
+                    f.set(item, D.toLocalDateTime());
+                } else if (f.getType() == Instant.class) {
+                    f.set(item, D.toInstant());
+                } else {
+                    f.set(item, D.toString());
+                }
+            }
             case Time D -> f.set(item, D.toLocalTime());
             case BigDecimal D -> {
                 if (f.getType() == long.class || f.getType() == Long.class) {
@@ -348,27 +369,6 @@ public class DatabaseUtils {
         Table annotation = clazz.getAnnotation(Table.class);
         if (annotation != null && !annotation.name().isEmpty()) return annotation.name().toLowerCase();
         return clazz.getSimpleName().toLowerCase();
-    }
-
-
-    protected static String getSQLType(Field field) {
-        String type = field.getType().getSimpleName();
-        String sql = switch (type) {
-            case "String" -> "VARCHAR(255)";
-            case "int" -> "INT";
-            case "long" -> "BIGINT";
-            case "float" -> "FLOAT";
-            case "double" -> "DOUBLE";
-            case "boolean" -> "TINYINT(1)";
-            case "Date", "LocalDate" -> "DATE";
-            case "LocalDateTime" -> "DATETIME";
-            case "UUID" -> "CHAR(36)";
-            default -> "VARCHAR(40)";
-        };
-        if (field.getAnnotatedType().isAnnotationPresent(Id.class)) {
-            sql += " AUTO_INCREMENT PRIMARY KEY NOT NULL";
-        }
-        return sql;
     }
 
     protected static class SQLCleaner {

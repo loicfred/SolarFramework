@@ -1,4 +1,4 @@
-package org.solarframework.db.spring.dto;
+package org.solarframework.db.api.dto;
 
 import java.util.ArrayList;
 import java.util.List;

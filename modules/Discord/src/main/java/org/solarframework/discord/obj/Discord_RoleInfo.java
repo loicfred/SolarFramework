@@ -3,10 +3,10 @@ package org.solarframework.discord.obj;
 import jakarta.persistence.*;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Role;
-import org.solarframework.db.spring.DatabaseObject;
+import org.solarframework.db.api.DatabaseObject;
 import org.solarframework.discord.obj.other.ActionServerID;
 
-import static org.solarframework.db.spring.Provider.dbService;
+import static org.solarframework.discord.core.BotBuilder.DiscordDBService;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 
 @Entity
@@ -26,6 +26,9 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
     @Column(name = "RoleID", nullable = false)
     private Long RoleID;
 
+    @Column(name = "EmojiID")
+    private Long EmojiID;
+
     public Discord_RoleInfo() {}
     public Discord_RoleInfo(Guild G, Role role, String action) {
         this.G = G;
@@ -34,7 +37,7 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
         this.Action = action;
         this.RoleID = role != null ? role.getIdLong() : null;
         if (role != null) Upsert();
-        else if (dbService.getWhere(Discord_RoleInfo.class, "ServerID = ? AND Action = ?", ServerID, action).orElse(null) instanceof Discord_RoleInfo RI) RI.Delete();
+        else if (DiscordDBService.getWhere(Discord_RoleInfo.class, "ServerID = ? AND Action = ?", ServerID, action).orElse(null) instanceof Discord_RoleInfo RI) RI.Delete();
     }
 
     public Long getServerID() {
@@ -49,6 +52,13 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
     }
     public void setRoleID(Long roleID) {
         RoleID = roleID;
+    }
+
+    public Long getEmojiID() {
+        return EmojiID;
+    }
+    public void setEmojiID(Long emojiID) {
+        EmojiID = emojiID;
     }
 
     public String getAction() {

@@ -2,26 +2,38 @@ package org.solarframework.discord.core;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.components.ModalTopLevelComponent;
+import net.dv8tion.jda.api.components.attachmentupload.AttachmentUpload;
 import net.dv8tion.jda.api.components.buttons.Button;
+import net.dv8tion.jda.api.components.checkboxgroup.CheckboxGroup;
+import net.dv8tion.jda.api.components.checkboxgroup.CheckboxGroupOption;
+import net.dv8tion.jda.api.components.label.Label;
+import net.dv8tion.jda.api.components.radiogroup.RadioGroup;
+import net.dv8tion.jda.api.components.radiogroup.RadioGroupOption;
 import net.dv8tion.jda.api.components.selections.EntitySelectMenu;
 import net.dv8tion.jda.api.components.selections.SelectOption;
 import net.dv8tion.jda.api.components.selections.StringSelectMenu;
+import net.dv8tion.jda.api.components.textinput.TextInput;
+import net.dv8tion.jda.api.components.textinput.TextInputStyle;
+import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Member;
 import net.dv8tion.jda.api.entities.Role;
 import net.dv8tion.jda.api.entities.channel.ChannelType;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.entities.emoji.RichCustomEmoji;
 import net.dv8tion.jda.api.interactions.Interaction;
 import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.modals.Modal;
 import org.solarframework.discord.obj.Discord_GuildInfo;
 
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.TimeUtils.getNow;
-import static org.solarframework.db.spring.Provider.dbService;
+import static org.solarframework.db.api.DatabaseObject.retrieveServiceFor;
 import static org.solarframework.discord.core.BotBuilder.LogChannel;
 import static org.solarframework.discord.lang.L10N.SYSL;
 import static org.solarframework.discord.lang.L10N.SYSLG;
@@ -38,7 +50,7 @@ public class CMD {
     }
 
     public Discord_GuildInfo currentGuild() {
-        return GI == null && IT.isFromAttachedGuild() ? GI = dbService.getById(Discord_GuildInfo.class, IT.getGuild().getIdLong()).orElse(null) : GI;
+        return GI == null && IT.isFromAttachedGuild() ? GI = retrieveServiceFor(Discord_GuildInfo.class).getById(Discord_GuildInfo.class, IT.getGuild().getIdLong()).orElse(null) : GI;
     }
 
     public void Log(String logMsg) {
@@ -114,23 +126,49 @@ public class CMD {
         return C != null && C.getGuild().getSelfMember().hasPermission(C, Perm);
     }
 
+    public boolean isFromGuild() {
+        return IT.isFromGuild();
+    }
+    public boolean isFromGuild(InteractionHook M) {
+        if (isFromGuild()) return true;
+        M.editOriginal(SYSL(M, "reply-failed-not-in-guild")).queue();
+        return false;
+    }
 
-    protected Button makeButton(Class<? extends ButtonCMD> button, String... metadata) {
+    public boolean isUserInGuild(String userID) {
+        return IT.getGuild().getMemberById(userID) != null;
+    }
+    public boolean isUserInGuild(InteractionHook M, String userID) {
+        if (isUserInGuild(userID)) return true;
+        M.editOriginal(SYSL(M, "user-not-part-of-guild")).queue();
+        return false;
+    }
+    public boolean isUserInGuild(Guild guild, String userID) {
+        return guild.getMemberById(userID) != null;
+    }
+    public boolean isUserInGuild(InteractionHook M, Guild guild, String userID) {
+        if (isUserInGuild(guild, userID)) return true;
+        M.editOriginal(SYSL(M, "user-not-part-of-guild")).queue();
+        return false;
+    }
+
+
+    protected Button makeButton(Class<? extends ButtonCMD> button, Object... metadata) {
         try {
             ButtonCMD BTN = button.getDeclaredConstructor().newInstance();
             BTN.IT = IT;
-            String id = BTN.getData().id() + "/" + String.join("/", metadata);
+            String id = BTN.getData().id() + Arrays.stream(metadata).map(Object::toString).reduce("", (a, b) -> a + "/" + b);
             if (id.length() > Button.ID_MAX_LENGTH) throw new RuntimeException("Button ID is too long for " + id);
             return Button.primary(id, TL(BTN.getData().label())).withStyle(BTN.getData().style());
         } catch (Exception ignored) {
             return null;
         }
     }
-    protected Modal makeModal(Class<? extends ModalCMD> modal, List<ModalTopLevelComponent> components, String... metadata) {
+    protected Modal makeModal(Class<? extends ModalCMD> modal, List<ModalTopLevelComponent> components, Object... metadata) {
         try {
             ModalCMD Mdl = modal.getDeclaredConstructor().newInstance();
             Mdl.IT = IT;
-            String id = Mdl.getData().id() + "/" + String.join("/", metadata);
+            String id = Mdl.getData().id() + Arrays.stream(metadata).map(Object::toString).reduce("", (a, b) -> a + "/" + b);
             if (id.length() > Button.ID_MAX_LENGTH) throw new RuntimeException("Modal ID is too long for " + id);
             return Modal.create(id, TL(Mdl.getData().title()))
                     .addComponents(components).build();
@@ -138,11 +176,11 @@ public class CMD {
             return null;
         }
     }
-    protected StringSelectMenu makeStringSelectMenu(Class<? extends StringSelectCMD> select, List<SelectOption> options, String... metadata) {
+    protected StringSelectMenu makeStringSelectMenu(Class<? extends StringSelectCMD> select, List<SelectOption> options, Object... metadata) {
         try {
             StringSelectCMD Menu = select.getDeclaredConstructor().newInstance();
             Menu.IT = IT;
-            String id = Menu.getData().id() + "/" + String.join("/", metadata);
+            String id = Menu.getData().id() + Arrays.stream(metadata).map(Object::toString).reduce("", (a, b) -> a + "/" + b);
             if (id.length() > Button.ID_MAX_LENGTH) throw new RuntimeException("String Select ID is too long for " + id);
             return StringSelectMenu.create(id)
                     .setPlaceholder(TL(Menu.getData().placeholder()))
@@ -153,20 +191,20 @@ public class CMD {
             return null;
         }
     }
-    protected EntitySelectMenu makeUserSelectMenu(Class<? extends EntitySelectCMD> select, Interaction event, String... metadata) {
+    protected EntitySelectMenu makeUserSelectMenu(Class<? extends EntitySelectCMD> select, Object... metadata) {
         return makeEntitySelectMenu(select, EntitySelectMenu.SelectTarget.USER, metadata);
     }
-    protected EntitySelectMenu makeChannelSelectMenu(Class<? extends EntitySelectCMD> select, Interaction event, String... metadata) {
+    protected EntitySelectMenu makeChannelSelectMenu(Class<? extends EntitySelectCMD> select, Object... metadata) {
         return makeEntitySelectMenu(select, EntitySelectMenu.SelectTarget.CHANNEL, metadata);
     }
-    protected EntitySelectMenu makeRoleSelectMenu(Class<? extends EntitySelectCMD> select, Interaction event, String... metadata) {
+    protected EntitySelectMenu makeRoleSelectMenu(Class<? extends EntitySelectCMD> select, Object... metadata) {
         return makeEntitySelectMenu(select, EntitySelectMenu.SelectTarget.ROLE, metadata);
     }
-    private EntitySelectMenu makeEntitySelectMenu(Class<? extends EntitySelectCMD> select, EntitySelectMenu.SelectTarget target, String... metadata) {
+    private EntitySelectMenu makeEntitySelectMenu(Class<? extends EntitySelectCMD> select, EntitySelectMenu.SelectTarget target, Object... metadata) {
         try {
             EntitySelectCMD Menu = select.getDeclaredConstructor().newInstance();
             Menu.IT = IT;
-            String id = Menu.getData().id() + "/" + String.join("/", metadata);
+            String id = Menu.getData().id() + Arrays.stream(metadata).map(Object::toString).reduce("", (a, b) -> a + "/" + b);
             if (id.length() > Button.ID_MAX_LENGTH) throw new RuntimeException("Entity Select ID is too long for " + id);
             return EntitySelectMenu.create(id, target)
                     .setPlaceholder(TL(Menu.getData().placeholder()))
@@ -175,5 +213,47 @@ public class CMD {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    protected <T extends CMD> T makeCustomCMD(Class<T> clazz) {
+        try {
+            T obj = clazz.getDeclaredConstructor().newInstance();
+            obj.IT = IT;
+            obj.GI = GI;
+            return obj;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+    protected <T extends CMD> T makeCustomCMD(Class<T> clazz, Object... args) {
+        try {
+            Constructor<T> constructor = clazz.getDeclaredConstructor(Arrays.stream(args).map(Object::getClass).toArray(Class[]::new));
+            T obj = constructor.newInstance(args);
+            obj.IT = IT;
+            obj.GI = GI;
+            return obj;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+
+    public static ModalTopLevelComponent makeTextInput(String label, String id, TextInputStyle style, String placeholder, int minLength, int maxLength, boolean required) {
+        return Label.of(label, TextInput.create(id, style).setPlaceholder(placeholder).setRequiredRange(minLength, maxLength).setRequired(required).build());
+    }
+    public static ModalTopLevelComponent makeEntityInput(String label, String id, EntitySelectMenu.SelectTarget type, String placeholder, int minLength, int maxLength, boolean required) {
+        return Label.of(label, EntitySelectMenu.create(id, type).setPlaceholder(placeholder).setRequiredRange(minLength, maxLength).setRequired(required).build());
+    }
+    public static ModalTopLevelComponent makeEntityInput(String label, String id, String placeholder, int minLength, int maxLength, boolean required, SelectOption... options) {
+        return Label.of(label, StringSelectMenu.create(id).setPlaceholder(placeholder).addOptions(options).setRequiredRange(minLength, maxLength).setRequired(required).build());
+    }
+    public static ModalTopLevelComponent makeCheckboxInput(String label, int minValues, int maxValues, boolean required, CheckboxGroupOption... options) {
+        return Label.of(label, CheckboxGroup.create("checkbox-group").addOptions(options).setRequiredRange(minValues, maxValues).setRequired(required).build());
+    }
+    public static ModalTopLevelComponent makeRadioInput(String label, String id, boolean required, RadioGroupOption... options) {
+        return Label.of(label, RadioGroup.create(id).addOptions(options).setRequired(required).build());
+    }
+    public static ModalTopLevelComponent makeAttachmentInput(String label, String id, int minValues, int maxValues, boolean required) {
+        return Label.of(label, AttachmentUpload.create(id).setRequiredRange(minValues, maxValues).setRequired(required).build());
     }
 }

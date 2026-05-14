@@ -16,14 +16,15 @@
     <modules>
         <module>core</module>
         <module>modules/DatabaseImpl</module>
+        <module>modules/DatabaseAPI</module>
         <module>modules/AI</module>
         <module>modules/Discord</module>
         <module>modules/Excel</module>
         <module>modules/SSLServer</module>
         <module>modules/Plugin</module>
         <module>modules/JSON</module>
-        <module>modules/DatabaseAPI</module>
-    </modules>
+        <module>modules/Authentication</module>
+   </modules>
 
     <repositories>
         <repository>
@@ -63,6 +64,11 @@
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
                 <artifactId>DatabaseAPI</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>DatabaseCommon</artifactId>
                 <version>1.0</version>
             </dependency>
             <dependency>
@@ -137,7 +143,7 @@
             <dependency>
                 <groupId>net.dv8tion</groupId>
                 <artifactId>JDA</artifactId>
-                <version>6.4.0</version>
+                <version>6.4.1</version>
             </dependency>
             <dependency>
                 <groupId>io.github.classgraph</groupId>

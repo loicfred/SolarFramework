@@ -30,7 +30,7 @@ public class Main {
         output = aiService.prompt("What is the current time?", new Toolbox());
         System.out.println(output); // [The current time from Toolbox]
 
-        SystemMessage instruction = SystemMessage.builder().text("You are an AI assistent designed answer the time related questions of the user.").build();
+        SystemMessage instruction = SystemMessage.builder().text("You are an AI assistent designed answer the time related questions of the authAccountUser.").build();
         Conversation c = aiService.startConversation("Loïc", instruction, new Toolbox());
         System.out.println(c.talk("What is the current time?")); // The current time is XXX
         System.out.println(c.talk("Thank you!"));
@@ -92,7 +92,7 @@ public class User extends DatabaseObject<User> {
 ```java
 import jakarta.persistence.*;
 
-@Table(name = 'user') 
+@Table(name = 'authAccountUser') 
 public class User extends DatabaseObject.ID_OBJ<Long, User> {
     @OneToMany
     @JoinColumn(referencedColumnName = "ID", name = "UserID")
@@ -136,15 +136,15 @@ Note: You must enable caching in your spring application. You must scan both you
 import static my.loic.utilities.db.spring.DatabaseService.dbService;
 
 public void interactTest() {
-   User user = dbService.getById(User.class, 3L).orElse(null);
-   user.Name = "Loic";
-   user = user.WriteThenReturn();
+   User authAccountUser = dbService.getById(User.class, 3L).orElse(null);
+   authAccountUser.Name = "Loic";
+   authAccountUser = authAccountUser.WriteThenReturn();
 
    User loic = dbService.getWhere(User.class, "Name = ?", "Loic").orElse(null);
    loic.Email = "loic@email.com";
    loic.UpdateOnly("Email");
 
-   Row R = dbService.doQuery("SELECT * FROM user WHERE Email = ?", "loic@email.com").orElse(null);
+   Row R = dbService.doQuery("SELECT * FROM authAccountUser WHERE Email = ?", "loic@email.com").orElse(null);
    String email = R.getAsString("Email");   
    
    loic.Delete();
@@ -190,7 +190,7 @@ import org.solarframework.discord.core.*;
 import org.solarframework.discord.core.annotation.*;
 
 // This is a slash command /hello that has a button "Click me!" attached to it with metadata attached.
-@SlashCommand(name = "hello", description = "Says hello to the user.")
+@SlashCommand(name = "hello", description = "Says hello to the authAccountUser.")
 public class SlashHello extends SlashCMD {
     @Override
     public void onSlash(SlashCommandInteractionEvent e) {
@@ -248,7 +248,7 @@ public class Main {
 The default path of files are stored the root ./WAMP/domains. The root domain files (ex. `mysite.com`) are stored in "mysite.com/_" and subdomains files (ex. `www.mysite.com`) are stored in "mysite.com/_www".  
 The url `http://localhost:8080` is another spring web application which can use the domain `myothersite.com` for free local HTTPS access.
 
-<img width="600" alt="image" src="https://github.com/user-attachments/assets/b4bd2b06-fb33-49d4-ad9c-0e95069c024d" />
+<img width="600" alt="image" src="https://github.com/authAccountUser-attachments/assets/b4bd2b06-fb33-49d4-ad9c-0e95069c024d" />
 
 # 5. Excel Utilities
 A simple library which enables users to convert excel files to database tables.

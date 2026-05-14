@@ -1,9 +1,8 @@
-package org.solarframework.db.spring;
+package org.solarframework.db.api;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 public interface IDBObjectService<T> {
 
@@ -21,7 +20,7 @@ public interface IDBObjectService<T> {
     Optional<T> UpsertThenReturn();
 
     int IncrementColumn(String column, int amount);
-    int IncrementColumns(Map<String, Object> parameters);
+    int IncrementColumns(Map<String, Double> parameters);
     int Update();
     int UpdateOnly(String... columns);
 

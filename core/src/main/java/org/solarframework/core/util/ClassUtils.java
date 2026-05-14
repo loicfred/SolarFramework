@@ -67,10 +67,10 @@ public class ClassUtils {
 
     public static Object copyObject(Object target, Object source) {
         try {
-            if (target.getClass() != source.getClass()) return false;
-            for (Field field : getSerializableFieldsOfClassFamily(target.getClass())) field.set(target, field.get(source));
+            for (Field field : getAllFieldsOfClassFamily(target.getClass())) field.set(target, field.get(source));
             return target;
         } catch (Exception e) {
+            e.printStackTrace();
             return null;
         }
     }

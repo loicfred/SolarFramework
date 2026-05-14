@@ -1,28 +1,41 @@
-package org.solarframework.db.spring;
+package org.solarframework.db.api;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Id;
 import jakarta.persistence.MappedSuperclass;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
-
-import static org.solarframework.db.spring.Provider.dbService;
 
 public class DatabaseObject<T> {
-    private transient final IDBObjectService<T> service;
+    private static final Logger log = LoggerFactory.getLogger(DatabaseObject.class);
+    private transient IDBObjectService<T> service;
 
     public IDBObjectService<T> getService() {
         return service;
     }
 
-    public DatabaseObject() {
-        service = dbService.makeObjectManager(this);
+    public static IDatabaseService retrieveServiceFor(Class<?> clazz) {
+        try {
+            Class<?> databaseRegistry = Class.forName("org.solarframework.db.spring.DatabaseRegistry");
+            Object SolarDBManager = databaseRegistry.getField("SolarDBManager").get(null);
+            return ((IDatabaseService) SolarDBManager.getClass().getMethod("getService", Class.class).invoke(SolarDBManager, clazz));
+        } catch (Exception ignored) {
+            return null;
+        }
     }
 
-    protected String getHashedIdentifier() {
+    public DatabaseObject() {
+        try {
+            service = retrieveServiceFor(this.getClass()).makeObjectManager(this);
+        } catch (NullPointerException ignored) {
+            log.warn("The entity {} doesn't have any linked data source. Operations will not be available.", this.getClass().getSimpleName());
+        }
+    }
+
+    public String getHashedIdentifier() {
         return service.getHashedIdentifier();
     }
 
@@ -50,7 +63,7 @@ public class DatabaseObject<T> {
         return service.IncrementColumn(column, amount);
     }
 
-    public int IncrementColumns(Map<String, Object> parameters) {
+    public int IncrementColumns(Map<String, Double> parameters) {
         return service.IncrementColumns(parameters);
     }
 

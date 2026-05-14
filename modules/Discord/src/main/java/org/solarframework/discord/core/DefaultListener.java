@@ -24,6 +24,8 @@ import net.dv8tion.jda.api.interactions.InteractionContextType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -38,6 +40,7 @@ import static org.solarframework.discord.core.BotBuilder.LogChannel;
 import static org.solarframework.core.util.ThreadUtils.ShutdownAfterAction;
 
 public class DefaultListener extends ListenerAdapter {
+    private final static Logger log = LoggerFactory.getLogger(DefaultListener.class);
 
     protected List<SlashCMD> SlashCommands;
     protected List<UserCMD> UserCommands;
@@ -49,10 +52,15 @@ public class DefaultListener extends ListenerAdapter {
 
     @Override
     public void onReady(@NotNull ReadyEvent event) {
-        SetupGlobalCommands();
-        onReady.get();
-        DiscordAccount.getPresence().setActivity(Activity.customStatus("✅ Bot start-up done!"));
-        System.out.println("[Discord] Finished bot start-up!");
+        try {
+            SetupGlobalCommands();
+            onReady.get();
+            DiscordAccount.getPresence().setActivity(Activity.customStatus("✅ Bot start-up done!"));
+            System.out.println("[Discord] Finished bot start-up!");
+        } catch (Exception e) {
+            log.error("Failed to start bot: {}", e.getMessage());
+            System.exit(1);
+        }
     }
 
     @Override

@@ -9,6 +9,9 @@ import net.dv8tion.jda.api.entities.channel.middleman.StandardGuildMessageChanne
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.ChunkingFilter;
 import net.dv8tion.jda.api.utils.MemberCachePolicy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.solarframework.db.api.IDatabaseService;
 
 import java.util.function.Supplier;
 
@@ -16,9 +19,11 @@ public class BotBuilder {
     protected static Supplier<Void> onReady = () -> null;
 
     public static JDA DiscordAccount;
+    public static IDatabaseService DiscordDBService;
     public static Guild BotGuild;
     public static StandardGuildMessageChannel TemporaryFilesChannel;
     public static StandardGuildMessageChannel LogChannel;
+    public static boolean IsTestMode = false;
 
     private final String token;
     private final String commandPackage;
@@ -31,6 +36,11 @@ public class BotBuilder {
     public BotBuilder(String token, String commandPackage) {
         this.token = token;
         this.commandPackage = commandPackage;
+    }
+    public BotBuilder(String token, String commandPackage, boolean testMode) {
+        this.token = token;
+        this.commandPackage = commandPackage;
+        IsTestMode = testMode;
     }
 
     public JDA build() {
@@ -46,12 +56,10 @@ public class BotBuilder {
                 setActivity(Activity.customStatus("⚙️ Rebooting, please wait a little longer...")).
                 addEventListeners(new DefaultListener(commandPackage)).build();
         onReady = () -> {
-            try {
-                BotGuild = DiscordAccount.getGuildById(BotGuildID);
-                TemporaryFilesChannel = BotGuild.getTextChannelById(TemporaryFilesChannelID);
-                LogChannel = BotGuild.getTextChannelById(LogChannelID);
-                AfterReadyAction.get();
-            } catch (Exception ignored) {}
+            BotGuild = DiscordAccount.getGuildById(BotGuildID);
+            TemporaryFilesChannel = BotGuild.getTextChannelById(TemporaryFilesChannelID);
+            LogChannel = BotGuild.getTextChannelById(LogChannelID);
+            AfterReadyAction.get();
             return null;
         };
         System.out.println("[Discord] Starting bot...");
@@ -69,6 +77,9 @@ public class BotBuilder {
     }
     public void setAfterReadyAction(Supplier<Void> AfterReadyAction) {
         this.AfterReadyAction = AfterReadyAction;
+    }
+    public void setDiscordDBService(IDatabaseService discordDBService) {
+        DiscordDBService = discordDBService;
     }
 
 }

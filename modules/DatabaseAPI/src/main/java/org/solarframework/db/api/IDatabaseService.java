@@ -1,56 +1,42 @@
-package org.solarframework.db.spring;
+package org.solarframework.db.api;
 
-import org.solarframework.db.spring.dto.DatabaseStats;
-import org.solarframework.db.spring.dto.Row;
-import org.solarframework.db.spring.dto.TableStats;
+import org.solarframework.db.api.dto.DatabaseStats;
+import org.solarframework.db.api.dto.Row;
+import org.solarframework.db.api.dto.TableStats;
 
+import javax.sql.DataSource;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
 public interface IDatabaseService {
 
+    DataSource getDataSource();
+    void setDataSource(DataSource database);
     <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject);
 
-    <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object id);
-
-    <T> Optional<T> getById(String select, Class<T> clazz, Object id);
-
-    <T> Optional<T> getById(Class<T> clazz, Object id);
-
-    <T> Optional<T> getWhereWithJoins(Class<T> clazz, String whereClause, Object... args);
-
-    <T> Optional<T> getWhere(String select, Class<T> clazz, String whereClause, Object... args);
-
-    <T> Optional<T> getWhere(Class<T> clazz, String whereClause, Object... args);
-
-    <T> List<T> getAll(String select, Class<T> clazz);
-
-    <T> List<T> getAll(Class<T> clazz);
-
-    <T> List<T> getAllWhere(String select, Class<T> clazz, String whereClause, Object... args);
-
-    <T> List<T> getAllWhere(Class<T> clazz, String whereClause, Object... args);
-
-    <T> Set<T> getAllWhereDistinct(String select, Class<T> clazz, String whereClause, Object... args);
-
-    <T> Set<T> getAllWhereDistinct(Class<T> clazz, String whereClause, Object... args);
 
     <O, T> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object id);
-
     <O, T> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args);
-
+    <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object id);
+    <T> Optional<T> getById(String select, Class<T> clazz, Object id);
+    <T> Optional<T> getById(Class<T> clazz, Object id);
+    <T> Optional<T> getWhereWithJoins(Class<T> clazz, String whereClause, Object... args);
+    <T> Optional<T> getWhere(String select, Class<T> clazz, String whereClause, Object... args);
+    <T> Optional<T> getWhere(Class<T> clazz, String whereClause, Object... args);
+    <T> List<T> getAll(String select, Class<T> clazz);
+    <T> List<T> getAll(Class<T> clazz);
+    <T> List<T> getAllWhere(String select, Class<T> clazz, String whereClause, Object... args);
+    <T> List<T> getAllWhere(Class<T> clazz, String whereClause, Object... args);
+    <T> Set<T> getAllWhereDistinct(String select, Class<T> clazz, String whereClause, Object... args);
+    <T> Set<T> getAllWhereDistinct(Class<T> clazz, String whereClause, Object... args);
     <T> int Count(Class<T> clazz);
-
     <T> int Count(Class<T> clazz, String whereClause, Object... args);
-
     <T> T getRandom(String select, Class<T> clazz);
-
     <T> T getRandom(Class<T> clazz);
-
     <T> T getRandom(String select, Class<T> clazz, String whereClause, Object... args);
-
     <T> T getRandom(Class<T> clazz, String whereClause, Object... args);
+
 
     <T> Optional<T> doQuery(Class<T> clazz, String sql, Object... args);
 
@@ -86,22 +72,12 @@ public interface IDatabaseService {
 
     int doUpdate(Class<?> clazz, String sql, Object... args);
 
-    void resetAllCaches();
-
-    void resetCache(String cacheName);
-
-    void resetCacheFor(DatabaseObject<?> dbobject);
-    void resetCacheFor(IDBObjectService<?> dbobject);
-
-    void resetCacheForClass(Class<?> dbclazz, boolean items, boolean lists);
 
     DatabaseStats getDatabaseStats();
 
     TableStats getTableStats(String name);
 
     String getSchema();
-
-    <T> boolean createTable(Class<T> clazz);
 
     void createSchema(List<Class<?>> clz);
 

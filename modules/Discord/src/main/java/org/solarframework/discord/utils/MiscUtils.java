@@ -11,7 +11,7 @@ public class MiscUtils {
         M.editOriginal(SYSL(M, "error-invalid-colorcode")).queue();
         return false;
     }
-    
+
     public static boolean isSyntaxValid(InteractionHook M, String text) {
         if (text != null && !text.matches(".*[\\\\|:*?\"<>].*")) return true;
         M.editOriginal(SYSL(M, "error-illegal-character")).queue();
@@ -29,9 +29,9 @@ public class MiscUtils {
         M.editOriginal(SYSL(M, "error-invalid-url-link")).queue();
         return false;
     }
-    
+
     public static boolean isDateValid(InteractionHook M, String text) {
-        if (text != null && org.solarframework.core.util.TimeUtils.isDateValid(text)) return true;
+        if (text != null && org.solarframework.core.util.TimeUtils.isDateValid(text, "dd/MM/uuuu")) return true;
         M.editOriginal(SYSL(M, "error-invalid-date")).queue();
         return false;
     }

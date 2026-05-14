@@ -6,12 +6,12 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.requests.restaction.MessageCreateAction;
-import org.solarframework.db.spring.DatabaseObject;
+import org.solarframework.db.api.DatabaseObject;
 import org.solarframework.discord.obj.other.ActionServerID;
 
 import java.util.List;
 
-import static org.solarframework.db.spring.Provider.dbService;
+import static org.solarframework.discord.core.BotBuilder.DiscordDBService;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 
 @Entity
@@ -43,7 +43,7 @@ public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
         this.Action = action;
         this.ChannelID = channel != null ? channel.getIdLong() : null;
         if (channel != null) Upsert();
-        else if (dbService.getWhere(Discord_ChannelInfo.class, "ServerID = ? AND Action = ?", ServerID, action).orElse(null) instanceof Discord_ChannelInfo RI) RI.Delete();
+        else if (DiscordDBService.getWhere(Discord_ChannelInfo.class, "ServerID = ? AND Action = ?", ServerID, action).orElse(null) instanceof Discord_ChannelInfo RI) RI.Delete();
     }
 
     public Long getServerID() {
@@ -88,7 +88,7 @@ public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
     }
 
     public List<Discord_MessageInfo> getMessages() {
-        return Messages == null ? Messages = dbService.getAllWhere(Discord_MessageInfo.class, "ChannelID = ? AND ChannelAction = ?", getChannelID(), getAction()) : Messages;
+        return Messages == null ? Messages = DiscordDBService.getAllWhere(Discord_MessageInfo.class, "ChannelID = ? AND ChannelAction = ?", getChannelID(), getAction()) : Messages;
     }
 
     public Discord_MessageInfo newEmptyMessage() {

@@ -12,6 +12,6 @@ public class SlashHello extends SlashCMD {
     @Override
     public void onSlash(SlashCommandInteractionEvent e) {
         Button Btn = makeButton(ClickMe.class,  "This is some data."); // makeButton is part of SlashCMD
-        e.reply("Hello, " + e.getUser().getAsMention() + "!").setComponents(ActionRow.of(Btn)).queue();
+        e.reply("Hello, " + e.getUser().getAsMention() + "! " + makeCustomCMD(Extension.class).getHi()).setComponents(ActionRow.of(Btn)).queue();
     }
 }

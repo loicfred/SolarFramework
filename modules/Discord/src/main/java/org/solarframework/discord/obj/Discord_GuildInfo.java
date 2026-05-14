@@ -3,16 +3,19 @@ package org.solarframework.discord.obj;
 import club.minnced.discord.webhook.send.WebhookMessageBuilder;
 import jakarta.persistence.*;
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
 import org.solarframework.core.lang.Nationalities;
-import org.solarframework.db.spring.DatabaseObject;
+import org.solarframework.db.api.DatabaseObject;
+import org.solarframework.discord.lang.L10N;
 
 import java.awt.*;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static org.solarframework.core.util.ImageUtils.getDominantColor;
 import static org.solarframework.core.util.OtherUtils.getHexValue;
-import static org.solarframework.db.spring.Provider.dbService;
+import static org.solarframework.discord.core.BotBuilder.DiscordDBService;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 
 @Entity
@@ -264,13 +267,157 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         else new Discord_ChannelInfo(getGuild(), null, "LOG");
     }
 
-
+    public Discord_RoleInfo getUsageRole(String action) {
+        return DiscordDBService.getWhere(Discord_RoleInfo.class, "ServerID = ? AND Action LIKE ?", getID(), action).orElse(null);
+    }
     public Discord_ChannelInfo getUsageChannel(String action) {
-        return dbService.getWhere(Discord_ChannelInfo.class, "ServerID = ? AND Action LIKE ?", getID(), action).orElse(null);
+        return DiscordDBService.getWhere(Discord_ChannelInfo.class, "ServerID = ? AND Action LIKE ?", getID(), action).orElse(null);
     }
     public Discord_ChannelInfo getLogChannel() {
         return getUsageChannel("LOG");
     }
 
+    private String TLG(String key, Object... args) {
+        return L10N.TLG(getGuild(), key, args);
+    }
 
+    private synchronized Role createRole(String name, String roleemoji, Color color, Icon icon) {
+        try {
+            if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
+                if (getGuild().getRolesByName(name, false).isEmpty()) {
+                    Role newrole = getGuild().createRole()
+                            .setName(name)
+                            .setColor(color)
+                            .setHoisted(true)
+                            .submit().orTimeout(10, TimeUnit.SECONDS).get();
+                    LogGuild(TLG("role-create", "__**" + roleemoji + " " + name + "**__"));
+                    setRoleIcon(newrole, icon, roleemoji, false);
+                    return newrole;
+                } else {
+                    Role newrole = getGuild().getRolesByName(name, false).getFirst();
+                    setRoleIcon(newrole, icon, roleemoji, false);
+                    return newrole;
+                }
+            } else {
+                setAreClanRolesAllowed(false);
+                setAreGlobalRankAllowed(false);
+                for (Game G : Game.values()) setGameRanksAllowed(false, G);
+                Update();
+                //LogSlash(TLG(I,"role-create-permission-fail",  roleemoji + " **__" + name + "__**"));
+            }
+        } catch (Exception ignored) {}
+        return null;
+    }
+    public synchronized void setRoleIcon(Role role, Icon icon, String roleemoji, boolean replace) {
+        try {
+            if (icon != null && getGuild().getFeatures().contains("ROLE_ICONS")) {
+                if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
+                    if (role.getIcon() == null || replace) { // if not exist, then true, and true if replace too
+                        if (getGuild().getSelfMember().canInteract(role)) {
+                            role.getManager().setIcon(icon).queue(_ ->  LogGuild(TLG("role-icon-success", roleemoji + " **__" + role.getName() + "__**")));
+                        } else {
+                            //LogSlash(TLG(I,"role-icon-permission-fail", roleemoji + " **__" + role.getName() + "__**"));
+                        }
+                    }
+                } else {
+                    setAreClanRolesAllowed(false);
+                    setAreGlobalRankAllowed(false);
+                    for (Game G : Game.values()) setGameRanksAllowed(false, G);
+                    Update();
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+    public synchronized void setRoleColor(Role role, Color color, String roleemoji) {
+        try {
+            if (!getHexValue(role.getColors().getPrimary()).equals(getHexValue(color))) {
+                if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
+                    if (getGuild().getSelfMember().canInteract(role)) {
+                        role.getManager().setColor(color).queue(_ -> LogGuild(TLG("role-recolor-success",roleemoji + " **__" + role.getName() + "__**", "**" + getHexValue(color) + "**")));
+                    } else {
+                        //LogSlash(TLG(I, "role-recolor-interact-fail", roleemoji + " **__" + role.getName() + "__**"));
+                    }
+                } else {
+                    setAreClanRolesAllowed(false);
+                    setAreGlobalRankAllowed(false);
+                    for (Game G : Game.values()) setGameRanksAllowed(false, G);
+                    Update();
+                    //LogSlash(TLG(I, "role-recolor-permission-fail", roleemoji + " **__" + role.getName() + "__**"));
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+    public synchronized void renameRole(Role role, String newname, String roleemoji) {
+        try {
+            if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
+                if (getGuild().getSelfMember().canInteract(role)) {
+                    String oldname = role.getName();
+                    role.getManager().setName(newname).queue(_ -> LogGuild(TLG("role-rename-success","**" + oldname + "**", roleemoji + " **__" + newname + "__**")));
+                } else {
+                    //LogSlash(TLG(I,"role-rename-interact-fail", roleemoji + " **__" + role.getName() + "__**"));
+                }
+            } else {
+                setAreClanRolesAllowed(false);
+                setAreGlobalRankAllowed(false);
+                for (Game G : Game.values()) setGameRanksAllowed(false, G);
+                Update();
+                //LogSlash(TLG(I,"role-rename-permission-fail", roleemoji + " **__" + role.getName() + "__**"));
+            }
+        } catch (Exception ignored) {}
+    }
+    public synchronized void deleteRole(Role role, String roleemoji) {
+        try {
+            if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
+                if (getGuild().getSelfMember().canInteract(role)) {
+                    role.delete().queue(_ -> LogGuild(TLG("role-delete-success",roleemoji + " **__" + role.getName() + "__**")));
+                } else {
+                    //LogSlash(TLG(I,"role-delete-interact-fail", roleemoji + " **__" + role.getName() + "__**"));
+                }
+            } else {
+                setAreClanRolesAllowed(false);
+                setAreGlobalRankAllowed(false);
+                for (Game G : Game.values()) setGameRanksAllowed(false, G);
+                Update();
+                //LogSlash(TLG(I,"role-delete-permission-fail", roleemoji + " **__" + role.getName() + "__**"));
+            }
+        } catch (Exception ignored) {}
+    }
+    public synchronized void AddRoleToMember(Role role, String roleemoji, Member member) {
+        try {
+            if (member != null && member.getRoles().stream().noneMatch(R -> R.getIdLong() == role.getIdLong())) {
+                if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
+                    if (getGuild().getSelfMember().canInteract(role)) {
+                        getGuild().removeRoleFromMember(member, role).queue();
+                        getGuild().addRoleToMember(member, role).queue(_ -> LogGuild(TLG("role-add-success", roleemoji + " **__" + role.getName() + "__**", "**" + member.getEffectiveName() + "**")));
+                    } else {
+                        //if (!isStartup) LogSlash(TLG(I, "role-add-interact-fail", roleemoji + " **__" + role.getName() + "__**", "**" + member.getEffectiveName() + "**"));
+                    }
+                } else {
+                    setAreClanRolesAllowed(false);
+                    setAreGlobalRankAllowed(false);
+                    for (Game G : Game.values()) setGameRanksAllowed(false, G);
+                    Update();
+                    //if (!isStartup) LogSlash(TLG(I, "role-add-permission-fail", roleemoji + " **__" + role.getName() + "__**", "**" + member.getEffectiveName() + "**"));
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+    public synchronized boolean RemoveRoleFromMember(Discord_RoleInfo role, Member member) {
+        try {
+            if (member.getRoles().stream().anyMatch(R -> R.getIdLong() == role.getRoleID())) {
+                if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
+                    if (getGuild().getSelfMember().canInteract(role.getRole())) {
+                        getGuild().addRoleToMember(member, role.getRole()).queue();
+                        getGuild().removeRoleFromMember(member, role.getRole()).queue(_ -> LogGuild(TLG("role-remove-success",role + " **__" + role.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**")));
+                        return true;
+                    } else {
+                        LogGuild(TLG("role-remove-interact-fail", roleemoji + " **__" + role.getName() + "__**", "**" + member.getEffectiveName() + "**"));
+                    }
+                } else {
+                    LogGuild(TLG("role-remove-permission-fail", roleemoji + " **__" + role.getName() + "__**", "**" + member.getEffectiveName() + "**"));
+                }
+            }
+        } catch (Exception ignored) {}
+        return false;
+    }
 }

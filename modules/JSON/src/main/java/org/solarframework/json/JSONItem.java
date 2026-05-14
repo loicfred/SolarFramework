@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 
-public class JSONItem implements Serializable {
+public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
     public static final Gson GSON = new GsonBuilder()
             .registerTypeAdapter(LocalDate.class, new LocalDateAdapter())
             .registerTypeAdapter(LocalTime.class, new LocalTimeAdapter())
@@ -135,21 +135,19 @@ public class JSONItem implements Serializable {
 
 
 
-    public Object Save(String filePath) {
+    public T WriteJSON(String filePath) {
         try (FileWriter writer = new FileWriter(filePath, StandardCharsets.UTF_8)) {
             GSON.toJson(this, writer);
+            return (T) this;
         } catch (Exception e) {
-            e.printStackTrace();
+            return null;
         }
-        return this;
     }
 
-    // Method to read JSON from a file and deserialize it into an object
-    public <T> T Read(String filePath, Class<T> clazz) {
+    public static <A> A ReadJSON(String filePath, Class<A> clazz) {
         try (FileReader reader = new FileReader(filePath, StandardCharsets.UTF_8)) {
             return GSON.fromJson(reader, clazz);
         } catch (IOException e) {
-            e.printStackTrace();
             return null;
         }
     }

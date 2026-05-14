@@ -10,9 +10,9 @@ import static org.solarframework.core.Constants.ProgramZoneId;
 public class TimeUtils {
 
     // Format Check
-    public static boolean isDateValid(String text) {
+    public static boolean isDateValid(String text, String pattern) {
         try {
-            LocalDate.parse(text, DateTimeFormatter.ofPattern("dd/MM/uuuu").withResolverStyle(ResolverStyle.STRICT));
+            LocalDate.parse(text, DateTimeFormatter.ofPattern(pattern).withResolverStyle(ResolverStyle.STRICT));
             return true;
         } catch (Exception e) {
             return false;
@@ -22,7 +22,7 @@ public class TimeUtils {
 
     // Shortcuts
     public static String getTime(String pattern, Instant instant) {
-        return DateTimeFormatter.ofPattern("dd/MM/uuuu").format(instant.atZone(ProgramZoneId));
+        return DateTimeFormatter.ofPattern(pattern).format(instant.atZone(ProgramZoneId));
     }
     public static String getYesterday(String pattern) {
         return DateTimeFormatter.ofPattern(pattern).format(Instant.now().minus(1, ChronoUnit.DAYS).atZone(ProgramZoneId));

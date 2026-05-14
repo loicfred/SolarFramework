@@ -8,6 +8,7 @@
         <outputRelativeToContentRoot value="true" />
         <module name="core" />
         <module name="Excel" />
+        <module name="Authentication" />
         <module name="DatabaseImpl" />
         <module name="AI" />
         <module name="JSON" />
@@ -21,6 +22,7 @@
     <bytecodeTargetLevel>
       <module name="AstralCore-Framework" target="25" />
       <module name="DatabaseA" target="25" />
+      <module name="DatabaseCommon" target="25" />
       <module name="File" target="25" />
       <module name="ZIP" target="25" />
     </bytecodeTargetLevel>
@@ -28,8 +30,9 @@
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="AI" options="-parameters" />
-      <module name="DatabaseA" options="-parameters" />
+      <module name="Authentication" options="-parameters" />
       <module name="DatabaseAPI" options="-parameters" />
+      <module name="DatabaseCommon" options="-parameters" />
       <module name="DatabaseImpl" options="-parameters" />
       <module name="Discord" options="-parameters" />
       <module name="Excel" options="-parameters" />

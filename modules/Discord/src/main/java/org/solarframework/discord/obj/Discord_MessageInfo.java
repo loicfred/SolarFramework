@@ -7,7 +7,7 @@ import net.dv8tion.jda.api.entities.Message;
 import net.dv8tion.jda.api.entities.channel.middleman.StandardGuildMessageChannel;
 import net.dv8tion.jda.api.exceptions.ErrorHandler;
 import net.dv8tion.jda.api.requests.ErrorResponse;
-import org.solarframework.db.spring.DatabaseObject;
+import org.solarframework.db.api.DatabaseObject;
 import org.solarframework.discord.obj.other.ActionServerID;
 
 import java.util.concurrent.TimeUnit;
@@ -32,7 +32,7 @@ public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
 
     @Column(name = "ChannelID", nullable = false)
     private Long ChannelID;
-    @Column(name = "MessageID", nullable = false)
+    @Column(name = "MessageID", nullable = false, unique = true)
     private Long MessageID;
 
     @Column(name = "ChannelAction", length = 32, nullable = false)

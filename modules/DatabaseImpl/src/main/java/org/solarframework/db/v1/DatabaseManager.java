@@ -1,5 +1,6 @@
 package org.solarframework.db.v1;
 
+import org.solarframework.db.api.DatabaseType;
 import org.solarframework.db.v1.manipulator.ItemCreator;
 import org.solarframework.db.v1.manipulator.ItemDeleter;
 import org.solarframework.db.v1.manipulator.ItemRetrieval;

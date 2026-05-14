@@ -22,8 +22,8 @@ public class Conversation {
         msgs.add(systemMessage != null ? systemMessage : SystemMessage.builder().text("""
                 You are an AI model designed to answer have a conversation with %s.
                 Keep answers clear and short paragraphs, avoid switching lines too much.
-                Avoid answering in list format unless the user asks for it.
-                """.formatted(myName != null ? myName : "a user")).build());
+                Avoid answering in list format unless the authAccountUser asks for it.
+                """.formatted(myName != null ? myName : "a authAccountUser")).build());
     }
 
     public String talk(String yourMessage, Object... toolsObj) {
