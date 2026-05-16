@@ -7,6 +7,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="core" />
+        <module name="WebTemplates" />
         <module name="Excel" />
         <module name="Authentication" />
         <module name="DatabaseImpl" />
@@ -24,6 +25,7 @@
       <module name="DatabaseA" target="25" />
       <module name="DatabaseCommon" target="25" />
       <module name="File" target="25" />
+      <module name="web-modules" target="25" />
       <module name="ZIP" target="25" />
     </bytecodeTargetLevel>
   </component>
@@ -41,8 +43,10 @@
       <module name="Plugin" options="-parameters" />
       <module name="SSLServer" options="-parameters" />
       <module name="SolarFramework" options="-parameters" />
+      <module name="WebTemplates" options="-parameters" />
       <module name="ZIP" options="-parameters" />
       <module name="core" options="-parameters" />
+      <module name="web-modules" options="-parameters" />
     </option>
   </component>
 </project>

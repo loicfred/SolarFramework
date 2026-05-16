@@ -34,8 +34,9 @@ public class DatabaseUtils {
         List<Field> fs = getSerializableFieldsOfClassFamily(clazz);
         Map<String, Object> map = new HashMap<>();
         for (Field f : fs) {
+            String columnName = f.getAnnotation(Column.class) != null && !f.getAnnotation(Column.class).name().isBlank() ? f.getAnnotation(Column.class).name() : f.getName();
             Object value;
-            try {value = rs.getObject(f.getName());
+            try {value = rs.getObject(columnName);
             } catch (Exception ignored) {value = null;}
             map.put(f.getName(), value);
         }
@@ -45,7 +46,8 @@ public class DatabaseUtils {
         List<Field> fs = getSerializableFieldsOfClassFamily(clazz);
         Map<String, Object> map = new HashMap<>();
         for (Field f : fs) {
-            map.put(f.getName(), rs.get(f.getName()));
+            String columnName = f.getAnnotation(Column.class) != null && !f.getAnnotation(Column.class).name().isBlank() ? f.getAnnotation(Column.class).name() : f.getName();
+            map.put(f.getName(), rs.get(columnName));
         }
         return mapResultSetToObject(clazz, map, fs);
     }
@@ -61,6 +63,7 @@ public class DatabaseUtils {
             if (item instanceof DatabaseObject<?> i) i.getService().getCacheHashes().add(i.getHashedIdentifier());
             return item;
         } catch (Exception e) {
+            e.printStackTrace();
             throw new RuntimeException("Failed to map ResultSet to " + clazz.getSimpleName(), e);
         }
     }
@@ -325,7 +328,7 @@ public class DatabaseUtils {
     }
     protected static void setValueWhileConvertingDBToObject(Object item, Object value, Field f) throws IllegalAccessException {
         if (f.getType().isEnum()) {
-            Object enu = Arrays.stream(f.getType().getEnumConstants()).filter(o -> o.toString().equals(value.toString())).findFirst().orElse(null);
+            Object enu = value == null ? null : Arrays.stream(f.getType().getEnumConstants()).filter(o -> o.toString().equals(value.toString())).findFirst().orElse(null);
             f.set(item, enu);
             return;
         }

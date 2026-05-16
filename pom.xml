@@ -23,8 +23,9 @@
         <module>modules/SSLServer</module>
         <module>modules/Plugin</module>
         <module>modules/JSON</module>
-        <module>modules/Authentication</module>
-   </modules>
+        <module>web-modules/Authentication</module>
+        <module>web-modules/WebTemplates</module>
+    </modules>
 
     <repositories>
         <repository>
@@ -99,6 +100,11 @@
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
                 <artifactId>Plugin</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>Authentication</artifactId>
                 <version>1.0</version>
             </dependency>
 

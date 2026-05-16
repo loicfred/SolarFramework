@@ -1,4 +1,4 @@
-package org.solarframework.authentication.obj;
+package org.solarframework.auth.obj;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

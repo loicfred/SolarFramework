@@ -1,27 +1,26 @@
-package org.solarframework.authentication.obj;
+package org.solarframework.auth.obj;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "persistent_logins")
-public class PersistentLogin {
+public class PersistentLogins extends DatabaseObject<PersistentLogins> {
     @Id
     @Column(name = "series", nullable = false, length = 64)
     private String series;
-
     @Column(name = "username", nullable = false, length = 64)
     private String username;
-
     @Column(name = "token", nullable = false, length = 64)
     private String token;
-
     @Column(name = "last_used", nullable = false)
-    private Instant lastUsed;
+    private LocalDateTime lastUsed;
 
     public String getSeries() {
         return series;
@@ -32,7 +31,7 @@ public class PersistentLogin {
     public String getToken() {
         return token;
     }
-    public Instant getLastUsed() {
+    public LocalDateTime getLastUsed() {
         return lastUsed;
     }
 
@@ -45,7 +44,7 @@ public class PersistentLogin {
     public void setToken(String token) {
         this.token = token;
     }
-    public void setLastUsed(Instant lastUsed) {
+    public void setLastUsed(LocalDateTime lastUsed) {
         this.lastUsed = lastUsed;
     }
 

@@ -1,7 +1,7 @@
-package org.solarframework.authentication.obj;
+package org.solarframework.auth.obj;
 
 import jakarta.persistence.*;
-import org.solarframework.authentication.obj.enums.EmailVerificationType;
+import org.solarframework.auth.obj.enums.EmailVerificationType;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
@@ -10,7 +10,7 @@ import java.time.temporal.ChronoUnit;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 @Entity
-@Table(name = "email_verification")
+@Table(name = "account_emailverification")
 public class Account_EmailVerification extends DatabaseObject.ID_OBJ<Long, Account_EmailVerification> {
     @ManyToOne
     @JoinColumn(referencedColumnName = "ID", name = "UserID")
@@ -18,12 +18,12 @@ public class Account_EmailVerification extends DatabaseObject.ID_OBJ<Long, Accou
 
     @Column(name = "UserID", nullable = false)
     public Long userID;
-    @Column(name = "Token", length = 64, nullable = false)
+    @Column(name = "Token", length = 128, nullable = false)
     public String token;
     @Enumerated(EnumType.STRING)
-    @Column(name = "Type", length = 20, nullable = false)
+    @Column(name = "Type", length = 32, nullable = false)
     public EmailVerificationType type;
-    @Column(name = "ExpirtyDate", nullable = false)
+    @Column(name = "ExpiryDate", nullable = false)
     public Long expiryDate = Instant.now().plus(24, ChronoUnit.HOURS).toEpochMilli();
 
     public Account_EmailVerification() {}

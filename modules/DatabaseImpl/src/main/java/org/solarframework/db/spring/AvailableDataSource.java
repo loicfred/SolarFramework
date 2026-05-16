@@ -2,6 +2,7 @@ package org.solarframework.db.spring;
 
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
+import jakarta.persistence.Column;
 import org.solarframework.db.api.IDatabaseService;
 
 import javax.sql.DataSource;
@@ -24,6 +25,7 @@ import static org.solarframework.db.spring.DatabaseManager.loadEntity;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 
 public class AvailableDataSource {
+    private transient DatabaseManager manager;
     private transient IDatabaseService service;
     private transient DataSource dataSource;
 
@@ -47,11 +49,22 @@ public class AvailableDataSource {
 
     private final List<String> entities = new ArrayList<>();
 
-    public AvailableDataSource() {}
+    public AvailableDataSource(DatabaseManager manager) {
+        this.manager = manager;
+    }
 
-    public void addEntity(Class<?>... entities) {
+    public void addEntities(Class<?>... entities) {
         this.entities.addAll(Stream.of(entities).map(Class::getName).toList());
-        for (Class<?> C : entities) loadEntity(this, C);
+    }
+    public void removeEntities(Class<?>... entities) {
+        this.entities.removeAll(Stream.of(entities).map(Class::getName).toList());
+    }
+    public void clearEntities() {
+        this.entities.clear();
+        missingClasses = null;
+        updatableClasses = null;
+        installedClasses = null;
+        entitiesClasses = null;
     }
 
     public String getId() {
@@ -147,7 +160,7 @@ public class AvailableDataSource {
 
     public IDatabaseService getService() {
         if (service != null) return service;
-        if (DefaultDBService != null) this.service = (DatabaseService) copyObject(new DatabaseService(null, null, null, null), DefaultDBService);
+        if (manager != null) this.service = (DatabaseService) copyObject(new DatabaseService(null, null, null, null), DefaultDBService);
         if (this.service != null) this.service.setDataSource(getDataSource());
         return service;
     }
@@ -169,24 +182,30 @@ public class AvailableDataSource {
     }
 
 
+    protected transient List<Class<?>> entitiesClasses;
+    protected transient List<Class<?>> updatableClasses;
+    protected transient List<Class<?>> installedClasses;
+    protected transient List<Class<?>> missingClasses;
+
 
     public List<String> getEntities() {
         return entities;
     }
     public List<Class<?>> getEntitiesClasses() {
-        return entities.stream().map(entityName -> {
+        return entitiesClasses == null ? entitiesClasses = getEntities().stream().map(entityName -> {
             try {
                 return Class.forName(entityName);
             } catch (ClassNotFoundException e) {
                 return null;
             }
-        }).filter(Objects::nonNull).collect(Collectors.toList());
+        }).filter(Objects::nonNull).collect(Collectors.toList()) : entitiesClasses;
     }
 
     public List<String> getUpdatableEntities() {
         return getUpdatableEntitiesClasses().stream().map(Class::getSimpleName).toList();
     }
     public List<Class<?>> getUpdatableEntitiesClasses() {
+        if (updatableClasses != null) return updatableClasses;
         List<Class<?>> entities = new ArrayList<>();
         for (String table : getService().getDatabaseStats().getTableNames()) {
             Class<?> entity = getClassOfTable(table);
@@ -197,18 +216,23 @@ public class AvailableDataSource {
                 entities.add(entity);
                 continue;
             }
-            for (Field field : fields)
-                if (columns.stream().noneMatch(column -> column.equalsIgnoreCase(field.getName())))
+            for (Field field : fields) {
+                String fieldName = field.getAnnotation(Column.class) != null && !field.getAnnotation(Column.class).name().isEmpty() ? field.getAnnotation(Column.class).name() : field.getName();
+                if (columns.stream().noneMatch(column -> column.equalsIgnoreCase(fieldName))) {
                     entities.add(entity);
+                    break;
+                }
+            }
+
         }
-        return entities;
+        return updatableClasses = entities;
     }
 
     public List<String> getInstalledEntities() {
-        return getService().getDatabaseStats().getTableNames();
+        return getInstalledEntitiesClasses().stream().map(Class::getName).toList();
     }
     public List<Class<?>> getInstalledEntitiesClasses() {
-        return getInstalledEntities().stream().map(this::getClassOfTable).collect(Collectors.toList());
+        return installedClasses == null ? installedClasses = getService().getDatabaseStats().getTableNames().stream().map(this::getClassOfTable).filter(Objects::nonNull).collect(Collectors.toList()) : installedClasses;
     }
 
     public List<String> getMissingEntities() {
@@ -216,13 +240,13 @@ public class AvailableDataSource {
         return getEntities().stream().filter(availableEntity -> installedEntities.stream().noneMatch(availableEntity::equalsIgnoreCase)).toList();
     }
     public List<Class<?>> getMissingEntitiesClasses() {
-        return getMissingEntities().stream().map(entityName -> {
+        return missingClasses == null ? missingClasses = getMissingEntities().stream().map(entityName -> {
             try {
                 return Class.forName(entityName);
             } catch (ClassNotFoundException e) {
                 return null;
             }
-        }).filter(Objects::nonNull).collect(Collectors.toList());
+        }).filter(Objects::nonNull).collect(Collectors.toList()) : missingClasses;
     }
 
     private Class<?> getClassOfTable(String name) {

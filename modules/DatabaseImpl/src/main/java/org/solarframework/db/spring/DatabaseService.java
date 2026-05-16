@@ -2,8 +2,11 @@ package org.solarframework.db.spring;
 
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.model.naming.Identifier;
+import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.hibernate.engine.jdbc.env.spi.JdbcEnvironment;
 import org.pf4j.PluginManager;
 import org.pf4j.PluginWrapper;
 import org.slf4j.Logger;
@@ -238,7 +241,7 @@ public class DatabaseService implements IDatabaseService {
 
     // ====== OTHER ======
 
-    public DatabaseStats getDatabaseStats() {
+    public synchronized DatabaseStats getDatabaseStats() {
         return getCachedOrCompute("DBData", "DBSTATISTICS", () -> {
             DatabaseStats stats = new DatabaseStats();
             jdbcTemplate.execute((Connection con) -> {
@@ -275,7 +278,7 @@ public class DatabaseService implements IDatabaseService {
             return stats;
         });
     }
-    public TableStats getTableStats(String name) {
+    public synchronized TableStats getTableStats(String name) {
         return getCachedOrCompute("DBData", "TABLE-" + name, () -> {
             TableStats stats = new TableStats();
             jdbcTemplate.execute((Connection con) -> {
@@ -382,6 +385,7 @@ public class DatabaseService implements IDatabaseService {
                     .applySetting("hibernate.connection.datasource", dataSource)
                     .applySetting("hibernate.dialect", "org.hibernate.dialect.MariaDBDialect")
                     .applySetting("hibernate.hbm2ddl.auto", hb2ddl)
+                    .applySetting("hibernate.physical_naming_strategy", "org.solarframework.db.spring.TableOnlyLowerCaseNamingStrategy")
                     .build();
             MetadataSources metadata = new MetadataSources(registry);
             for (Class<?> c : clz) metadata.addAnnotatedClass(c);
@@ -390,5 +394,6 @@ public class DatabaseService implements IDatabaseService {
             Thread.currentThread().setContextClassLoader(original);
         }
     }
+
 
 }

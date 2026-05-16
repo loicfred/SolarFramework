@@ -1,8 +1,8 @@
-package org.solarframework.authentication.obj;
+package org.solarframework.auth.obj;
 
 import jakarta.persistence.*;
-import org.solarframework.authentication.obj.enums.Gender;
-import org.solarframework.authentication.obj.enums.UserStatus;
+import org.solarframework.auth.obj.enums.Gender;
+import org.solarframework.auth.obj.enums.UserStatus;
 import org.solarframework.core.lang.Nationalities;
 import org.solarframework.db.spring.DatabaseObject;
 
@@ -20,10 +20,12 @@ public class Account_User extends DatabaseObject.ID_RECORD<Long, Account_User> {
 
     @Column(name = "Username", nullable = false, length = 50)
     private String username;
-    @Column(name = "Email", nullable = false)
+    @Column(name = "Email", length = 128, nullable = false)
     private String email;
-    @Column(name = "PasswordHash", nullable = false)
+    @Column(name = "PasswordHash", length = 512, nullable = false)
     private String passwordHash;
+    @Column(name = "Role", length = 64)
+    private String role;
     @Column(name = "FirstName", length = 100)
     private String firstName;
     @Column(name = "LastName", length = 100)
@@ -41,6 +43,12 @@ public class Account_User extends DatabaseObject.ID_RECORD<Long, Account_User> {
     private Boolean emailVerified = false;
     @Column(name = "PhoneNumber", length = 20)
     private String phoneNumber;
+    @Column(name = "Country", length = 32)
+    private String Country;
+    @Column(name = "City", length = 64)
+    private String City;
+    @Column(name = "Address", length = 128)
+    private String Address;
     @Column(name = "PhoneVerified")
     private Boolean phoneVerified = false;
     @Column(name = "FailedLoginAttempts")
@@ -81,6 +89,13 @@ public class Account_User extends DatabaseObject.ID_RECORD<Long, Account_User> {
     }
     public void setPasswordHash(String passwordHash) {
         this.passwordHash = passwordHash;
+    }
+
+    public String getRole() {
+        return role;
+    }
+    public void setRole(String role) {
+        this.role = role;
     }
 
     public String getFirstName() {
@@ -138,6 +153,27 @@ public class Account_User extends DatabaseObject.ID_RECORD<Long, Account_User> {
     }
     public void setPhoneNumber(String phoneNumber) {
         this.phoneNumber = phoneNumber;
+    }
+
+    public String getCountry() {
+        return Country;
+    }
+    public void setCountry(String country) {
+        Country = country;
+    }
+
+    public String getCity() {
+        return City;
+    }
+    public void setCity(String city) {
+        City = city;
+    }
+
+    public String getAddress() {
+        return Address;
+    }
+    public void setAddress(String address) {
+        Address = address;
     }
 
     public Boolean isPhoneVerified() {

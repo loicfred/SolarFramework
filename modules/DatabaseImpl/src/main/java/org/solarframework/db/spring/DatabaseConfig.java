@@ -25,32 +25,6 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 @EnableCaching
 public class DatabaseConfig {
 
-    protected ApplicationContext context;
-
-    public DatabaseConfig(ApplicationContext context) {
-        this.context = context;
-    }
-
-    @EventListener(ApplicationReadyEvent.class)
-    public void setStaticReference() {
-        SolarDBManager = context.getBean(DatabaseManager.class);
-        DefaultDBService = context.getBean(DatabaseService.class);
-        AvailableDataSource s = new AvailableDataSource();
-        s.setName("Database (Default)");
-        s.setConnectionString(connectionString);
-        s.setUsername(username);
-        s.setPassword(password);
-        s.setType(type);
-        s.setMaxPoolSize(maxPoolSize);
-        s.setMinimumIdle(minimumIdle);
-        s.setIdleTimeout(idleTimeout);
-        s.setMaxLifetime(maxLifetime);
-        s.setConnectionTimeout(connectionTimeout);
-        s.asDefault();
-        SolarDBManager.addSource(s);
-        SolarDBManager.reload();
-    }
-
     @Bean("databaseCacheManager")
     public CacheManager databaseCacheManager() {
         SimpleCacheManager cacheManager = new SimpleCacheManager();

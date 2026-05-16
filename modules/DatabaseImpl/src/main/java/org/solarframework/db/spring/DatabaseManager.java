@@ -10,17 +10,21 @@ import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
 import org.solarframework.db.api.dto.DatabaseStats;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.util.*;
 
 import static org.solarframework.core.util.ClassUtils.copyObject;
 import static org.solarframework.core.util.ClassUtils.isClassRelated;
 import static org.solarframework.db.spring.DBObjectService.*;
 import static org.solarframework.db.spring.DatabaseObject.serviceCache;
+import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
+import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 @Service
 public class DatabaseManager {
@@ -31,34 +35,65 @@ public class DatabaseManager {
     protected CacheManager dbCacheManager;
 
     private boolean IsSingleSource = true;
+    private Instant Cooldown = Instant.now().minusSeconds(5);
 
-    protected DatabaseManager(@Qualifier("databaseCacheManager") CacheManager dbCacheManager) {
+    protected DatabaseManager(@Qualifier("databaseCacheManager") CacheManager dbCacheManager,
+                              @Value("${spring.datasource.url:#{null}}") String connectionString,
+                              @Value("${spring.datasource.username:#{null}}") String username,
+                              @Value("${spring.datasource.password:#{null}}") String password,
+                              @Value("${spring.datasource.driver-class-name:#{null}}") String type,
+                              @Value("${spring.datasource.hikari.pool-name:#{null}}") String name,
+                              @Value("${spring.datasource.hikari.maximum-pool-size:#{null}}") Integer maxPoolSize,
+                              @Value("${spring.datasource.hikari.minimum-idle:#{null}}") Integer minimumIdle,
+                              @Value("${spring.datasource.hikari.idle-timeout:#{null}}") Long idleTimeout,
+                              @Value("${spring.datasource.hikari.max-lifetime:#{null}}") Long maxLifetime,
+                              @Value("${spring.datasource.hikari.connection-timeout:#{null}}") Long connectionTimeout,
+                              DatabaseService defaultService) {
         this.dbCacheManager = dbCacheManager;
+        AvailableDataSource s = new AvailableDataSource(this);
+        s.setName("Database (Default)");
+        s.setConnectionString(connectionString);
+        s.setUsername(username);
+        s.setPassword(password);
+        s.setType(type);
+        s.setMaxPoolSize(maxPoolSize);
+        s.setMinimumIdle(minimumIdle);
+        s.setIdleTimeout(idleTimeout);
+        s.setMaxLifetime(maxLifetime);
+        s.setConnectionTimeout(connectionTimeout);
+        s.asDefault();
+        addSource(s);
+        DefaultDBService = defaultService;
+        SolarDBManager = this;
+        reload();
     }
 
     public void reload() {
-        IdFields.clear();
-        TableNames.clear();
-        CachedFields.clear();
-        serviceCache.clear();
-        resetAllCaches();
-        for (AvailableDataSource ds : dataSources) {
-            DatabaseStats stats = ds.getService().getDatabaseStats();
-            log.info("Verifying entities for [{}] - {} Tables - {} Views - {} Rows", ds.getName(), stats.totalTables, stats.totalViews, stats.totalRows);
-            List<Class<?>> availableEntities = (IsSingleSource ? findEntities() : ds.getEntitiesClasses());
-            for (Class<?> C : availableEntities)
-                loadEntity(ds, C);
-            for (String E : ds.getInstalledEntities().stream().filter(e -> availableEntities.stream().noneMatch(c -> Objects.equals(TableNames.get(c), e))).toList())
-                log.warn("Entity class [{}] is missing for [{}].", E, ds.getName());
+        if (Instant.now().isAfter(Cooldown)) {
+            Cooldown = Instant.now().plusSeconds(90);
+            IdFields.clear();
+            TableNames.clear();
+            CachedFields.clear();
+            serviceCache.clear();
+            resetAllCaches();
+            for (AvailableDataSource ds : dataSources) ds.clearEntities();
+            if (IsSingleSource) getDefaultAvailableSource().addEntities(findEntities().toArray(new Class<?>[0]));
+            for (AvailableDataSource ds : dataSources) {
+                DatabaseStats stats = ds.getService().getDatabaseStats();
+                log.info("Verifying entities for [{}] - {} Tables - {} Views - {} Rows", ds.getName(), stats.totalTables, stats.totalViews, stats.totalRows);
+                for (Class<?> C : ds.getEntitiesClasses()) {
+                    loadEntity(ds, C);
+                }
+            }
         }
     }
 
     protected static void loadEntity(AvailableDataSource ds, Class<?> C) {
         try {
-            if (C.getDeclaredConstructor().newInstance() instanceof DatabaseObject<?>) {
-                if (ds.getMissingEntities().contains(C.getSimpleName())) {
-                    log.error("Entity [{}] is registered for [{}] but is missing from the database.", C.getName(), ds.getName());
-                } else if (ds.getUpdatableEntities().contains(C.getSimpleName())) {
+            if (ds.getMissingEntitiesClasses().contains(C)) {
+                log.error("Entity [{}] is registered for [{}] but is missing from the database.", C.getName(), ds.getName());
+            } else if (C.getDeclaredConstructor().newInstance() instanceof DatabaseObject<?>) {
+                 if (ds.getUpdatableEntitiesClasses().contains(C)) {
                     log.warn("Entity [{}] is registered for [{}] but needs to be updated.", C.getName(), ds.getName());
                 } else {
                     log.info("Entity [{}] is registered for [{}].", C.getName(), ds.getName());
@@ -267,4 +302,5 @@ public class DatabaseManager {
         }
         return L;
     }
+
 }

@@ -1,7 +1,8 @@
-package org.solarframework.authentication.spring;
+package org.solarframework.auth.spring;
 
-import org.solarframework.authentication.obj.Account_User;
-import org.solarframework.authentication.obj.PersistentLogin;
+import org.solarframework.auth.obj.Account_User;
+import org.solarframework.auth.obj.PersistentLogins;
+import org.solarframework.db.spring.DatabaseManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -20,15 +21,15 @@ import org.springframework.security.web.authentication.rememberme.PersistentToke
 import java.util.Collections;
 import java.util.List;
 
-import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
-
 @Configuration
 public class SecurityConfig {
 
     private final OAuth2Service oAuth2UserService;
+    private final DatabaseManager databaseManager;
 
-    public SecurityConfig(OAuth2Service oAuth2UserService) {
+    public SecurityConfig(OAuth2Service oAuth2UserService, DatabaseManager databaseManager) {
         this.oAuth2UserService = oAuth2UserService;
+        this.databaseManager = databaseManager;
     }
 
     // Password Encoder
@@ -74,7 +75,7 @@ public class SecurityConfig {
     public LogoutSuccessHandler logoutSuccessHandler() {
         return (request, response, authentication) -> {
             if (authentication != null) System.out.println(authentication.getName() + " logged out!");
-            response.sendRedirect("/accounts/login?logout");
+            response.sendRedirect("/auth/v1/login?logout");
         };
     }
 
@@ -91,10 +92,10 @@ public class SecurityConfig {
     @Bean
     public PersistentTokenRepository persistentTokenRepository() {
         JdbcTokenRepositoryImpl repo = new JdbcTokenRepositoryImpl();
-        if (SolarDBManager.getAvailableSource(PersistentLogin.class).getMissingEntities().contains(PersistentLogin.class)) {
-            SolarDBManager.getService(PersistentLogin.class).createSchema(List.of(PersistentLogin.class));
+        if (databaseManager.getAvailableSource(PersistentLogins.class).getMissingEntitiesClasses().contains(PersistentLogins.class)) {
+            databaseManager.getService(PersistentLogins.class).createSchema(List.of(PersistentLogins.class));
         }
-        repo.setDataSource(SolarDBManager.getAvailableSource(PersistentLogin.class).getDataSource());
+        repo.setDataSource(databaseManager.getAvailableSource(PersistentLogins.class).getDataSource());
         return repo;
     }
 
@@ -102,7 +103,7 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, RememberMeServices rememberMeServices) {
         String[] publicPaths = {
-                "/", "/home", "/accounts/**", "/api/v1/**", "/error",
+                "/", "/home", "/auth/v1/**", "/auth/v2/**", "/api/v1/**", "/api/v2/**", "/error",
                 "/service-worker.js", "/manifest.json", "/offline",
                 "/css/**", "/js/**", "/img/**"
         };
@@ -118,10 +119,10 @@ public class SecurityConfig {
                 )
                 // Form Login
                 .formLogin(form -> form
-                        .loginPage("/accounts/login")
-                        .loginProcessingUrl("/accounts/login")
+                        .loginPage("/auth/v1/login")
+                        .loginProcessingUrl("/auth/v1/login")
                         .successHandler(formLoginSuccessHandler())
-                        .failureUrl("/accounts/login?error")
+                        .failureUrl("/auth/v1/login?error")
                         .permitAll()
                 )
                 // Remember-Me
@@ -138,7 +139,7 @@ public class SecurityConfig {
                 )
                 // OAuth2 Login
                 .oauth2Login(oauth -> oauth
-                        .loginPage("/accounts/login")
+                        .loginPage("/auth/v1/login")
                         .userInfoEndpoint(userInfo -> userInfo.userService(oAuth2UserService))
                         .successHandler(oauth2LoginSuccessHandler(rememberMeServices))
                 )

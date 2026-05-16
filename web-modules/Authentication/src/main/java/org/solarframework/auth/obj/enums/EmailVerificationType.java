@@ -1,4 +1,4 @@
-package org.solarframework.authentication.obj.enums;
+package org.solarframework.auth.obj.enums;
 
 public enum EmailVerificationType {
 

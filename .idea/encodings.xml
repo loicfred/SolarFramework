@@ -6,7 +6,6 @@
     <file url="file://$PROJECT_DIR$/core/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/AI/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/modules/Authentication/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/Database-API/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/DatabaseA/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/modules/DatabaseAPI/src/main/java" charset="UTF-8" />
@@ -23,5 +22,8 @@
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/untitled/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/untitled/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/web-modules/Authentication/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/web-modules/WebTemplates/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/web-modules/src/main/java" charset="UTF-8" />
   </component>
 </project>

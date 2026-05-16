@@ -1,6 +1,6 @@
-package org.solarframework.authentication.spring;
+package org.solarframework.auth.spring;
 
-import org.solarframework.authentication.obj.Account_User;
+import org.solarframework.auth.obj.Account_User;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
