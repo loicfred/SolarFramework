@@ -27,9 +27,8 @@ public class ActionServerID implements Serializable {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        ActionServerID entity = (ActionServerID) o;
-        return Objects.equals(this.Action, entity.Action) && Objects.equals(this.ServerID, entity.ServerID);
+        if (!(o instanceof ActionServerID that)) return false;
+        return Objects.equals(this.Action, that.Action) && Objects.equals(this.ServerID, that.ServerID);
     }
 
     @Override

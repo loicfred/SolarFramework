@@ -1,5 +1,7 @@
 package org.solarframework.db.api;
 
+import org.solarframework.db.spring.DatabaseObject;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;

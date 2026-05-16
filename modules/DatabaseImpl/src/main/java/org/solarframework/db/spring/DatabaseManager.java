@@ -1,71 +1,117 @@
 package org.solarframework.db.spring;
 
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ScanResult;
+import jakarta.persistence.Entity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.solarframework.db.api.DatabaseObject;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
 import org.solarframework.db.api.dto.DatabaseStats;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.context.ApplicationContext;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 import static org.solarframework.core.util.ClassUtils.copyObject;
 import static org.solarframework.core.util.ClassUtils.isClassRelated;
-import static org.solarframework.db.spring.DatabaseUtils.getTableName;
-import static org.solarframework.db.spring.DatabaseRegistry.*;
+import static org.solarframework.db.spring.DBObjectService.*;
+import static org.solarframework.db.spring.DatabaseObject.serviceCache;
 
 @Service
 public class DatabaseManager {
     private static final Logger log = LoggerFactory.getLogger(DatabaseManager.class);
     private final List<AvailableDataSource> dataSources = new java.util.ArrayList<>();
+    private List<ClassLoader> entityClassloaders = new java.util.ArrayList<>();
 
-    protected ApplicationContext context;
     protected CacheManager dbCacheManager;
 
-    public DatabaseManager(ApplicationContext context, @Qualifier("databaseCacheManager") CacheManager dbCacheManager) {
-        this.context = context;
+    private boolean IsSingleSource = true;
+
+    protected DatabaseManager(@Qualifier("databaseCacheManager") CacheManager dbCacheManager) {
         this.dbCacheManager = dbCacheManager;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
-    public void setStaticReference() {
-        DefaultDBService = context.getBean(DatabaseService.class);
-        SolarDBManager = context.getBean(DatabaseManager.class);
+    public void reload() {
+        IdFields.clear();
+        TableNames.clear();
+        CachedFields.clear();
+        serviceCache.clear();
+        resetAllCaches();
+        for (AvailableDataSource ds : dataSources) {
+            DatabaseStats stats = ds.getService().getDatabaseStats();
+            log.info("Verifying entities for [{}] - {} Tables - {} Views - {} Rows", ds.getName(), stats.totalTables, stats.totalViews, stats.totalRows);
+            List<Class<?>> availableEntities = (IsSingleSource ? findEntities() : ds.getEntitiesClasses());
+            for (Class<?> C : availableEntities)
+                loadEntity(ds, C);
+            for (String E : ds.getInstalledEntities().stream().filter(e -> availableEntities.stream().noneMatch(c -> Objects.equals(TableNames.get(c), e))).toList())
+                log.warn("Entity class [{}] is missing for [{}].", E, ds.getName());
+        }
     }
 
+    protected static void loadEntity(AvailableDataSource ds, Class<?> C) {
+        try {
+            if (C.getDeclaredConstructor().newInstance() instanceof DatabaseObject<?>) {
+                if (ds.getMissingEntities().contains(C.getSimpleName())) {
+                    log.error("Entity [{}] is registered for [{}] but is missing from the database.", C.getName(), ds.getName());
+                } else if (ds.getUpdatableEntities().contains(C.getSimpleName())) {
+                    log.warn("Entity [{}] is registered for [{}] but needs to be updated.", C.getName(), ds.getName());
+                } else {
+                    log.info("Entity [{}] is registered for [{}].", C.getName(), ds.getName());
+                }
+            } else {
+                log.error("Entity class [{}] is NOT CHILD of DatabaseObject<>.", C.getName());
+            }
+        } catch (Exception ignored) {
+            log.error("{} does not have a default constructor.", C.getName());
+        }
+    }
+
+
+    public void createAllSchemas() {
+        for (AvailableDataSource ds : dataSources) {
+            ds.getService().createSchema(ds.getEntitiesClasses());
+        }
+    }
+    public void updateAllSchemas() {
+        for (AvailableDataSource ds : dataSources) {
+            ds.getService().updateSchema(ds.getEntitiesClasses());
+        }
+    }
 
     public void addSource(AvailableDataSource ds) {
-        if (ds.isDefault()) for (AvailableDataSource d : dataSources) d.setDefault(false);
+        if (ds.getConnectionString().isEmpty() || ds.getName().isEmpty() || ds.getPassword().isEmpty() || ds.getUsername().isEmpty()
+                || getSources().stream().anyMatch(d -> d.getConnectionString().equalsIgnoreCase(ds.getConnectionString()) || d.getName().equals(ds.getName()))) return;
         dataSources.add(ds);
+        IsSingleSource = dataSources.size() == 1;
     }
-
-
+    public boolean removeSource(String name) {
+        if (getSources().stream().anyMatch(ds -> ds.getName().equals(name) && ds.isDefault())) return false;
+        return getSources().removeIf(ds -> ds.getName().equals(name));
+    }
     public List<AvailableDataSource> getSources() {
-        if (dataSources.stream().noneMatch(AvailableDataSource::isDefault) && !dataSources.isEmpty()) dataSources.getFirst().setDefault(true);
         return dataSources;
     }
 
     public IDatabaseService getService(String name) {
+        if (IsSingleSource) return getDefaultService();
         return getAvailableSource(name).getService();
     }
     public IDatabaseService getService(Class<?> entity) {
+        if (IsSingleSource) return getDefaultService();
         return getAvailableSource(entity).getService();
     }
 
     public AvailableDataSource getAvailableSource(String name) {
+        if (IsSingleSource) return getDefaultAvailableSource();
         return getSources().stream().filter(ds -> ds.getEntities().contains(name) || ds.getName().equalsIgnoreCase(name)).findFirst().orElseThrow();
     }
     public AvailableDataSource getAvailableSource(Class<?> entity) {
+        if (IsSingleSource) return getDefaultAvailableSource();
         return getSources().stream().filter(ds -> ds.getEntities().contains(entity.getName())).findFirst().orElseThrow();
     }
 
@@ -80,13 +126,13 @@ public class DatabaseManager {
 
     // ====== SHORT CUTS ======
 
-    public <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object id) {
+    public <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object... id) {
         return getService(clazz).getByIdWithJoins(clazz, id);
     }
-    public <T> Optional<T> getById(String select, Class<T> clazz, Object id) {
+    public <T> Optional<T> getById(String select, Class<T> clazz, Object... id) {
         return getService(clazz).getById(select, clazz, id);
     }
-    public <T> Optional<T> getById(Class<T> clazz, Object id) {
+    public <T> Optional<T> getById(Class<T> clazz, Object... id) {
         return getService(clazz).getById(clazz, id);
     }
 
@@ -141,7 +187,7 @@ public class DatabaseManager {
     }
 
     public void resetAllCaches() {
-        dbCacheManager.getCacheNames().stream().filter(c -> !c.equals("DBObject")).toList().forEach(c -> dbCacheManager.getCache(c).clear());
+        dbCacheManager.getCacheNames().forEach(c -> dbCacheManager.getCache(c).clear());
     }
     public void resetCache(String cacheName) {
         Cache cache = dbCacheManager.getCache(cacheName);
@@ -195,8 +241,8 @@ public class DatabaseManager {
                 DatabaseStats stats = ds.getService().getDatabaseStats();
                 full.totalRows += stats.totalRows;
                 full.totalTables += stats.totalTables;
-                full.tableNames.addAll(stats.tableNames);
                 full.totalViews += stats.totalViews;
+                full.tableNames.addAll(stats.tableNames);
                 full.viewNames.addAll(stats.viewNames);
                 return stats;
             } catch (Exception ignored) {
@@ -204,5 +250,21 @@ public class DatabaseManager {
             }
         }
         return full;
+    }
+
+    public void setEntityClassLoaders(List<ClassLoader> entityClassloaders) {
+        this.entityClassloaders = entityClassloaders;
+    }
+
+
+    private List<Class<?>> findEntities() {
+        List<Class<?>> L = new ArrayList<>();
+        if (entityClassloaders.isEmpty()) entityClassloaders.add(Thread.currentThread().getContextClassLoader());
+        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(entityClassloaders.toArray(new ClassLoader[]{})).scan()) {
+            for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(Entity.class).stream().toList()) {
+                L.add(classInfo.loadClass());
+            }
+        }
+        return L;
     }
 }

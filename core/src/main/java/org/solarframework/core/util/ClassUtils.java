@@ -5,6 +5,7 @@ import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 public class ClassUtils {
@@ -24,11 +25,10 @@ public class ClassUtils {
 
     public static List<Field> getAllFieldsOfClassFamily(Class<?> clazz) {
         List<Field> fields = new ArrayList<>();
-        Class<?> currentClass = clazz;
-        while (currentClass != null) {
-            fields.addAll(Arrays.stream(currentClass.getDeclaredFields()).peek(field -> field.setAccessible(true)).toList());
-            currentClass = currentClass.getSuperclass();
+        for (Class<?> c = clazz; c != null; c = c.getSuperclass()) {
+            fields.addAll(Arrays.stream(c.getDeclaredFields()).peek(f -> f.setAccessible(true)).toList());
         }
+        Collections.reverse(fields);
         return fields;
     }
     public static List<Field> getSerializableFieldsOfClassFamily(Class<?> clazz) {
@@ -67,7 +67,11 @@ public class ClassUtils {
 
     public static Object copyObject(Object target, Object source) {
         try {
-            for (Field field : getAllFieldsOfClassFamily(target.getClass())) field.set(target, field.get(source));
+            for (Field field : getAllFieldsOfClassFamily(target.getClass())) {
+                if (Modifier.isStatic(field.getModifiers())) continue;
+                if (Modifier.isFinal(field.getModifiers())) continue;
+                field.set(target, field.get(source));
+            }
             return target;
         } catch (Exception e) {
             e.printStackTrace();

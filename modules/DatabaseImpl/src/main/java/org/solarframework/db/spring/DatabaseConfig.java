@@ -1,10 +1,7 @@
 package org.solarframework.db.spring;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.zaxxer.hikari.HikariConfig;
-import com.zaxxer.hikari.HikariDataSource;
-import org.solarframework.db.api.DatabaseType;
-import org.solarframework.db.v1.DatabaseEditor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cache.CacheManager;
@@ -17,11 +14,12 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.event.EventListener;
-import org.springframework.data.annotation.ReadOnlyProperty;
 
-import javax.sql.DataSource;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
+import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 @Configuration
 @EnableCaching
@@ -31,6 +29,26 @@ public class DatabaseConfig {
 
     public DatabaseConfig(ApplicationContext context) {
         this.context = context;
+    }
+
+    @EventListener(ApplicationReadyEvent.class)
+    public void setStaticReference() {
+        SolarDBManager = context.getBean(DatabaseManager.class);
+        DefaultDBService = context.getBean(DatabaseService.class);
+        AvailableDataSource s = new AvailableDataSource();
+        s.setName("Database (Default)");
+        s.setConnectionString(connectionString);
+        s.setUsername(username);
+        s.setPassword(password);
+        s.setType(type);
+        s.setMaxPoolSize(maxPoolSize);
+        s.setMinimumIdle(minimumIdle);
+        s.setIdleTimeout(idleTimeout);
+        s.setMaxLifetime(maxLifetime);
+        s.setConnectionTimeout(connectionTimeout);
+        s.asDefault();
+        SolarDBManager.addSource(s);
+        SolarDBManager.reload();
     }
 
     @Bean("databaseCacheManager")
@@ -50,4 +68,26 @@ public class DatabaseConfig {
         manager.setCaffeine(Caffeine.newBuilder().expireAfterWrite(30, TimeUnit.MINUTES).maximumSize(50_000));
         return manager;
     }
+
+    @Value("${spring.datasource.url:#{null}}")
+    private String connectionString;
+    @Value("${spring.datasource.username:#{null}}")
+    public String username;
+    @Value("${spring.datasource.password:#{null}}")
+    public String password;
+    @Value("${spring.datasource.driver-class-name:#{null}}")
+    public String type;
+    @Value("${spring.datasource.hikari.pool-name:#{null}}")
+    public String name;
+    @Value("${spring.datasource.hikari.maximum-pool-size:#{null}}")
+    public int maxPoolSize;
+    @Value("${spring.datasource.hikari.minimum-idle:#{null}}")
+    public int minimumIdle;
+    @Value("${spring.datasource.hikari.idle-timeout:#{null}}")
+    public long idleTimeout;
+    @Value("${spring.datasource.hikari.max-lifetime:#{null}}")
+    public long maxLifetime;
+    @Value("${spring.datasource.hikari.connection-timeout:#{null}}")
+    public long connectionTimeout;
+
 }

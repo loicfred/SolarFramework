@@ -3,7 +3,7 @@ package org.solarframework.authentication.obj;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import org.solarframework.db.api.DatabaseObject;
+import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
 import java.util.List;

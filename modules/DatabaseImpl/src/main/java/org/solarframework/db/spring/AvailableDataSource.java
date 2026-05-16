@@ -20,6 +20,7 @@ import java.util.stream.Stream;
 
 import static org.solarframework.core.util.ClassUtils.copyObject;
 import static org.solarframework.core.util.ClassUtils.getAllFieldsOfClassFamily;
+import static org.solarframework.db.spring.DatabaseManager.loadEntity;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 
 public class AvailableDataSource {
@@ -44,12 +45,13 @@ public class AvailableDataSource {
     private long maxLifetime = 1800000;
     private long connectionTimeout = 20000;
 
-    private List<String> entities = new ArrayList<>();
+    private final List<String> entities = new ArrayList<>();
 
     public AvailableDataSource() {}
 
     public void addEntity(Class<?>... entities) {
         this.entities.addAll(Stream.of(entities).map(Class::getName).toList());
+        for (Class<?> C : entities) loadEntity(this, C);
     }
 
     public String getId() {
@@ -88,9 +90,6 @@ public class AvailableDataSource {
     public long getConnectionTimeout() {
         return connectionTimeout;
     }
-    public void setDefault(boolean isDefault) {
-        this.isDefault = isDefault;
-    }
 
     public void setName(String name) {
         this.name = name;
@@ -121,6 +120,9 @@ public class AvailableDataSource {
     }
     public void setConnectionTimeout(long connectionTimeout) {
         this.connectionTimeout = connectionTimeout;
+    }
+    protected void asDefault() {
+        this.isDefault = true;
     }
 
     public long getPing() {

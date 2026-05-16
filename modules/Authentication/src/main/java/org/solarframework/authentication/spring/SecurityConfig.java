@@ -20,7 +20,6 @@ import org.springframework.security.web.authentication.rememberme.PersistentToke
 import java.util.Collections;
 import java.util.List;
 
-import static org.solarframework.db.api.DatabaseObject.retrieveServiceFor;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 @Configuration

@@ -1,32 +1,35 @@
 package org.solarframework.discord.obj;
 
-import iecompbot.Config;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Table;
 import net.dv8tion.jda.api.entities.emoji.ApplicationEmoji;
 import net.dv8tion.jda.api.entities.emoji.CustomEmoji;
 import net.dv8tion.jda.api.entities.emoji.Emoji;
-import org.jetbrains.annotations.NotNull;
-import org.solarframework.db.api.DatabaseObject;
+import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
-import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
-import static org.solarframework.discord.core.BotBuilder.DiscordDBService;
 import static org.solarframework.discord.core.BotBuilder.*;
 
+@Entity
+@Table(name = "discord_channelinfo")
 public class Discord_BotEmoji extends DatabaseObject.ID_OBJ<Long, Discord_BotEmoji> {
-    public static final Emoji EmptyEmoji = Emoji.fromUnicode("U+25AA");
+    private static final Emoji EmptyEmoji = Emoji.fromUnicode("U+25AA");
     private transient Emoji emoji;
 
-    public Long ServerID = null;
+    @Column(name = "ChannelID", nullable = false)
     public String Name;
+    @Column(name = "Formatted")
     public String Formatted;
+    @Column(name = "ServerID")
+    public Long ServerID = null;
 
     protected Discord_BotEmoji() {}
     public Discord_BotEmoji(ApplicationEmoji emoji) {
-        Name = emoji.getName();
         ID = emoji.getIdLong();
+        Name = emoji.getName();
         Formatted = emoji.getAsMention();
         if (!IsTestMode) Write();
     }
@@ -46,22 +49,17 @@ public class Discord_BotEmoji extends DatabaseObject.ID_OBJ<Long, Discord_BotEmo
         }
     }
 
-    public static Discord_BotEmoji get(@NotNull String emojiFormatted, Long serverID) {
-        if (Config.isUsingTestBot && serverID == null && !emojiFormatted.toLowerCase().contains("u+")) return DiscordDBService.getById(BotEmoji.class, TestBotEmpty).orElse(null);
-        Discord_BotEmoji E = DiscordDBService.getWhere(BotEmoji.class, "(ID = ? OR Name = ? OR Formatted = ?) AND ServerID = ?", emojiFormatted, emojiFormatted, emojiFormatted, serverID).orElse(null);
-        if (E != null && E.Name.toLowerCase().startsWith("u+")) return E;
-        else if (E != null && E.ServerID != null && DiscordAccount.getGuildById(E.ServerID) != null) return E;
-        else if (E == null && Config.isUsingTestBot) return DiscordDBService.getById(BotEmoji.class, TestBotEmpty).orElse(null);
-        else if (E == null) return DiscordDBService.getById(BotEmoji.class, NormalBotEmpty).orElse(null);
-        else if (Objects.equals(E.ID, TestBotEmpty) && !Config.isUsingTestBot) return DiscordDBService.getById(BotEmoji.class, NormalBotEmpty).orElse(null);
-        else if (Objects.equals(E.ID, NormalBotEmpty) && Config.isUsingTestBot) return DiscordDBService.getById(BotEmoji.class, TestBotEmpty).orElse(null);
-        return E;
+    public static Discord_BotEmoji getById(long emojiId) {
+        if (IsTestMode) return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
+        return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "ID = ?", emojiId).orElse(null);
     }
-    public static Discord_BotEmoji get(long emojiId) {
-        return get(String.valueOf(emojiId), null);
+    public static Discord_BotEmoji getByName(String name) {
+        if (IsTestMode) return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
+        return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "Name = ?", name).orElse(null);
     }
-    public static Discord_BotEmoji get(String emojiFormatted) {
-        return get(emojiFormatted, null);
+    public static Discord_BotEmoji getByFormatted(String formatted) {
+        if (IsTestMode) return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
+        return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "Formatted = ?", formatted).orElse(null);
     }
 
     public Emoji retrieve() {

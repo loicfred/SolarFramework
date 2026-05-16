@@ -3,6 +3,7 @@ package org.solarframework.db.api;
 import org.solarframework.db.api.dto.DatabaseStats;
 import org.solarframework.db.api.dto.Row;
 import org.solarframework.db.api.dto.TableStats;
+import org.solarframework.db.spring.DatabaseObject;
 
 import javax.sql.DataSource;
 import java.util.List;
@@ -16,11 +17,11 @@ public interface IDatabaseService {
     <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject);
 
 
-    <O, T> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object id);
+    <O, T> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id);
     <O, T> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args);
-    <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object id);
-    <T> Optional<T> getById(String select, Class<T> clazz, Object id);
-    <T> Optional<T> getById(Class<T> clazz, Object id);
+    <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object... id);
+    <T> Optional<T> getById(String select, Class<T> clazz, Object... id);
+    <T> Optional<T> getById(Class<T> clazz, Object... id);
     <T> Optional<T> getWhereWithJoins(Class<T> clazz, String whereClause, Object... args);
     <T> Optional<T> getWhere(String select, Class<T> clazz, String whereClause, Object... args);
     <T> Optional<T> getWhere(Class<T> clazz, String whereClause, Object... args);

@@ -8,9 +8,11 @@ import org.pf4j.PluginManager;
 import org.pf4j.PluginWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.solarframework.db.api.DatabaseObject;
-import org.solarframework.db.api.*;
-import org.solarframework.db.api.dto.*;
+import org.solarframework.db.api.IDBObjectService;
+import org.solarframework.db.api.IDatabaseService;
+import org.solarframework.db.api.dto.DatabaseStats;
+import org.solarframework.db.api.dto.Row;
+import org.solarframework.db.api.dto.TableStats;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -26,6 +28,7 @@ import java.sql.ResultSet;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.solarframework.db.spring.DBObjectService.IdFields;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.db.spring.DatabaseUtils.*;
 
@@ -62,8 +65,8 @@ public class DatabaseService implements IDatabaseService {
         return new DBObjectService<>(this, dbobject);
     }
 
-    public <O, T> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object id) {
-        return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE ID = ? LIMIT 1;", id);
+    public <O, T> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id) {
+        return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + IdFields.get(table).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")) + " LIMIT 1;", id);
     }
     public <O, T> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args) {
         return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + where + " LIMIT 1;", args);
@@ -72,13 +75,13 @@ public class DatabaseService implements IDatabaseService {
 
     // ====== SHORT CUTS ======
 
-    public <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object id) {
-        return this.doQueryJoin(clazz, "MAIN.ID = ?", id);
+    public <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object... id) {
+        return this.doQueryJoin(clazz, IdFields.get(clazz).stream().map(f -> "MAIN." + f.getName() + " = ?").collect(Collectors.joining(" AND ")), id);
     }
-    public <T> Optional<T> getById(String select, Class<T> clazz, Object id) {
-        return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE ID = ? LIMIT 1;", id);
+    public <T> Optional<T> getById(String select, Class<T> clazz, Object... id) {
+        return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + IdFields.get(clazz).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")) + " LIMIT 1;", id);
     }
-    public <T> Optional<T> getById(Class<T> clazz, Object id) {
+    public <T> Optional<T> getById(Class<T> clazz, Object... id) {
         return getById("*", clazz, id);
     }
 

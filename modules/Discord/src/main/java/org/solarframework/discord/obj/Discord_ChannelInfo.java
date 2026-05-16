@@ -6,7 +6,7 @@ import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildMessageChannel;
 import net.dv8tion.jda.api.requests.restaction.MessageCreateAction;
-import org.solarframework.db.api.DatabaseObject;
+import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.discord.obj.other.ActionServerID;
 
 import java.util.List;

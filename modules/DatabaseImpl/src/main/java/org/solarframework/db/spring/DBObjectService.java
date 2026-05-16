@@ -1,8 +1,8 @@
 package org.solarframework.db.spring;
 
 import jakarta.persistence.Id;
-import org.solarframework.db.api.*;
-import org.springframework.jdbc.core.RowMapper;
+import org.solarframework.db.api.IDBObjectService;
+import org.solarframework.db.api.IDatabaseService;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -18,33 +18,32 @@ import static org.solarframework.json.JSONItem.GSON;
 
 @SuppressWarnings("all")
 public class DBObjectService<T> implements IDBObjectService<T> {
-    protected transient Class<T> entityClass;
-    protected transient List<Field> cachedFields = new ArrayList<>();
-    protected transient String tableName;
-    protected transient List<String> idFields = new ArrayList<>();
-    protected transient List<String> cacheHashes = new ArrayList<>();
-    protected transient RowMapper<T> rowMapper;
+    protected static final Map<Class<?>, String> TableNames = new HashMap<>();
+    protected static final Map<Class<?>, List<Field>> IdFields = new HashMap<>();
+    protected static final Map<Class<?>, List<Field>> CachedFields = new HashMap<>();
+
     protected transient DatabaseObject<T> dbObject;
     protected transient IDatabaseService dbService;
-
+    protected transient Class<T> entityClass;
+    protected transient String tableName;
+    protected transient List<Field> cachedFields = new ArrayList<>();
+    protected transient List<Field> idFields = new ArrayList<>();
+    protected transient List<String> cacheHashes = new ArrayList<>();
 
     public List<String> getCacheHashes() {
         return cacheHashes;
     }
 
-
     public DBObjectService(IDatabaseService service, DatabaseObject<T> obj) {
         this.dbService = service;
         this.dbObject = obj;
         this.entityClass = (Class<T>) dbObject.getClass();
-        this.tableName = getTableName(entityClass);
 
-        this.cachedFields.addAll(getSerializableFieldsOfClassFamily(entityClass).stream().collect(Collectors.toList()));
-        this.cachedFields.stream().filter(f -> f.isAnnotationPresent(Id.class)).forEach(f -> idFields.add(f.getName().toLowerCase()));
-
-        this.cachedFields.removeIf(f -> !dbService.getTableStats(tableName).columnNames.contains(f.getName().toLowerCase()));
-        this.rowMapper = (rs, rowNum) -> mapResultSetToObject(rs, entityClass);
+        this.tableName = TableNames.computeIfAbsent(entityClass, c -> getTableName(entityClass));
+        this.cachedFields = CachedFields.computeIfAbsent(entityClass, c -> getSerializableFieldsOfClassFamily(entityClass).stream().filter(f -> dbService.getTableStats(tableName).getColumnNames().contains(f.getName().toLowerCase())).collect(Collectors.toList()));
+        this.idFields = IdFields.computeIfAbsent(entityClass, c -> CachedFields.get(entityClass).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toList()));
     }
+
 
     public String getHashedIdentifier() {
         List<Object> ids = cachedFields.stream().filter(f -> idFields.contains(f.getName().toLowerCase())).map(f -> getFieldValue(f, dbObject)).toList();
@@ -120,8 +119,8 @@ public class DBObjectService<T> implements IDBObjectService<T> {
             String setClause = column + " = " + column + " + ?";
             List<Object> setValues = List.of(amount);
 
-            String whereClause = idFields.stream().map(ID -> ID + " = ?").collect(Collectors.joining(" AND "));
-            List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(cachedFields.stream().filter(f -> f.getName().equalsIgnoreCase(ID)).findFirst().orElseThrow(), dbObject)).collect(Collectors.toList()));
+            String whereClause = idFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
+            List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));
 
             List<Object> finalValues = new ArrayList<>();
             finalValues.addAll(setValues);
@@ -141,8 +140,8 @@ public class DBObjectService<T> implements IDBObjectService<T> {
             String setClause = parameters.entrySet().stream().map(f -> f.getKey() + " = " + f.getKey() + " + ?").collect(Collectors.joining(", "));
             List<Object> setValues = parameters.entrySet().stream().map(f -> f.getValue()).collect(Collectors.toList());
 
-            String whereClause = idFields.stream().map(ID -> ID + " = ?").collect(Collectors.joining(" AND "));
-            List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(cachedFields.stream().filter(f -> f.getName().equalsIgnoreCase(ID)).findFirst().orElseThrow(), dbObject)).collect(Collectors.toList()));
+            String whereClause = idFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
+            List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));
 
             List<Object> finalValues = new ArrayList<>();
             finalValues.addAll(setValues);
@@ -164,8 +163,8 @@ public class DBObjectService<T> implements IDBObjectService<T> {
             String setClause = cachedFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(", "));
             List<Object> setValues = cleanParameterList(cachedFields.stream().map(f -> getFieldValue(f, dbObject)).collect(Collectors.toList()));
 
-            String whereClause = idFields.stream().map(ID -> ID + " = ?").collect(Collectors.joining(" AND "));
-            List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(cachedFields.stream().filter(f -> f.getName().equalsIgnoreCase(ID)).findFirst().orElseThrow(), dbObject)).collect(Collectors.toList()));
+            String whereClause = idFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
+            List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));
 
             List<Object> finalValues = new ArrayList<>();
             finalValues.addAll(setValues);
@@ -189,8 +188,8 @@ public class DBObjectService<T> implements IDBObjectService<T> {
             String setClause = fieldsList.stream().filter(f -> Arrays.stream(columns).anyMatch(c -> Objects.equals(c, f.getName()))).map(f -> f.getName() + " = ?").collect(Collectors.joining(", "));
             List<Object> setValues = cleanParameterList(fieldsList.stream().filter(f -> Arrays.stream(columns).anyMatch(c -> Objects.equals(c, f.getName()))).map(f -> getFieldValue(f, dbObject)).collect(Collectors.toList()));
 
-            String whereClause = idFields.stream().map(ID -> ID + " = ?").collect(Collectors.joining(" AND "));
-            List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(cachedFields.stream().filter(f -> f.getName().equalsIgnoreCase(ID)).findFirst().orElseThrow(), dbObject)).collect(Collectors.toList()));
+            String whereClause = idFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
+            List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));
 
             List<Object> finalValues = new ArrayList<>();
             finalValues.addAll(setValues);
@@ -209,9 +208,9 @@ public class DBObjectService<T> implements IDBObjectService<T> {
     @Override
     public int Delete() {
         try {
-            List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(cachedFields.stream().filter(f -> f.getName().equalsIgnoreCase(ID)).findFirst().orElseThrow(), dbObject)).collect(Collectors.toList()));
+            List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));
 
-            String sql = "DELETE FROM " + tableName + " WHERE " + idFields.stream().map(ID -> ID + " = ?").collect(Collectors.joining(" AND "));
+            String sql = "DELETE FROM " + tableName + " WHERE " + idFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
             return dbService.doUpdate(sql, whereValues.toArray());
         } catch (Exception e) {
             throw new RuntimeException("No ID field found in " + tableName + ".");
@@ -225,8 +224,8 @@ public class DBObjectService<T> implements IDBObjectService<T> {
     public <A> A refetchAttribute(String attributeName, Class<A> attributeType) {
         Field attribute = getAllFieldsOfClassFamily(entityClass).stream().filter(f -> f.getName().equalsIgnoreCase(attributeName)).findFirst().orElse(null);
         if (attribute == null) return null;
-        String whereClause = idFields.stream().map(ID -> ID + " = ?").collect(Collectors.joining(" AND "));
-        List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(cachedFields.stream().filter(f -> f.getName().equalsIgnoreCase(ID)).findFirst().orElseThrow(), dbObject)).collect(Collectors.toList()));
+        String whereClause = idFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
+        List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));
         A val = dbService.getSingleColumnOfTableWhere(attribute.getName(), attributeType, entityClass, whereClause, whereValues.toArray()).orElse(null);
         setFieldValue(attribute,dbObject, val);
         return val;

@@ -2,7 +2,7 @@ package org.solarframework.authentication.obj;
 
 import jakarta.persistence.*;
 import org.solarframework.authentication.obj.enums.EmailVerificationType;
-import org.solarframework.db.api.DatabaseObject;
+import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;

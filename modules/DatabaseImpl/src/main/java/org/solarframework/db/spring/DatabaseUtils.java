@@ -2,8 +2,8 @@ package org.solarframework.db.spring;
 
 import com.google.gson.*;
 import jakarta.persistence.*;
-import org.solarframework.db.api.*;
-import org.solarframework.db.api.dto.*;
+import org.solarframework.db.api.IDatabaseService;
+import org.solarframework.db.api.dto.Row;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Constructor;

@@ -3,7 +3,7 @@ package org.solarframework.discord.obj;
 import jakarta.persistence.*;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Role;
-import org.solarframework.db.api.DatabaseObject;
+import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.discord.obj.other.ActionServerID;
 
 import static org.solarframework.discord.core.BotBuilder.DiscordDBService;
@@ -79,4 +79,7 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
         return G == null ? G = DiscordAccount.getGuildById(ServerID) : G;
     }
 
+    public Discord_BotEmoji getEmoji() {
+        return retrieveServiceFor(Discord_BotEmoji.class).getById(Discord_BotEmoji.class, EmojiID).orElse(null);
+    }
 }

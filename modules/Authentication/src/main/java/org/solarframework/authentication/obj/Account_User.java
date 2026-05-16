@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import org.solarframework.authentication.obj.enums.Gender;
 import org.solarframework.authentication.obj.enums.UserStatus;
 import org.solarframework.core.lang.Nationalities;
-import org.solarframework.db.api.DatabaseObject;
+import org.solarframework.db.spring.DatabaseObject;
 
 import java.security.Principal;
 import java.time.Instant;
@@ -16,7 +16,7 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 @Entity
 @Table(name = "account_user")
-public class Account_User extends DatabaseObject.ID_OBJ<Long, Account_User> {
+public class Account_User extends DatabaseObject.ID_RECORD<Long, Account_User> {
 
     @Column(name = "Username", nullable = false, length = 50)
     private String username;
@@ -61,12 +61,6 @@ public class Account_User extends DatabaseObject.ID_OBJ<Long, Account_User> {
     private Gender gender = Gender.OTHER;
     @Column(name = "Timezone", length = 50)
     private String timezone = "UTC";
-    @Column(name = "CreatedAt", nullable = false)
-    private Instant createdAt = Instant.now();
-    @Column(name = "UpdatedAt", nullable = false)
-    private Instant updatedAt = Instant.now();
-    @Column(name = "DeletedAt")
-    private Instant deletedAt;
 
     public String getUsername() {
         return username;
@@ -207,27 +201,6 @@ public class Account_User extends DatabaseObject.ID_OBJ<Long, Account_User> {
     }
     public void setTimezone(String timezone) {
         this.timezone = timezone;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-    public void setCreatedAt(Instant createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-    public void setUpdatedAt(Instant updatedAt) {
-        this.updatedAt = updatedAt;
-    }
-
-    public Instant getDeletedAt() {
-        return deletedAt;
-    }
-    public void setDeletedAt(Instant deletedAt) {
-        this.deletedAt = deletedAt;
     }
 
     public Account_User() {
