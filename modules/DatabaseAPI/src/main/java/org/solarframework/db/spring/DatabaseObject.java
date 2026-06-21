@@ -103,23 +103,7 @@ public class DatabaseObject<T> {
     protected void onUpdate() {}
 
     @MappedSuperclass
-    public static class ID_OBJ<IDTYPE, T> extends DatabaseObject<T> {
-        @Id
-        @Column(name = "ID")
-        public IDTYPE ID;
-
-        public IDTYPE getID() {
-            return ID;
-        }
-        public void setID(IDTYPE ID) {
-            this.ID = ID;
-        }
-
-        protected ID_OBJ() {}
-    }
-
-    @MappedSuperclass
-    public static class ID_RECORD<IDTYPE, T> extends ID_OBJ<IDTYPE, T> {
+    public static class ID_RECORD<T> extends DatabaseObject<T> {
         @Column(name = "CreatedAt", nullable = false)
         private LocalDateTime createdAt;
         @Column(name = "UpdatedAt", nullable = false)
@@ -160,5 +144,35 @@ public class DatabaseObject<T> {
         }
 
         protected ID_RECORD() {}
+    }
+    @MappedSuperclass
+    public static class ID_OBJ<IDTYPE, T> extends DatabaseObject<T> {
+        @Id
+        @Column(name = "ID")
+        public IDTYPE ID;
+
+        public IDTYPE getID() {
+            return ID;
+        }
+        public void setID(IDTYPE ID) {
+            this.ID = ID;
+        }
+
+        protected ID_OBJ() {}
+    }
+    @MappedSuperclass
+    public static class ID_OBJ_RECORD<IDTYPE, T> extends ID_RECORD<T> {
+        @Id
+        @Column(name = "ID")
+        public IDTYPE ID;
+
+        public IDTYPE getID() {
+            return ID;
+        }
+        public void setID(IDTYPE ID) {
+            this.ID = ID;
+        }
+
+        protected ID_OBJ_RECORD() {}
     }
 }

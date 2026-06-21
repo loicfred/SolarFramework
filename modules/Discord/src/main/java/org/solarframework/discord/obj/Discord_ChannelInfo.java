@@ -35,8 +35,8 @@ public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
     @Column(name = "ChannelID", nullable = false)
     private Long ChannelID;
 
-    public Discord_ChannelInfo() {}
-    public Discord_ChannelInfo(Guild G, GuildChannel channel, String action) {
+    protected Discord_ChannelInfo() {}
+    protected Discord_ChannelInfo(Guild G, GuildChannel channel, String action) {
         this.G = G;
         this.C = channel;
         this.ServerID = G.getIdLong();
@@ -91,7 +91,12 @@ public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
         return Messages == null ? Messages = DiscordDBService.getAllWhere(Discord_MessageInfo.class, "ChannelID = ? AND ChannelAction = ?", getChannelID(), getAction()) : Messages;
     }
 
-    public Discord_MessageInfo newEmptyMessage() {
-        return new Discord_MessageInfo(getAction(), getServerID(), getChannelID());
+    public String getAsMention() {
+        return getChannel() != null ? getChannel().getAsMention() : null;
     }
+    public String getJumpUrl() {
+        return getChannel() != null ? getChannel().getJumpUrl() : null;
+    }
+
+
 }

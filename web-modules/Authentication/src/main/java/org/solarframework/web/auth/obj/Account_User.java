@@ -1,8 +1,8 @@
-package org.solarframework.auth.obj;
+package org.solarframework.web.auth.obj;
 
 import jakarta.persistence.*;
-import org.solarframework.auth.obj.enums.Gender;
-import org.solarframework.auth.obj.enums.UserStatus;
+import org.solarframework.web.auth.obj.enums.Gender;
+import org.solarframework.web.auth.obj.enums.UserStatus;
 import org.solarframework.core.lang.Nationalities;
 import org.solarframework.db.spring.DatabaseObject;
 
@@ -16,7 +16,7 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 @Entity
 @Table(name = "account_user")
-public class Account_User extends DatabaseObject.ID_RECORD<Long, Account_User> {
+public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_User> {
 
     @Column(name = "Username", nullable = false, length = 50)
     private String username;
@@ -25,7 +25,7 @@ public class Account_User extends DatabaseObject.ID_RECORD<Long, Account_User> {
     @Column(name = "PasswordHash", length = 512, nullable = false)
     private String passwordHash;
     @Column(name = "Role", length = 64)
-    private String role;
+    private String role = "USER";
     @Column(name = "FirstName", length = 100)
     private String firstName;
     @Column(name = "LastName", length = 100)

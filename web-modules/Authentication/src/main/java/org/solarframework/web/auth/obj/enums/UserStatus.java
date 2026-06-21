@@ -1,4 +1,4 @@
-package org.solarframework.auth.obj.enums;
+package org.solarframework.web.auth.obj.enums;
 
 public enum UserStatus {
     ACTIVE,

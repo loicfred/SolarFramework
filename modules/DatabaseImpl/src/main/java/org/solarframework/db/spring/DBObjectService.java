@@ -182,11 +182,11 @@ public class DBObjectService<T> implements IDBObjectService<T> {
     @Override
     public int UpdateOnly(String... columns) {
         try {
-            List<Field> fieldsList = Arrays.stream(columns).noneMatch(c -> cachedFields.stream().anyMatch(f -> Objects.equals(c, f.getName()))) ?
-                    getAllFieldsOfClassFamily(entityClass).stream().filter(ff -> !Modifier.isTransient(ff.getModifiers()) && !Modifier.isStatic(ff.getModifiers())).toList() : cachedFields;
+            List<Field> fieldsList = cachedFields.stream().filter(f -> Arrays.stream(columns).anyMatch(c -> f.getName().equalsIgnoreCase(c.toLowerCase()))).toList();
+            if (fieldsList.isEmpty()) return 0;
 
-            String setClause = fieldsList.stream().filter(f -> Arrays.stream(columns).anyMatch(c -> Objects.equals(c, f.getName()))).map(f -> f.getName() + " = ?").collect(Collectors.joining(", "));
-            List<Object> setValues = cleanParameterList(fieldsList.stream().filter(f -> Arrays.stream(columns).anyMatch(c -> Objects.equals(c, f.getName()))).map(f -> getFieldValue(f, dbObject)).collect(Collectors.toList()));
+            String setClause = fieldsList.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(", "));
+            List<Object> setValues = cleanParameterList(fieldsList.stream().map(f -> getFieldValue(f, dbObject)).collect(Collectors.toList()));
 
             String whereClause = idFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
             List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));

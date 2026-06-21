@@ -11,6 +11,7 @@ import net.dv8tion.jda.api.utils.ChunkingFilter;
 import net.dv8tion.jda.api.utils.MemberCachePolicy;
 import org.solarframework.db.api.IDatabaseService;
 
+import java.util.List;
 import java.util.function.Supplier;
 
 public class BotBuilder {
@@ -22,6 +23,7 @@ public class BotBuilder {
     public static StandardGuildMessageChannel TemporaryFilesChannel;
     public static StandardGuildMessageChannel LogChannel;
     public static boolean IsTestMode = false;
+    protected static List<ClassLoader> classLoaders = List.of(Thread.currentThread().getContextClassLoader());
 
     private final String token;
     private final String commandPackage;
@@ -79,5 +81,7 @@ public class BotBuilder {
     public void setDiscordDBService(IDatabaseService discordDBService) {
         DiscordDBService = discordDBService;
     }
-
+    public void setClassLoaders(List<ClassLoader> loaders) {
+        classLoaders.addAll(loaders);
+    }
 }

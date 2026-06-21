@@ -1,4 +1,4 @@
-package org.solarframework.auth.spring;
+package org.solarframework.web.auth.spring;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;

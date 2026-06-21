@@ -134,20 +134,27 @@ public class DatabaseManager {
 
     public IDatabaseService getService(String name) {
         if (IsSingleSource) return getDefaultService();
-        return getAvailableSource(name).getService();
+        return getSourceByName(name).getService();
     }
     public IDatabaseService getService(Class<?> entity) {
         if (IsSingleSource) return getDefaultService();
-        return getAvailableSource(entity).getService();
+        return getSourceByEntity(entity).getService();
     }
 
-    public AvailableDataSource getAvailableSource(String name) {
+    public AvailableDataSource getSourceById(String id) {
         if (IsSingleSource) return getDefaultAvailableSource();
-        return getSources().stream().filter(ds -> ds.getEntities().contains(name) || ds.getName().equalsIgnoreCase(name)).findFirst().orElseThrow();
+        return getSources().stream().filter(ds -> ds.getId().equals(id)).findFirst().orElseThrow();
     }
-    public AvailableDataSource getAvailableSource(Class<?> entity) {
+    public AvailableDataSource getSourceByName(String name) {
         if (IsSingleSource) return getDefaultAvailableSource();
-        return getSources().stream().filter(ds -> ds.getEntities().contains(entity.getName())).findFirst().orElseThrow();
+        return getSources().stream().filter(ds -> ds.getName().equalsIgnoreCase(name)).findFirst().orElseThrow();
+    }
+    public AvailableDataSource getSourceByEntity(String name) {
+        if (IsSingleSource) return getDefaultAvailableSource();
+        return getSources().stream().filter(ds -> ds.getEntities().contains(name)).findFirst().orElseThrow();
+    }
+    public AvailableDataSource getSourceByEntity(Class<?> entity) {
+        return getSourceByEntity(entity.getName());
     }
 
     public AvailableDataSource getDefaultAvailableSource() {

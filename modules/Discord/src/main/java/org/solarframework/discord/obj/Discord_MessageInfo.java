@@ -1,5 +1,6 @@
 package org.solarframework.discord.obj;
 
+import club.minnced.discord.webhook.receive.ReadonlyMessage;
 import club.minnced.discord.webhook.send.WebhookMessageBuilder;
 import jakarta.persistence.*;
 import net.dv8tion.jda.api.entities.Guild;
@@ -11,6 +12,7 @@ import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.discord.obj.other.ActionServerID;
 
 import java.util.concurrent.TimeUnit;
+import java.util.function.Consumer;
 
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 import static org.solarframework.discord.utils.WebhookUtils.getWebhookOfChannel;
@@ -32,7 +34,7 @@ public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
 
     @Column(name = "ChannelID", nullable = false)
     private Long ChannelID;
-    @Column(name = "MessageID", nullable = false, unique = true)
+    @Column(name = "MessageID", unique = true)
     private Long MessageID;
 
     @Column(name = "ChannelAction", length = 32, nullable = false)
@@ -73,23 +75,23 @@ public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
         return M;
     }
 
-    public void ModifyWebhookMessageElseCreate(WebhookMessageBuilder e) {
+    public void ModifyWebhookMessageElseCreate(WebhookMessageBuilder e, Consumer<ReadonlyMessage> m) {
         try {
             if (MessageID == null) {
                 getWebhookOfChannel(getChannel(), WC
                         -> WC.send(e.build()).whenComplete((msg, _)
-                        -> { if (msg != null) MessageID = msg.getId();
-                }));
+                        -> {if (msg != null) MessageID = msg.getId();m.accept(msg);}
+                ));
                 return;
             }
             getChannel().retrieveMessageById(MessageID).queue(ignored
                             -> getWebhookOfChannel(getChannel(), WC
                             -> WC.edit(MessageID, e.build()).whenComplete((msg, _)
-                            -> MessageID = msg.getId())),
+                            -> {MessageID = msg.getId();m.accept(msg);})),
                     new ErrorHandler().handle(ErrorResponse.UNKNOWN_MESSAGE, _
                             -> getWebhookOfChannel(getChannel(), WC
-                            -> WC.send(e.build()).whenComplete((msg, _) -> {
-                        if (msg != null) MessageID = msg.getId();
+                            -> WC.send(e.build()).whenComplete((msg, _)
+                            -> {if (msg != null) MessageID = msg.getId();m.accept(msg);
                     })))
             );
         } catch (Exception ignored) {}
@@ -114,5 +116,41 @@ public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
             M = null;
             MessageID = null;
         } catch (Exception ignored) {}
+    }
+
+    public String getAction() {
+        return Action;
+    }
+    public void setAction(String action) {
+        Action = action;
+    }
+
+    public Long getServerID() {
+        return ServerID;
+    }
+    public void setServerID(Long serverID) {
+        ServerID = serverID;
+    }
+
+    public Long getChannelID() {
+        return ChannelID;
+    }
+    public void setChannelID(Long channelID) {
+        ChannelID = channelID;
+    }
+
+    public Long getMessageID() {
+        return MessageID;
+    }
+    public void setMessageID(Long messageID) {
+        MessageID = messageID;
+    }
+
+    public String getChannelAction() {
+        return ChannelAction;
+    }
+
+    public void setChannelAction(String channelAction) {
+        ChannelAction = channelAction;
     }
 }

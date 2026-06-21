@@ -29,8 +29,8 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
     @Column(name = "EmojiID")
     private Long EmojiID;
 
-    public Discord_RoleInfo() {}
-    public Discord_RoleInfo(Guild G, Role role, String action) {
+    protected Discord_RoleInfo() {}
+    protected Discord_RoleInfo(Guild G, Role role, String action) {
         this.G = G;
         this.R = role;
         this.ServerID = G.getIdLong();
@@ -81,5 +81,12 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
 
     public Discord_BotEmoji getEmoji() {
         return retrieveServiceFor(Discord_BotEmoji.class).getById(Discord_BotEmoji.class, EmojiID).orElse(null);
+    }
+    public void setEmoji(Discord_BotEmoji emoji) {
+        EmojiID = emoji != null ? emoji.getID() : null;
+    }
+
+    public String getAsMention() {
+        return getRole() != null ? getRole().getAsMention() : null;
     }
 }

@@ -165,7 +165,7 @@ public class DefaultListener extends ListenerAdapter {
     @SuppressWarnings("unchecked")
     private static <T> List<T> loadClasses(Class<T> clazz, String commandPackage) {
         List<T> L = new ArrayList<>();
-        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().acceptPackages(commandPackage).scan()) {
+        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(classLoaders.toArray(new ClassLoader[]{})).acceptPackages(commandPackage).scan()) {
             for (ClassInfo classInfo : scanResult.getSubclasses(clazz).stream().toList()) {
                 try {
                     L.add((T) classInfo.loadClass().getDeclaredConstructor().newInstance());

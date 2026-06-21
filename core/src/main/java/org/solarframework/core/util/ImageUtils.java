@@ -171,7 +171,7 @@ public class ImageUtils {
     }
 
 
-   public static BufferedImage reducePixelColorWithRoof(File input, Color rgbRemove, Color roof, boolean isZeroTransparent) throws IOException {
+    public static BufferedImage reducePixelColorWithRoof(File input, Color rgbRemove, Color roof, boolean isZeroTransparent) throws IOException {
         return reducePixelColorWithRoof(ImageIO.read(input), rgbRemove, roof, isZeroTransparent);
     }
     public static BufferedImage reducePixelColorWithRoof(String url, Color rgbRemove, Color roof, boolean isZeroTransparent) throws IOException {

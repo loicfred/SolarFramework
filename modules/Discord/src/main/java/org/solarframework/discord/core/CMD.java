@@ -167,19 +167,23 @@ public class CMD {
             return null;
         }
     }
-    protected Modal makeModal(Class<? extends ModalCMD> modal, List<ModalTopLevelComponent> components, Object... metadata) {
+
+    protected Modal.Builder makeModalBuilder(Class<? extends ModalCMD> modal, List<ModalTopLevelComponent> components, Object... metadata) {
         try {
             ModalCMD Mdl = modal.getDeclaredConstructor().newInstance();
             Mdl.IT = IT;
             String id = Mdl.getData().id() + Arrays.stream(metadata).map(Object::toString).reduce("", (a, b) -> a + "/" + b);
             if (id.length() > Button.ID_MAX_LENGTH) throw new RuntimeException("Modal ID is too long for " + id);
-            return Modal.create(id, TL(Mdl.getData().title()))
-                    .addComponents(components).build();
+            return Modal.create(id, TL(Mdl.getData().title())).addComponents(components);
         } catch (Exception ignored) {
             return null;
         }
     }
-    protected StringSelectMenu makeStringSelectMenu(Class<? extends StringSelectCMD> select, List<SelectOption> options, Object... metadata) {
+    protected Modal makeModal(Class<? extends ModalCMD> modal, List<ModalTopLevelComponent> components, Object... metadata) {
+        return makeModalBuilder(modal, components, metadata).build();
+    }
+
+    protected StringSelectMenu.Builder makeStringSelectMenuBuilder(Class<? extends StringSelectCMD> select, List<SelectOption> options, Object... metadata) {
         try {
             StringSelectCMD Menu = select.getDeclaredConstructor().newInstance();
             Menu.IT = IT;
@@ -188,34 +192,32 @@ public class CMD {
             return StringSelectMenu.create(id)
                     .setPlaceholder(TL(Menu.getData().placeholder()))
                     .setRequiredRange(Menu.getData().minValues(), Menu.getData().maxValues()).addOptions(options)
-                    .setRequired(Menu.getData().required()).build();
+                    .setRequired(Menu.getData().required());
 
         } catch (Exception ignored) {
             return null;
         }
     }
-    protected EntitySelectMenu makeUserSelectMenu(Class<? extends EntitySelectCMD> select, Object... metadata) {
-        return makeEntitySelectMenu(select, EntitySelectMenu.SelectTarget.USER, metadata);
-    }
-    protected EntitySelectMenu makeChannelSelectMenu(Class<? extends EntitySelectCMD> select, Object... metadata) {
-        return makeEntitySelectMenu(select, EntitySelectMenu.SelectTarget.CHANNEL, metadata);
-    }
-    protected EntitySelectMenu makeRoleSelectMenu(Class<? extends EntitySelectCMD> select, Object... metadata) {
-        return makeEntitySelectMenu(select, EntitySelectMenu.SelectTarget.ROLE, metadata);
-    }
-    private EntitySelectMenu makeEntitySelectMenu(Class<? extends EntitySelectCMD> select, EntitySelectMenu.SelectTarget target, Object... metadata) {
+    protected EntitySelectMenu.Builder makeEntitySelectMenuBuilder(Class<? extends EntitySelectCMD> select, Object... metadata) {
         try {
             EntitySelectCMD Menu = select.getDeclaredConstructor().newInstance();
             Menu.IT = IT;
             String id = Menu.getData().id() + Arrays.stream(metadata).map(Object::toString).reduce("", (a, b) -> a + "/" + b);
             if (id.length() > Button.ID_MAX_LENGTH) throw new RuntimeException("Entity Select ID is too long for " + id);
-            return EntitySelectMenu.create(id, target)
+            return EntitySelectMenu.create(id, Menu.getData().type())
                     .setPlaceholder(TL(Menu.getData().placeholder()))
                     .setRequiredRange(Menu.getData().minValues(), Menu.getData().maxValues())
-                    .setRequired(Menu.getData().required()).build();
+                    .setRequired(Menu.getData().required());
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    protected StringSelectMenu makeStringSelectMenu(Class<? extends StringSelectCMD> select, List<SelectOption> options, Object... metadata) {
+        return makeStringSelectMenuBuilder(select, options, metadata).build();
+    }
+    protected EntitySelectMenu makeEntitySelectMenu(Class<? extends EntitySelectCMD> select, Object... metadata) {
+        return makeEntitySelectMenuBuilder(select, EntitySelectMenu.SelectTarget.ROLE, metadata).build();
     }
 
     protected <T extends CMD> T makeCustomCMD(Class<T> clazz) {
@@ -244,10 +246,10 @@ public class CMD {
     public static ModalTopLevelComponent makeTextInput(String label, String id, TextInputStyle style, String placeholder, int minLength, int maxLength, boolean required) {
         return Label.of(label, TextInput.create(id, style).setPlaceholder(placeholder).setRequiredRange(minLength, maxLength).setRequired(required).build());
     }
-    public static ModalTopLevelComponent makeEntityInput(String label, String id, EntitySelectMenu.SelectTarget type, String placeholder, int minLength, int maxLength, boolean required) {
+    public static ModalTopLevelComponent makeEntitySelectInput(String label, String id, EntitySelectMenu.SelectTarget type, String placeholder, int minLength, int maxLength, boolean required) {
         return Label.of(label, EntitySelectMenu.create(id, type).setPlaceholder(placeholder).setRequiredRange(minLength, maxLength).setRequired(required).build());
     }
-    public static ModalTopLevelComponent makeEntityInput(String label, String id, String placeholder, int minLength, int maxLength, boolean required, SelectOption... options) {
+    public static ModalTopLevelComponent makeStringSelectInput(String label, String id, String placeholder, int minLength, int maxLength, boolean required, SelectOption... options) {
         return Label.of(label, StringSelectMenu.create(id).setPlaceholder(placeholder).addOptions(options).setRequiredRange(minLength, maxLength).setRequired(required).build());
     }
     public static ModalTopLevelComponent makeCheckboxInput(String label, int minValues, int maxValues, boolean required, CheckboxGroupOption... options) {

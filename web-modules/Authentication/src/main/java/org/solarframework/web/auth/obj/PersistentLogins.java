@@ -1,4 +1,4 @@
-package org.solarframework.auth.obj;
+package org.solarframework.web.auth.obj;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -6,7 +6,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import org.solarframework.db.spring.DatabaseObject;
 
-import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity

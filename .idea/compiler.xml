@@ -6,17 +6,18 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="core" />
         <module name="WebTemplates" />
+        <module name="DatabaseEditor" />
+        <module name="AI" />
+        <module name="JSON" />
+        <module name="DatabaseAPI" />
+        <module name="DatabaseA" />
+        <module name="core" />
         <module name="Excel" />
         <module name="Authentication" />
         <module name="DatabaseImpl" />
-        <module name="AI" />
-        <module name="JSON" />
         <module name="Discord" />
-        <module name="DatabaseAPI" />
         <module name="SSLServer" />
-        <module name="DatabaseA" />
         <module name="Plugin" />
       </profile>
     </annotationProcessing>
@@ -35,6 +36,7 @@
       <module name="Authentication" options="-parameters" />
       <module name="DatabaseAPI" options="-parameters" />
       <module name="DatabaseCommon" options="-parameters" />
+      <module name="DatabaseEditor" options="-parameters" />
       <module name="DatabaseImpl" options="-parameters" />
       <module name="Discord" options="-parameters" />
       <module name="Excel" options="-parameters" />

@@ -5,11 +5,15 @@ import jakarta.persistence.*;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
 import org.solarframework.core.lang.Nationalities;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.awt.*;
+import java.lang.reflect.InvocationTargetException;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 import static org.solarframework.core.util.ImageUtils.getDominantColor;
@@ -29,7 +33,11 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     @OneToMany
     @JoinColumn(referencedColumnName = "ID", name = "ServerID")
     private transient List<Discord_ChannelInfo> Channels;
+    @OneToMany
+    @JoinColumn(referencedColumnName = "ID", name = "ServerID")
+    private transient List<Discord_GuildVariable> Variables;
 
+    private transient Object extender;
 
     @Column(name = "OwnerID", nullable = false)
     private Long ownerID;
@@ -40,59 +48,64 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     @Column(name = "Name", nullable = false, length = 256)
     private String name;
 
-    @Column(name = "Description", nullable = false, length = 2048)
+    @Column(name = "Description", length = 2048)
     private String description;
-
-    @Column(name = "Story", length = 2048)
-    private String story;
-
+    
     @Column(name = "DominantColorcode", nullable = false, length = 7)
-    private String dominantColorcode;
+    private String dominantColorcode = "#808080";
 
     @Column(name = "InviteLink", length = 128)
     private String inviteLink;
 
-    @Column(name = "IconUrl", nullable = false, length = 256)
+    @Column(name = "IconUrl", length = 512)
     private String iconUrl;
-
+    
     @Enumerated(EnumType.STRING)
     @Column(name = "Nationality", nullable = false, length = 32)
     private Nationalities nationality = Nationalities.International;
 
-    @Column(name = "WebsiteURL", length = 256)
-    private String websiteURL;
+    @Column(name = "BannerUrl", length = 512)
+    private String bannerUrl;
 
-    @Column(name = "TwitterURL", length = 256)
-    private String twitterURL;
+    @Column(name = "BoostTier")
+    private Integer boostTier;
 
-    @Column(name = "TwitchURL", length = 256)
-    private String twitchURL;
+    @Column(name = "BoostCount")
+    private Integer boostCount;
 
-    @Column(name = "YouTubeURL", length = 256)
-    private String youTubeURL;
+    @Column(name = "VerificationLevel", length = 32)
+    private String verificationLevel;
 
-    @Column(name = "InstagramURL", length = 256)
-    private String instagramURL;
+    @Column(name = "NsfwLevel", length = 32)
+    private String nsfwLevel;
 
-    @Column(name = "TiktokURL", length = 256)
-    private String tiktokURL;
+    @Column(name = "ExplicitContentFilter", length = 32)
+    private String explicitContentFilter;
 
-    @Column(name = "Public", nullable = false)
-    private Boolean publicField;
+    @Column(name = "MfaLevel", length = 32)
+    private String mfaLevel;
 
-    @Column(name = "Trusted", nullable = false)
-    private Boolean trusted;
+    @Column(name = "SystemChannelID")
+    private Long systemChannelID;
 
+    @Column(name = "RulesChannelID")
+    private Long rulesChannelID;
 
-    public Guild getGuild() {
-        return Guild == null ? Guild = DiscordAccount.getGuildById(ID) : Guild;
-    }
-    public List<Discord_RoleInfo> getRoles() {
-        return Roles;
-    }
-    public List<Discord_ChannelInfo> getChannels() {
-        return Channels;
-    }
+    @Column(name = "AfkChannelID")
+    private Long afkChannelID;
+
+    @Column(name = "AfkTimeout")
+    private Integer afkTimeout;
+
+    @Column(name = "MaxMembers")
+    private Integer maxMembers = 0;
+
+    @Column(name = "MaxPresences")
+    private Integer maxPresences;
+
+    @Column(name = "PremiumTier")
+    private Integer premiumTier;
+
 
     public Long getOwnerID() {
         return ownerID;
@@ -120,13 +133,6 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     }
     public void setDescription(String description) {
         this.description = description;
-    }
-
-    public String getStory() {
-        return story;
-    }
-    public void setStory(String story) {
-        this.story = story;
     }
 
     public String getDominantColorcode() {
@@ -157,60 +163,102 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         this.nationality = nationality;
     }
 
-    public String getWebsiteURL() {
-        return websiteURL;
+    public String getBannerUrl() {
+        return bannerUrl;
     }
-    public void setWebsiteURL(String websiteURL) {
-        this.websiteURL = websiteURL;
-    }
-
-    public String getTwitterURL() {
-        return twitterURL;
-    }
-    public void setTwitterURL(String twitterURL) {
-        this.twitterURL = twitterURL;
+    public void setBannerUrl(String bannerUrl) {
+        this.bannerUrl = bannerUrl;
     }
 
-    public String getTwitchURL() {
-        return twitchURL;
+    public Integer getBoostTier() {
+        return boostTier;
     }
-    public void setTwitchURL(String twitchURL) {
-        this.twitchURL = twitchURL;
-    }
-
-    public String getYouTubeURL() {
-        return youTubeURL;
-    }
-    public void setYouTubeURL(String youTubeURL) {
-        this.youTubeURL = youTubeURL;
+    public void setBoostTier(Integer boostTier) {
+        this.boostTier = boostTier;
     }
 
-    public String getInstagramURL() {
-        return instagramURL;
+    public Integer getBoostCount() {
+        return boostCount;
     }
-    public void setInstagramURL(String instagramURL) {
-        this.instagramURL = instagramURL;
-    }
-
-    public String getTiktokURL() {
-        return tiktokURL;
-    }
-    public void setTiktokURL(String tiktokURL) {
-        this.tiktokURL = tiktokURL;
+    public void setBoostCount(Integer boostCount) {
+        this.boostCount = boostCount;
     }
 
-    public Boolean getPublic() {
-        return publicField;
+    public String getVerificationLevel() {
+        return verificationLevel;
     }
-    public void setPublic(Boolean publicField) {
-        this.publicField = publicField;
+    public void setVerificationLevel(String verificationLevel) {
+        this.verificationLevel = verificationLevel;
     }
 
-    public Boolean getTrusted() {
-        return trusted;
+    public String getNsfwLevel() {
+        return nsfwLevel;
     }
-    public void setTrusted(Boolean trusted) {
-        this.trusted = trusted;
+    public void setNsfwLevel(String nsfwLevel) {
+        this.nsfwLevel = nsfwLevel;
+    }
+
+    public String getExplicitContentFilter() {
+        return explicitContentFilter;
+    }
+    public void setExplicitContentFilter(String explicitContentFilter) {
+        this.explicitContentFilter = explicitContentFilter;
+    }
+
+    public String getMfaLevel() {
+        return mfaLevel;
+    }
+    public void setMfaLevel(String mfaLevel) {
+        this.mfaLevel = mfaLevel;
+    }
+
+    public Long getSystemChannelID() {
+        return systemChannelID;
+    }
+    public void setSystemChannelID(Long systemChannelID) {
+        this.systemChannelID = systemChannelID;
+    }
+
+    public Long getRulesChannelID() {
+        return rulesChannelID;
+    }
+    public void setRulesChannelID(Long rulesChannelID) {
+        this.rulesChannelID = rulesChannelID;
+    }
+
+    public Long getAfkChannelID() {
+        return afkChannelID;
+    }
+    public void setAfkChannelID(Long afkChannelID) {
+        this.afkChannelID = afkChannelID;
+    }
+
+    public Integer getAfkTimeout() {
+        return afkTimeout;
+    }
+    public void setAfkTimeout(Integer afkTimeout) {
+        this.afkTimeout = afkTimeout;
+    }
+
+    public Integer getMaxMembers() {
+        return maxMembers;
+    }
+    public void setMaxMembers(Integer maxMembers) {
+        this.maxMembers = maxMembers;
+    }
+
+    public Integer getMaxPresences() {
+        return maxPresences;
+    }
+    public void setMaxPresences(Integer maxPresences) {
+        this.maxPresences = maxPresences;
+    }
+
+    public Integer getPremiumTier() {
+        return premiumTier;
+    }
+    public void setPremiumTier(Integer premiumTier) {
+        this.premiumTier = premiumTier;
     }
 
     public Color getColor() {
@@ -232,6 +280,18 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         return new WebhookMessageBuilder().setUsername(getGuild().getName()).setAvatarUrl(getGuild().getIconUrl());
     }
 
+    public Guild getGuild() {
+        return Guild == null ? Guild = DiscordAccount.getGuildById(ID) : Guild;
+    }
+    public List<Discord_RoleInfo> getRoles() {
+        return Roles != null ? Roles = DiscordDBService.getAllWhere(Discord_RoleInfo.class, "ServerID = ?", getID()) : Roles;
+    }
+    public List<Discord_ChannelInfo> getChannels() {
+        return Channels != null ? Channels = DiscordDBService.getAllWhere(Discord_ChannelInfo.class, "ServerID = ?", getID()) : Channels;
+    }
+    public List<Discord_GuildVariable> getVariables() {
+        return DiscordDBService.getAllWhere(Discord_GuildVariable.class, "ServerID = ?", getID());
+    }
 
     public Discord_GuildInfo() {}
     public Discord_GuildInfo(Guild guild) {
@@ -258,22 +318,89 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
             if (getGuild().getFeatures().contains("COMMUNITY") && getNationality() == Nationalities.International) setNationality(Nationalities.get(getGuild().getLocale().getLanguageName()));
             if (getGuild().getVanityCode() != null) setInviteLink("https://discord.gg/" + getGuild().getVanityCode());
             setDominantColorcode(getHexValue(getDominantColor(getGuild().getIconUrl())));
+            setBannerUrl(getGuild().getBannerUrl());
+            setBoostTier(getGuild().getBoostTier().getKey());
+            setBoostCount(getGuild().getBoostCount());
+            setVerificationLevel(getGuild().getVerificationLevel().name());
+            setNsfwLevel(getGuild().getNSFWLevel().name());
+            setExplicitContentFilter(getGuild().getExplicitContentLevel().name());
+            setMfaLevel(getGuild().getRequiredMFALevel().name());
+            setSystemChannelID(getGuild().getSystemChannel() != null ? getGuild().getSystemChannel().getIdLong() : null);
+            setRulesChannelID(getGuild().getRulesChannel() != null ? getGuild().getRulesChannel().getIdLong() : null);
+            setAfkChannelID(getGuild().getAfkChannel() != null ? getGuild().getAfkChannel().getIdLong() : null);
+            setAfkTimeout(getGuild().getAfkTimeout().getSeconds());
+            setMaxMembers(getGuild().getMaxMembers());
+            setMaxPresences(getGuild().getMaxPresences());
+            setPremiumTier(getGuild().getBoostTier().getKey());
         } catch (Exception ignored) {}
         Update();
     }
 
     public void LogGuild(String string) {
-        if (getLogChannel() != null && getLogChannel().canTalk()) getLogChannel().sendMessage(string).queue();
+        if (getLogChannel().isPresent() && getLogChannel().get().canTalk()) getLogChannel().get().sendMessage(string).queue();
         else new Discord_ChannelInfo(getGuild(), null, "LOG");
     }
 
-    public Discord_RoleInfo getUsageRole(String action) {
-        return DiscordDBService.getWhere(Discord_RoleInfo.class, "ServerID = ? AND Action LIKE ?", getID(), action).orElse(null);
+    public <T> T extender(Class<T> extenderClass) {
+        try {
+            if (extender == null) {
+                try {extender = extenderClass.getDeclaredConstructor(getClass()).newInstance(this);
+                } catch (Exception ignored) {
+                    try {extender = extenderClass.getDeclaredConstructor().newInstance();
+                    } catch (Exception ignored2) {}
+                }
+            }
+            return (T) extender;
+        } catch (Exception ignored) {
+            return null;
+        }
     }
-    public Discord_ChannelInfo getUsageChannel(String action) {
-        return DiscordDBService.getWhere(Discord_ChannelInfo.class, "ServerID = ? AND Action LIKE ?", getID(), action).orElse(null);
+    public <T> T extender(Class<T> extenderClass, T extender) {
+        this.extender = extender;
+        return extender(extenderClass);
     }
-    public Discord_ChannelInfo getLogChannel() {
+
+    public void setVariable(String name, Object value) {
+        getVariables().removeIf(V -> V.getName().equalsIgnoreCase(name));
+        getVariables().add(new Discord_GuildVariable(getID(), name, value));
+    }
+    public Discord_GuildVariable getVariable(String name) {
+        return getVariables().stream().filter(V -> V.getName().equalsIgnoreCase(name)).findFirst().orElse(new Discord_GuildVariable(getID(), name, null));
+    }
+    public String getVariableAsString(String name) {
+        return getVariable(name).getValue();
+    }
+    public boolean getVariableAsBool(String name) {
+        return getVariable(name).getAsBoolean();
+    }
+    public int getVariableAsInt(String name) {
+        return getVariable(name).getAsInt();
+    }
+    public long getVariableAsLong(String name) {
+        return getVariable(name).getAsLong();
+    }
+    public double getVariableAsDouble(String name) {
+        return getVariable(name).getAsDouble();
+    }
+
+
+    public Optional<Discord_RoleInfo> getUsageRole(String action) {
+        return getRoles().stream().filter(R -> R.getAction().equalsIgnoreCase(action)).findFirst();
+    }
+    public void setUsageRole(String action, Role role) {
+        getRoles().removeIf(V -> V.getAction().equalsIgnoreCase(name) && Objects.equals(V.getServerID(), getID()));
+        getRoles().add(new Discord_RoleInfo(getGuild(), role, action));
+    }
+    
+    public Optional<Discord_ChannelInfo> getUsageChannel(String action) {
+        return getChannels().stream().filter(C -> C.getAction().equalsIgnoreCase(action)).findFirst();
+    }
+    public void setUsageChannel(String action, GuildChannel channel) {
+        getChannels().removeIf(V -> V.getAction().equalsIgnoreCase(name) && Objects.equals(V.getServerID(), getID()));
+        getChannels().add(new Discord_ChannelInfo(getGuild(), channel, action));
+    }
+
+    public Optional<Discord_ChannelInfo> getLogChannel() {
         return getUsageChannel("LOG");
     }
 

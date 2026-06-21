@@ -1,7 +1,7 @@
-package org.solarframework.auth.spring;
+package org.solarframework.web.auth.spring;
 
-import org.solarframework.auth.obj.Account_User;
-import org.solarframework.auth.obj.PersistentLogins;
+import org.solarframework.web.auth.obj.Account_User;
+import org.solarframework.web.auth.obj.PersistentLogins;
 import org.solarframework.db.spring.DatabaseManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -92,10 +92,10 @@ public class SecurityConfig {
     @Bean
     public PersistentTokenRepository persistentTokenRepository() {
         JdbcTokenRepositoryImpl repo = new JdbcTokenRepositoryImpl();
-        if (databaseManager.getAvailableSource(PersistentLogins.class).getMissingEntitiesClasses().contains(PersistentLogins.class)) {
+        if (databaseManager.getSourceByEntity(PersistentLogins.class).getMissingEntitiesClasses().contains(PersistentLogins.class)) {
             databaseManager.getService(PersistentLogins.class).createSchema(List.of(PersistentLogins.class));
         }
-        repo.setDataSource(databaseManager.getAvailableSource(PersistentLogins.class).getDataSource());
+        repo.setDataSource(databaseManager.getSourceByEntity(PersistentLogins.class).getDataSource());
         return repo;
     }
 

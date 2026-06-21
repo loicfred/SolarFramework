@@ -1,10 +1,13 @@
-package org.solarframework.auth.spring;
+package org.solarframework.web.auth.spring.v1;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.solarframework.auth.obj.*;
-import org.solarframework.auth.obj.enums.EmailVerificationType;
-import org.solarframework.auth.obj.enums.Gender;
-import org.solarframework.auth.obj.enums.UserStatus;
+import org.solarframework.web.auth.obj.Account_EmailVerification;
+import org.solarframework.web.auth.obj.Account_Notification;
+import org.solarframework.web.auth.obj.Account_User;
+import org.solarframework.web.auth.obj.enums.EmailVerificationType;
+import org.solarframework.web.auth.obj.enums.Gender;
+import org.solarframework.web.auth.obj.enums.UserStatus;
+import org.solarframework.web.auth.spring.AuthEmailService;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Controller;
@@ -20,18 +23,17 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 @Controller
 @RequestMapping("/auth/v1")
-public class AuthControllerV1 {
+public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final AuthEmailService authEmailService;
 
-    public AuthControllerV1(PasswordEncoder passwordEncoder, AuthEmailService authEmailService) {
+    public AuthController(PasswordEncoder passwordEncoder, AuthEmailService authEmailService) {
         this.passwordEncoder = passwordEncoder;
         this.authEmailService = authEmailService;
     }
 
     @GetMapping("/login")
     public String login(Principal loggedUser) {
-        System.err.println("HIIIIIIIIIIII");
         if (loggedUser != null) return "redirect:/";
         return "auth/v1/login";
     }
@@ -194,5 +196,68 @@ public class AuthControllerV1 {
         public String Password;
         public String Phone;
         public Instant DateOfBirth;
+
+        public Long getID() {
+            return ID;
+        }
+        public void setID(Long ID) {
+            this.ID = ID;
+        }
+
+        public String getFirstName() {
+            return FirstName;
+        }
+        public void setFirstName(String firstName) {
+            FirstName = firstName;
+        }
+
+        public String getLastName() {
+            return LastName;
+        }
+        public void setLastName(String lastName) {
+            LastName = lastName;
+        }
+
+        public String getAddress() {
+            return Address;
+        }
+        public void setAddress(String address) {
+            Address = address;
+        }
+
+        public Gender getGender() {
+            return Gender;
+        }
+        public void setGender(Gender gender) {
+            Gender = gender;
+        }
+
+        public String getEmail() {
+            return Email;
+        }
+        public void setEmail(String email) {
+            Email = email;
+        }
+
+        public String getPassword() {
+            return Password;
+        }
+        public void setPassword(String password) {
+            Password = password;
+        }
+
+        public String getPhone() {
+            return Phone;
+        }
+        public void setPhone(String phone) {
+            Phone = phone;
+        }
+
+        public Instant getDateOfBirth() {
+            return DateOfBirth;
+        }
+        public void setDateOfBirth(Instant dateOfBirth) {
+            DateOfBirth = dateOfBirth;
+        }
     }
 }

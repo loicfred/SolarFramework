@@ -249,7 +249,7 @@ public class AvailableDataSource {
         }).filter(Objects::nonNull).collect(Collectors.toList()) : missingClasses;
     }
 
-    private Class<?> getClassOfTable(String name) {
+    public Class<?> getClassOfTable(String name) {
         return getEntitiesClasses().stream().filter(availableEntity -> DatabaseUtils.getTableName(availableEntity).equalsIgnoreCase(name)).findFirst().orElse(null);
     }
 }

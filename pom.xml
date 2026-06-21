@@ -25,6 +25,7 @@
         <module>modules/JSON</module>
         <module>web-modules/Authentication</module>
         <module>web-modules/WebTemplates</module>
+        <module>web-modules/DatabaseEditor</module>
     </modules>
 
     <repositories>
@@ -105,6 +106,11 @@
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
                 <artifactId>Authentication</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>DatabaseEditor</artifactId>
                 <version>1.0</version>
             </dependency>
 
