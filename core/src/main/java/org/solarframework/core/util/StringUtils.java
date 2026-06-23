@@ -121,7 +121,10 @@ public class StringUtils {
         return input == null ? "" : input.length() > maxCharactersPerLine ? input.substring(0, maxCharactersPerLine) : input;
     }
 
-
+    public static String capitalize(String str) {
+        if (str == null || str.isEmpty()) return str;
+        return Character.toUpperCase(str.charAt(0)) + str.substring(1);
+    }
 
     public static String PlusMinusSign(double num) {
         if (num > 0) return "+";

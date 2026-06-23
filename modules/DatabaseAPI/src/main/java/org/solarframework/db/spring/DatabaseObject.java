@@ -6,6 +6,7 @@ import org.slf4j.LoggerFactory;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
@@ -105,41 +106,41 @@ public class DatabaseObject<T> {
     @MappedSuperclass
     public static class ID_RECORD<T> extends DatabaseObject<T> {
         @Column(name = "CreatedAt", nullable = false)
-        private LocalDateTime createdAt;
+        private Instant createdAt;
         @Column(name = "UpdatedAt", nullable = false)
-        private LocalDateTime updatedAt;
+        private Instant updatedAt;
         @Column(name = "DeletedAt")
-        private LocalDateTime deletedAt;
+        private Instant deletedAt;
 
-        public LocalDateTime getCreatedAt() {
+        public Instant getCreatedAt() {
             return createdAt;
         }
-        public LocalDateTime getUpdatedAt() {
+        public Instant getUpdatedAt() {
             return updatedAt;
         }
-        public LocalDateTime getDeletedAt() {
+        public Instant getDeletedAt() {
             return deletedAt;
         }
 
-        public void setCreatedAt(LocalDateTime createdAt) {
+        public void setCreatedAt(Instant createdAt) {
             this.createdAt = createdAt;
         }
-        public void setUpdatedAt(LocalDateTime updatedAt) {
+        public void setUpdatedAt(Instant updatedAt) {
             this.updatedAt = updatedAt;
         }
-        public void setDeletedAt(LocalDateTime deletedAt) {
+        public void setDeletedAt(Instant deletedAt) {
             this.deletedAt = deletedAt;
         }
 
         @Override
         protected void onCreate() {
-            updatedAt = LocalDateTime.now();
+            updatedAt = Instant.now();
             if (createdAt == null) createdAt = updatedAt;
             super.onCreate();
         }
         @Override
         protected void onUpdate() {
-            updatedAt = LocalDateTime.now();
+            updatedAt = Instant.now();
             super.onUpdate();
         }
 

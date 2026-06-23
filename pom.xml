@@ -22,8 +22,10 @@
         <module>modules/Excel</module>
         <module>modules/SSLServer</module>
         <module>modules/Plugin</module>
+        <module>modules/Language</module>
         <module>modules/JSON</module>
-        <module>web-modules/Authentication</module>
+        <module>web-modules/AuthenticationAPI</module>
+        <module>web-modules/AuthenticationImpl</module>
         <module>web-modules/WebTemplates</module>
         <module>web-modules/DatabaseEditor</module>
     </modules>
@@ -100,12 +102,22 @@
             </dependency>
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
+                <artifactId>Language</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
                 <artifactId>Plugin</artifactId>
                 <version>1.0</version>
             </dependency>
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
-                <artifactId>Authentication</artifactId>
+                <artifactId>AuthenticationImpl</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>AuthenticationAPI</artifactId>
                 <version>1.0</version>
             </dependency>
             <dependency>

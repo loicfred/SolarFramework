@@ -1,5 +1,6 @@
 package org.solarframework.mu.web.dbeditor.spring.v1;
 
+import jakarta.persistence.Column;
 import org.solarframework.db.spring.DatabaseObject;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -9,25 +10,26 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.lang.reflect.*;
 import java.security.Principal;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
-@CrossOrigin(origins = "*")
-@RequestMapping("/admin/db/v1")
 @Controller
+@RequestMapping("/admin/db/v1")
 public class DatabaseEditorController {
 
-    @GetMapping("/edit/{item}")
+    @GetMapping("/{item}/edit")
     public String adminEdit(Model model, Principal loggedUser, @PathVariable String item) {
         return adminEdit(model, loggedUser, item, null);
     }
-    @GetMapping("/edit/{item}/{id}")
+    @GetMapping("/{item}/edit/{id}")
     public String adminEdit(Model model, Principal loggedUser, @PathVariable String item, @PathVariable Long id) {
         if (loggedUser == null) return "redirect:/auth/v1/login";
         try {
@@ -48,11 +50,10 @@ public class DatabaseEditorController {
                 field.setAccessible(true);
                 if (Modifier.isStatic(field.getModifiers())) continue;
                 if (Modifier.isTransient(field.getModifiers())) continue;
-                if (field.getName().endsWith("CreatedAt")) continue;
-                if (field.getName().endsWith("UpdatedAt")) continue;
-                if (field.getName().endsWith("Password")) continue;
+                if (field.getType().equals(Instant.class)) continue;
 
                 FieldMeta meta = new FieldMeta();
+                if (field.getAnnotation(Column.class) != null) meta.colName = field.getAnnotation(Column.class).name();
                 meta.name = field.getName();
                 meta.type = field.getType().getSimpleName();
                 if (entity != null) meta.value = field.get(entity);
@@ -70,11 +71,11 @@ public class DatabaseEditorController {
         return "dbeditor/v1/editor";
     }
 
-    @PostMapping("/update/{objectName}")
+    @PostMapping("/{objectName}/update")
     public String updateItem(Model model, Principal loggedUser, RedirectAttributes redirectAttributes, @PathVariable String objectName, @ModelAttribute UniversalForm form) {
         return updateItem(model, loggedUser, redirectAttributes, objectName, null, form);
     }
-    @PostMapping("/update/{objectName}/{id}")
+    @PostMapping("/{objectName}/update/{id}")
     public String updateItem(Model model, Principal loggedUser, RedirectAttributes redirectAttributes, @PathVariable String objectName, @PathVariable Object id, @ModelAttribute UniversalForm form) {
         if (loggedUser == null) return "redirect:/auth/v1/login";
         try {
@@ -200,10 +201,18 @@ public class DatabaseEditorController {
     }
 
     public static class FieldMeta {
+        public String colName;
         public String name;
         public String type;
         public Object value = null;
         public Boolean booleanValue = null;
+
+        public String getColName() {
+            return colName;
+        }
+        public void setColName(String colName) {
+            this.colName = colName;
+        }
 
         public String getName() {
             return name;
@@ -220,6 +229,7 @@ public class DatabaseEditorController {
         }
 
         public Object getValue() {
+            if (value instanceof LocalDateTime L) value = L.truncatedTo(ChronoUnit.MINUTES);
             return value;
         }
         public void setValue(Object value) {

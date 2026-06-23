@@ -6,11 +6,10 @@ import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
-import org.solarframework.core.lang.Nationalities;
+import org.solarframework.lang.Nationalities;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.awt.*;
-import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;

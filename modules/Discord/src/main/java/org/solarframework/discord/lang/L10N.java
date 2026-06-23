@@ -9,7 +9,7 @@ import java.util.Locale;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
-public class L10N extends org.solarframework.core.lang.L10N {
+public class L10N extends org.solarframework.lang.L10N {
     protected static ResourceBundle getSystemLanguageBundle(DiscordLocale lang) {
         try {
             Locale locale;

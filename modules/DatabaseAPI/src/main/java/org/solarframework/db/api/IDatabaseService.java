@@ -12,8 +12,6 @@ import java.util.Set;
 
 public interface IDatabaseService {
 
-    DataSource getDataSource();
-    void setDataSource(DataSource database);
     <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject);
 
 

@@ -12,9 +12,11 @@
         <module name="JSON" />
         <module name="DatabaseAPI" />
         <module name="DatabaseA" />
+        <module name="AuthenticationImpl" />
         <module name="core" />
+        <module name="AuthenticationAPI" />
         <module name="Excel" />
-        <module name="Authentication" />
+        <module name="Language" />
         <module name="DatabaseImpl" />
         <module name="Discord" />
         <module name="SSLServer" />
@@ -33,7 +35,8 @@
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="AI" options="-parameters" />
-      <module name="Authentication" options="-parameters" />
+      <module name="AuthenticationAPI" options="-parameters" />
+      <module name="AuthenticationImpl" options="-parameters" />
       <module name="DatabaseAPI" options="-parameters" />
       <module name="DatabaseCommon" options="-parameters" />
       <module name="DatabaseEditor" options="-parameters" />
@@ -42,6 +45,7 @@
       <module name="Excel" options="-parameters" />
       <module name="File" options="-parameters" />
       <module name="JSON" options="-parameters" />
+      <module name="Language" options="-parameters" />
       <module name="Plugin" options="-parameters" />
       <module name="SSLServer" options="-parameters" />
       <module name="SolarFramework" options="-parameters" />

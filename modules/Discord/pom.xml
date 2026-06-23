@@ -23,6 +23,10 @@
             <artifactId>core</artifactId>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
+            <artifactId>Language</artifactId>
+        </dependency>
 
         <dependency>
             <groupId>com.github.MinnDevelopment</groupId>

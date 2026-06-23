@@ -15,6 +15,7 @@ import java.sql.ResultSet;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -363,7 +364,17 @@ public class DatabaseUtils {
                 }
             }
             case Integer I -> f.set(item, b ? I != 0 : value);
-            case String S -> f.set(item, b ? "1".equals(S) || "true".equalsIgnoreCase(S) : value);
+            case String S -> {
+                if (f.getType() == LocalDateTime.class) {
+                    f.set(item, LocalDateTime.parse(S));
+                } else if (f.getType() == LocalDate.class) {
+                    f.set(item, LocalDate.parse(S));
+                } else if (f.getType() == Instant.class) {
+                    f.set(item, Instant.parse(S));
+                } else {
+                    f.set(item, b ? "1".equals(S) || "true".equalsIgnoreCase(S) : value);
+                }
+            }
             case null, default -> f.set(item, value);
         }
     }

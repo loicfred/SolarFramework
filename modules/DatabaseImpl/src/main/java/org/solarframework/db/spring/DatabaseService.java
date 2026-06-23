@@ -11,6 +11,7 @@ import org.pf4j.PluginManager;
 import org.pf4j.PluginWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.solarframework.db.api.DatabaseType;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
 import org.solarframework.db.api.dto.DatabaseStats;
@@ -34,6 +35,9 @@ import java.util.stream.Collectors;
 import static org.solarframework.db.spring.DBObjectService.IdFields;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.db.spring.DatabaseUtils.*;
+import static org.solarframework.db.spring.QueryTranslation.QueryCurrentDatabase;
+import static org.solarframework.db.spring.QueryTranslation.QueryDatabaseStats;
+import static org.springframework.util.StringUtils.capitalize;
 
 @Service
 @SuppressWarnings("all")
@@ -42,26 +46,21 @@ public class DatabaseService implements IDatabaseService {
 
     protected ApplicationContext context;
     protected CacheManager dbCacheManager;
-    protected DataSource dataSource;
     protected JdbcTemplate jdbcTemplate;
+    protected AvailableDataSource availableSource;
 
-    public DatabaseService(ApplicationContext context, @Qualifier("databaseCacheManager") CacheManager dbCacheManager, DataSource dataSource, JdbcTemplate jdbcTemplate) {
+    public DatabaseService(ApplicationContext context, @Qualifier("databaseCacheManager") CacheManager dbCacheManager, JdbcTemplate jdbcTemplate) {
         this.context = context;
         this.dbCacheManager = dbCacheManager;
-        this.dataSource = dataSource;
         this.jdbcTemplate = jdbcTemplate;
+    }
+
+    public DatabaseType getDatabaseType() {
+        return availableSource.getType();
     }
 
     public CacheManager getDbCacheManager() {
         return dbCacheManager;
-    }
-
-    public DataSource getDataSource() {
-        return this.dataSource;
-    }
-    public void setDataSource(DataSource dataSource) {
-        this.dataSource = dataSource;
-        this.jdbcTemplate = new JdbcTemplate(dataSource);
     }
 
     public <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject) {
@@ -142,11 +141,11 @@ public class DatabaseService implements IDatabaseService {
     private <T> T getCachedOrCompute(String cacheName, String cacheKey, java.util.function.Supplier<T> supplier) {
         Cache cache = dbCacheManager.getCache(cacheName);
         if (cache != null) {
-            Cache.ValueWrapper cached = cache.get(cacheKey);
+            Cache.ValueWrapper cached = cache.get(availableSource.getId() + cacheKey);
             if (cached != null) return (T) cached.get();
         }
         T result = supplier.get();
-        if (cache != null && result != null) cache.put(cacheKey, result);
+        if (cache != null && result != null) cache.put(availableSource.getId() + cacheKey, result);
         return result;
     }
 
@@ -242,7 +241,7 @@ public class DatabaseService implements IDatabaseService {
     // ====== OTHER ======
 
     public synchronized DatabaseStats getDatabaseStats() {
-        return getCachedOrCompute("DBData", "DBSTATISTICS", () -> {
+        return getCachedOrCompute("DBData", "DBSTATISTICS-" + availableSource.getId(), () -> {
             DatabaseStats stats = new DatabaseStats();
             jdbcTemplate.execute((Connection con) -> {
                 DatabaseMetaData metaData = con.getMetaData();
@@ -264,12 +263,7 @@ public class DatabaseService implements IDatabaseService {
                 }
 
                 try {
-                    stats.totalRows = jdbcTemplate.queryForObject("""
-                    SELECT SUM(TABLE_ROWS) AS total_rows
-                    FROM information_schema.tables
-                    WHERE table_schema = DATABASE()
-                    AND TABLE_TYPE = 'BASE TABLE';
-                    """, Long.class).intValue();
+                    stats.totalRows = jdbcTemplate.queryForObject(QueryDatabaseStats(getDatabaseType()), Long.class).intValue();
                 } catch (Exception e) {
                     stats.totalRows = 0;
                 }
@@ -279,7 +273,7 @@ public class DatabaseService implements IDatabaseService {
         });
     }
     public synchronized TableStats getTableStats(String name) {
-        return getCachedOrCompute("DBData", "TABLE-" + name, () -> {
+        return getCachedOrCompute("DBData", "TABLE-" + availableSource.getId() + "-" + name, () -> {
             TableStats stats = new TableStats();
             jdbcTemplate.execute((Connection con) -> {
                 stats.schemaName = getSchema();
@@ -304,60 +298,10 @@ public class DatabaseService implements IDatabaseService {
     // ====== SCHEMA ======
 
     public String getSchema() {
-        return getCachedOrCompute("DBData", "SCHEMA", () -> {
-            return jdbcTemplate.queryForObject("SELECT DATABASE()", String.class);
+        return getCachedOrCompute("DBData-" + availableSource.getId(), "SCHEMA", () -> {
+            return jdbcTemplate.queryForObject(QueryCurrentDatabase(getDatabaseType()), String.class);
         });
     }
-
-    private SessionFactory getSessionFactory(List<Class<?>> clz, String hb2ddl) {
-        List<ClassLoader> loaders = new ArrayList<>();
-        loaders.add(Thread.currentThread().getContextClassLoader());
-
-        try {
-            PluginManager pluginManager = (PluginManager) context.getBean(Class.forName("org.pf4j.PluginManager"));
-            if (pluginManager != null) for (PluginWrapper c : pluginManager.getPlugins()) loaders.add(c.getPluginClassLoader());
-        } catch (Exception ignored) {}
-
-        StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
-                .applySetting("hibernate.connection.datasource", dataSource)
-                .applySetting("hibernate.dialect", "org.hibernate.dialect.MariaDBDialect")
-                .applySetting("hibernate.hbm2ddl.auto", "update")
-                .applySetting("hibernate.classLoaders", loaders).build();
-        MetadataSources metadata = new MetadataSources(registry);
-        for (Class<?> c : clz) metadata.addAnnotatedClass(c);
-        return metadata.buildMetadata().buildSessionFactory();
-    }
-
-    public void createSchemaTest(List<Class<?>> clz) {
-        for (Class<?> c : clz) {
-            try (SessionFactory sess = getSessionFactoryTest(c, "create")) {
-                log.info("Updated tables for class: " + c.getSimpleName());
-                System.err.println("Updated tables for class: " + c.getSimpleName() + " with " + c.getClassLoader());
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-    private SessionFactory getSessionFactoryTest(Class<?> clz, String hb2ddl) {
-        ClassLoader original = Thread.currentThread().getContextClassLoader();
-        try {
-            Thread.currentThread().setContextClassLoader(clz.getClassLoader());
-            StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
-                    .applySetting("hibernate.connection.datasource", dataSource)
-                    .applySetting("hibernate.dialect", "org.hibernate.dialect.MariaDBDialect")
-                    .applySetting("hibernate.hbm2ddl.auto", hb2ddl)
-                    .build();
-            MetadataSources metadata = new MetadataSources(registry);
-            metadata.addAnnotatedClass(clz);
-            return metadata.buildMetadata().buildSessionFactory();
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        } finally {
-            Thread.currentThread().setContextClassLoader(original);
-        }
-    }
-
 
     public void createSchema(List<Class<?>> clz) {
         appendSchema(clz, "create");
@@ -371,21 +315,21 @@ public class DatabaseService implements IDatabaseService {
         for (ClassLoader cl : loaders) {
             List<Class<?>> clz2 = clz.stream().filter(c -> c.getClassLoader() == cl).collect(Collectors.toList());
             try (SessionFactory sess = getSessionFactory(cl, clz2, action)) {
-                log.info("Updated tables for class: \n" + clz.stream().map((Class c ) -> "- " + c.getSimpleName()).collect(Collectors.joining("\n")));
+                log.info(capitalize(action) + "d tables for class: \n" + clz.stream().map((Class c ) -> "- " + c.getSimpleName()).collect(Collectors.joining("\n")));
             } catch (Exception e) {
                 e.printStackTrace();
             }
         }
     }
-    private SessionFactory getSessionFactory(ClassLoader loader, List<Class<?>> clz, String hb2ddl) {
+    private SessionFactory getSessionFactory(ClassLoader loader, List<Class<?>> clz, String action) {
         ClassLoader original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(loader);
             StandardServiceRegistry registry = new StandardServiceRegistryBuilder()
-                    .applySetting("hibernate.connection.datasource", dataSource)
-                    .applySetting("hibernate.dialect", "org.hibernate.dialect.MariaDBDialect")
-                    .applySetting("hibernate.hbm2ddl.auto", hb2ddl)
-                    .applySetting("hibernate.physical_naming_strategy", "org.solarframework.db.spring.TableOnlyLowerCaseNamingStrategy")
+                    .applySetting("hibernate.connection.datasource", availableSource.getDataSource())
+                    .applySetting("hibernate.dialect", getDatabaseType().getDialectClass())
+                    .applySetting("hibernate.hbm2ddl.auto", action)
+                    .applySetting("hibernate.physical_naming_strategy", "org.solarframework.db.spring.HibernateNamingStrategy")
                     .build();
             MetadataSources metadata = new MetadataSources(registry);
             for (Class<?> c : clz) metadata.addAnnotatedClass(c);

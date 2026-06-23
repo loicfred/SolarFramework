@@ -3,7 +3,10 @@ package org.solarframework.db.spring;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import jakarta.persistence.Column;
+import org.solarframework.db.api.DatabaseType;
 import org.solarframework.db.api.IDatabaseService;
+import org.solarframework.json.JSONItem;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
 
@@ -21,25 +24,24 @@ import java.util.stream.Stream;
 
 import static org.solarframework.core.util.ClassUtils.copyObject;
 import static org.solarframework.core.util.ClassUtils.getAllFieldsOfClassFamily;
-import static org.solarframework.db.spring.DatabaseManager.loadEntity;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 
-public class AvailableDataSource {
-    private transient DatabaseManager manager;
-    private transient IDatabaseService service;
+public class AvailableDataSource extends JSONItem<AvailableDataSource> {
+    protected transient DatabaseManager manager;
+    private transient DatabaseService service;
     private transient DataSource dataSource;
 
 
     private transient Long ping;
     private transient String pingError;
 
+    private boolean Default = false;
     private final String id = UUID.randomUUID().toString();
     private String name;
     private String username;
     private String password;
     private String connectionString;
-    private String type;
-    private boolean isDefault = false;
+    private DatabaseType type;
 
     private int maxPoolSize = 50;
     private int minimumIdle = 5;
@@ -47,24 +49,33 @@ public class AvailableDataSource {
     private long maxLifetime = 1800000;
     private long connectionTimeout = 20000;
 
-    private final List<String> entities = new ArrayList<>();
+    private List<String> entities = new ArrayList<>();
 
     public AvailableDataSource(DatabaseManager manager) {
         this.manager = manager;
     }
 
+    public void setEntities(List<Class<?>> entities) {
+        this.entities = entities.stream().map(Class::getName).collect(Collectors.toList());
+        clearEntities();
+    }
     public void addEntities(Class<?>... entities) {
         this.entities.addAll(Stream.of(entities).map(Class::getName).toList());
+        clearEntitiesClasses();
     }
     public void removeEntities(Class<?>... entities) {
         this.entities.removeAll(Stream.of(entities).map(Class::getName).toList());
+        clearEntitiesClasses();
     }
     public void clearEntities() {
         this.entities.clear();
+        clearEntitiesClasses();
+    }
+    private void clearEntitiesClasses() {
+        entitiesClasses = null;
         missingClasses = null;
         updatableClasses = null;
         installedClasses = null;
-        entitiesClasses = null;
     }
 
     public String getId() {
@@ -82,11 +93,11 @@ public class AvailableDataSource {
     public String getConnectionString() {
         return connectionString;
     }
-    public String getType() {
+    public DatabaseType getType() {
         return type;
     }
     public boolean isDefault() {
-        return isDefault;
+        return Default;
     }
     public int getMaxPoolSize() {
         return maxPoolSize;
@@ -116,7 +127,7 @@ public class AvailableDataSource {
     public void setConnectionString(String connectionString) {
         this.connectionString = connectionString;
     }
-    public void setType(String type) {
+    public void setType(DatabaseType type) {
         this.type = type;
     }
     public void setMaxPoolSize(int maxPoolSize) {
@@ -135,21 +146,21 @@ public class AvailableDataSource {
         this.connectionTimeout = connectionTimeout;
     }
     protected void asDefault() {
-        this.isDefault = true;
+        this.Default = true;
     }
 
     public long getPing() {
-        if (ping == null) calculatePing();
+        if (ping == null) resetPing();
         return ping;
     }
     public String getPingError() {
-        if (pingError == null) calculatePing();
+        if (pingError == null) resetPing();
         return pingError;
     }
-    private void calculatePing() {
+    public void resetPing() {
         long start = System.nanoTime();
         try (Connection conn = getDataSource().getConnection(); PreparedStatement ps = conn.prepareStatement("SELECT 1"); ResultSet rs = ps.executeQuery()) {
-            pingError = "";
+            pingError = null;
             ping = (System.nanoTime() - start) / 1_000_000;
         } catch (Exception e) {
             pingError = "Error: " + e.getMessage();
@@ -159,9 +170,13 @@ public class AvailableDataSource {
 
 
     public IDatabaseService getService() {
-        if (service != null) return service;
-        if (manager != null) this.service = (DatabaseService) copyObject(new DatabaseService(null, null, null, null), DefaultDBService);
-        if (this.service != null) this.service.setDataSource(getDataSource());
+        if (service == null && manager != null) {
+            this.service = (DatabaseService) copyObject(new DatabaseService(null, null, null), DefaultDBService);
+            if (this.service != null) {
+                this.service.availableSource = this;
+                this.service.jdbcTemplate = new JdbcTemplate(getDataSource());
+            }
+        }
         return service;
     }
     public DataSource getDataSource() {
@@ -170,7 +185,7 @@ public class AvailableDataSource {
         config.setJdbcUrl(getConnectionString());
         config.setUsername(getUsername());
         config.setPassword(getPassword());
-        config.setDriverClassName(getType());
+        config.setDriverClassName(getType().getDriverClass());
 
         config.setMaximumPoolSize(getMaxPoolSize());
         config.setMinimumIdle(getMinimumIdle());
@@ -193,16 +208,32 @@ public class AvailableDataSource {
     }
     public List<Class<?>> getEntitiesClasses() {
         return entitiesClasses == null ? entitiesClasses = getEntities().stream().map(entityName -> {
-            try {
-                return Class.forName(entityName);
-            } catch (ClassNotFoundException e) {
-                return null;
+            for (ClassLoader cl : manager.getEntityClassloaders()) {
+                try {
+                    return cl.loadClass(entityName);
+                } catch (ClassNotFoundException _) {}
             }
+            return null;
         }).filter(Objects::nonNull).collect(Collectors.toList()) : entitiesClasses;
     }
 
+    public List<String> getInstalledEntities() {
+        return getInstalledEntitiesClasses().stream().map(Class::getName).toList();
+    }
+    public List<Class<?>> getInstalledEntitiesClasses() {
+        return installedClasses == null ? installedClasses = getService().getDatabaseStats().getTableNames().stream().map(this::getClassOfTable).filter(Objects::nonNull).collect(Collectors.toList()) : installedClasses;
+    }
+
+
+    public List<String> getMissingEntities() {
+        return getMissingEntitiesClasses().stream().map(Class::getName).toList();
+    }
+    public List<Class<?>> getMissingEntitiesClasses() {
+        return missingClasses == null ? missingClasses = getEntitiesClasses().stream().filter(e -> !getInstalledEntitiesClasses().contains(e)).collect(Collectors.toList()) : missingClasses;
+    }
+
     public List<String> getUpdatableEntities() {
-        return getUpdatableEntitiesClasses().stream().map(Class::getSimpleName).toList();
+        return getUpdatableEntitiesClasses().stream().map(Class::getName).toList();
     }
     public List<Class<?>> getUpdatableEntitiesClasses() {
         if (updatableClasses != null) return updatableClasses;
@@ -223,30 +254,8 @@ public class AvailableDataSource {
                     break;
                 }
             }
-
         }
         return updatableClasses = entities;
-    }
-
-    public List<String> getInstalledEntities() {
-        return getInstalledEntitiesClasses().stream().map(Class::getName).toList();
-    }
-    public List<Class<?>> getInstalledEntitiesClasses() {
-        return installedClasses == null ? installedClasses = getService().getDatabaseStats().getTableNames().stream().map(this::getClassOfTable).filter(Objects::nonNull).collect(Collectors.toList()) : installedClasses;
-    }
-
-    public List<String> getMissingEntities() {
-        List<String> installedEntities = getInstalledEntities();
-        return getEntities().stream().filter(availableEntity -> installedEntities.stream().noneMatch(availableEntity::equalsIgnoreCase)).toList();
-    }
-    public List<Class<?>> getMissingEntitiesClasses() {
-        return missingClasses == null ? missingClasses = getMissingEntities().stream().map(entityName -> {
-            try {
-                return Class.forName(entityName);
-            } catch (ClassNotFoundException e) {
-                return null;
-            }
-        }).filter(Objects::nonNull).collect(Collectors.toList()) : missingClasses;
     }
 
     public Class<?> getClassOfTable(String name) {

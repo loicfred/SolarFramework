@@ -138,7 +138,6 @@ public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
     }
 
 
-
     public T WriteJSON(String filePath) {
         try (FileWriter writer = new FileWriter(filePath, StandardCharsets.UTF_8)) {
             GSON.toJson(this, writer);
