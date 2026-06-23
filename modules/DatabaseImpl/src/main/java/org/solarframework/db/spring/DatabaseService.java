@@ -2,13 +2,8 @@ package org.solarframework.db.spring;
 
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.MetadataSources;
-import org.hibernate.boot.model.naming.Identifier;
-import org.hibernate.boot.model.naming.PhysicalNamingStrategy;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
-import org.hibernate.engine.jdbc.env.spi.JdbcEnvironment;
-import org.pf4j.PluginManager;
-import org.pf4j.PluginWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.solarframework.db.api.DatabaseType;
@@ -25,14 +20,13 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.solarframework.db.spring.DBObjectService.IdFields;
+import static org.solarframework.db.spring.DBInstanceService.IdFields;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.db.spring.DatabaseUtils.*;
 import static org.solarframework.db.spring.QueryTranslation.QueryCurrentDatabase;
@@ -64,13 +58,14 @@ public class DatabaseService implements IDatabaseService {
     }
 
     public <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject) {
-        return new DBObjectService<>(this, dbobject);
+        return new DBInstanceService<>(this, dbobject);
     }
 
-    public <O, T> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id) {
+    public <O> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id) {
+        if (IdFields.isEmpty()) SolarDBManager.verifyEntities();
         return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + IdFields.get(table).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")) + " LIMIT 1;", id);
     }
-    public <O, T> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args) {
+    public <O> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args) {
         return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + where + " LIMIT 1;", args);
     }
 
@@ -78,9 +73,11 @@ public class DatabaseService implements IDatabaseService {
     // ====== SHORT CUTS ======
 
     public <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object... id) {
+        if (IdFields.isEmpty()) SolarDBManager.verifyEntities();
         return this.doQueryJoin(clazz, IdFields.get(clazz).stream().map(f -> "MAIN." + f.getName() + " = ?").collect(Collectors.joining(" AND ")), id);
     }
     public <T> Optional<T> getById(String select, Class<T> clazz, Object... id) {
+        if (IdFields.isEmpty()) SolarDBManager.verifyEntities();
         return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + IdFields.get(clazz).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")) + " LIMIT 1;", id);
     }
     public <T> Optional<T> getById(Class<T> clazz, Object... id) {
@@ -241,7 +238,7 @@ public class DatabaseService implements IDatabaseService {
     // ====== OTHER ======
 
     public synchronized DatabaseStats getDatabaseStats() {
-        return getCachedOrCompute("DBData", "DBSTATISTICS-" + availableSource.getId(), () -> {
+        return getCachedOrCompute("DBData", "DBSTATISTICS", () -> {
             DatabaseStats stats = new DatabaseStats();
             jdbcTemplate.execute((Connection con) -> {
                 DatabaseMetaData metaData = con.getMetaData();
@@ -273,7 +270,7 @@ public class DatabaseService implements IDatabaseService {
         });
     }
     public synchronized TableStats getTableStats(String name) {
-        return getCachedOrCompute("DBData", "TABLE-" + availableSource.getId() + "-" + name, () -> {
+        return getCachedOrCompute("DBData", "TABLE-" + name, () -> {
             TableStats stats = new TableStats();
             jdbcTemplate.execute((Connection con) -> {
                 stats.schemaName = getSchema();
@@ -298,7 +295,7 @@ public class DatabaseService implements IDatabaseService {
     // ====== SCHEMA ======
 
     public String getSchema() {
-        return getCachedOrCompute("DBData-" + availableSource.getId(), "SCHEMA", () -> {
+        return getCachedOrCompute("DBData", "SCHEMA", () -> {
             return jdbcTemplate.queryForObject(QueryCurrentDatabase(getDatabaseType()), String.class);
         });
     }
@@ -339,5 +336,170 @@ public class DatabaseService implements IDatabaseService {
         }
     }
 
+    public static class ENTITY<T> implements IDatabaseService.ENTITY<T> {
+        private static Logger log = LoggerFactory.getLogger(org.solarframework.db.spring.DatabaseService.class);
 
+        protected IDatabaseService service;
+        protected Class<T> clazz;
+
+        public ENTITY(Class<T> clazz, IDatabaseService service) {
+            this.service = service;
+            this.clazz = clazz;
+        }
+
+        @Override
+        public IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject) {
+            return service.makeObjectManager(dbobject);
+        }
+
+        @Override
+        public Optional<T> getByIdWithJoins(Object... id) {
+            return service.getByIdWithJoins(clazz, id);
+        }
+
+        @Override
+        public Optional<T> getById(String select, Object... id) {
+            return service.getById(select, clazz, id);
+        }
+
+        @Override
+        public Optional<T> getById(Object... id) {
+            return service.getById(clazz, id);
+        }
+
+        @Override
+        public Optional<T> getWhereWithJoins(String whereClause, Object... args) {
+            return service.getWhereWithJoins(clazz, whereClause, args);
+        }
+
+        @Override
+        public Optional<T> getWhere(String select, String whereClause, Object... args) {
+            return service.getWhere(select, clazz, whereClause, args);
+        }
+
+        @Override
+        public Optional<T> getWhere(String whereClause, Object... args) {
+            return service.getWhere(clazz, whereClause, args);
+        }
+
+        @Override
+        public List<T> getAll(String select) {
+            return service.getAll(select, clazz);
+        }
+
+        @Override
+        public List<T> getAll() {
+            return service.getAll(clazz);
+        }
+
+        @Override
+        public List<T> getAllWhere(String select, String whereClause, Object... args) {
+            return service.getAllWhere(select, clazz, whereClause, args);
+        }
+
+        @Override
+        public List<T> getAllWhere(String whereClause, Object... args) {
+            return service.getAllWhere(clazz, whereClause, args);
+        }
+
+        @Override
+        public Set<T> getAllWhereDistinct(String select, String whereClause, Object... args) {
+            return service.getAllWhereDistinct(select, clazz, whereClause, args);
+        }
+
+        @Override
+        public Set<T> getAllWhereDistinct(String whereClause, Object... args) {
+            return service.getAllWhereDistinct(clazz, whereClause, args);
+        }
+
+        @Override
+        public int Count() {
+            return service.Count(clazz);
+        }
+
+        @Override
+        public int Count(String whereClause, Object... args) {
+            return service.Count(clazz, whereClause, args);
+        }
+
+        @Override
+        public T getRandom(String select) {
+            return service.getRandom(select, clazz);
+        }
+
+        @Override
+        public T getRandom() {
+            return service.getRandom(clazz);
+        }
+
+        @Override
+        public T getRandom(String select, String whereClause, Object... args) {
+            return service.getRandom(select, clazz, whereClause, args);
+        }
+
+        @Override
+        public T getRandom(String whereClause, Object... args) {
+            return service.getRandom(clazz, whereClause, args);
+        }
+
+        @Override
+        public Optional<T> doQuery(String sql, Object... args) {
+            return service.doQuery(clazz, sql, args);
+        }
+
+        @Override
+        public List<T> doQueryAll(String sql, Object... args) {
+            return service.doQueryAll(clazz, sql, args);
+        }
+
+        @Override
+        public Set<T> doQueryAllDistinct(String sql, Object... args) {
+            return service.doQueryAllDistinct(clazz, sql, args);
+        }
+
+        @Override
+        public Optional<T> doQueryNoCache(String sql, Object... args) {
+            return service.doQueryNoCache(clazz, sql, args);
+        }
+
+        @Override
+        public List<T> doQueryAllNoCache(String sql, Object... args) {
+            return service.doQueryAllNoCache(clazz, sql, args);
+        }
+
+        @Override
+        public Set<T> doQueryAllDistinctNoCache(String sql, Object... args) {
+            return service.doQueryAllDistinctNoCache(clazz, sql, args);
+        }
+
+        @Override
+        public Optional<T> doQueryValue(String sql, Object... args) {
+            return service.doQueryValue(clazz, sql, args);
+        }
+
+        @Override
+        public Optional<T> doQueryValueNoCache(String sql, Object... args) {
+            return service.doQueryValueNoCache(clazz, sql, args);
+        }
+
+        @Override
+        public Optional<T> doQueryJoin(String whereClause, Object... args) {
+            return service.doQueryJoin(clazz, whereClause, args);
+        }
+
+        @Override
+        public int doUpdate(String sql, Object... args) {
+            return service.doUpdate(clazz, sql, args);
+        }
+
+        @Override
+        public void createSchema() {
+            service.createSchema(Arrays.asList(clazz));
+        }
+
+        @Override
+        public void updateSchema() {
+            service.updateSchema(Arrays.asList(clazz));
+        }
+    }
 }

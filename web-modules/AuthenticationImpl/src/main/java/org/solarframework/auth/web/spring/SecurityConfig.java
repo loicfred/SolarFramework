@@ -115,8 +115,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http, RememberMeServices rememberMeServices) {
         String[] publicPaths = {
                 "/", "/home", "/auth/v1/**", "/auth/v2/**", "/api/v1/**", "/api/v2/**", "/error",
-                "/service-worker.js", "/manifest.json", "/offline",
-                "/css/**", "/js/**", "/img/**"
+                "/static/**"
         };
         return http
                 // Authorization

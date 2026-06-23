@@ -13,6 +13,9 @@ import java.time.*;
 @Entity
 @Table(name = "account_user")
 public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_User> {
+    @ManyToOne
+    @JoinColumn(referencedColumnName = "ID", name = "RoleID")
+    private transient Account_Role role;
 
     @Column(name = "Username", nullable = false, length = 50)
     private String username;
@@ -20,8 +23,8 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
     private String email;
     @Column(name = "PasswordHash", length = 512, nullable = false)
     private String passwordHash;
-    @Column(name = "Role", length = 64)
-    private String role = "USER";
+    @Column(name = "RoleID")
+    private Long roleId = 0L;
     @Column(name = "FirstName", length = 100)
     private String firstName;
     @Column(name = "LastName", length = 100)
@@ -90,11 +93,11 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
         this.passwordHash = passwordHash;
     }
 
-    public String getRole() {
-        return role;
+    public Long getRoleId() {
+        return roleId;
     }
-    public void setRole(String role) {
-        this.role = role;
+    public void setRoleId(Long roleId) {
+        this.roleId = roleId;
     }
 
     public String getFirstName() {
@@ -247,6 +250,11 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
 
     public Account_User() {
         this.ID = Instant.now().toEpochMilli();
+    }
+
+
+    public Account_Role getRole() {
+        return role == null ? role = retrieveEntityServiceFor(Account_Role.class).getById(getRoleId()).orElse(null) : null;
     }
 
 

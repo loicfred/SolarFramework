@@ -5,7 +5,6 @@ import org.solarframework.db.api.dto.Row;
 import org.solarframework.db.api.dto.TableStats;
 import org.solarframework.db.spring.DatabaseObject;
 
-import javax.sql.DataSource;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -15,8 +14,8 @@ public interface IDatabaseService {
     <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject);
 
 
-    <O, T> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id);
-    <O, T> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args);
+    <O> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id);
+    <O> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args);
     <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object... id);
     <T> Optional<T> getById(String select, Class<T> clazz, Object... id);
     <T> Optional<T> getById(Class<T> clazz, Object... id);
@@ -81,5 +80,56 @@ public interface IDatabaseService {
     void createSchema(List<Class<?>> clz);
 
     void updateSchema(List<Class<?>> clz);
+
+    interface ENTITY<T> {
+
+        IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject);
+
+        Optional<T> getByIdWithJoins(Object... id);
+        Optional<T> getById(String select, Object... id);
+        Optional<T> getById(Object... id);
+        Optional<T> getWhereWithJoins(String whereClause, Object... args);
+        Optional<T> getWhere(String select, String whereClause, Object... args);
+        Optional<T> getWhere(String whereClause, Object... args);
+        List<T> getAll(String select);
+        List<T> getAll();
+        List<T> getAllWhere(String select, String whereClause, Object... args);
+        List<T> getAllWhere(String whereClause, Object... args);
+        Set<T> getAllWhereDistinct(String select, String whereClause, Object... args);
+        Set<T> getAllWhereDistinct(String whereClause, Object... args);
+        int Count();
+        int Count(String whereClause, Object... args);
+        T getRandom(String select);
+        T getRandom();
+        T getRandom(String select, String whereClause, Object... args);
+        T getRandom(String whereClause, Object... args);
+
+
+        Optional<T> doQuery(String sql, Object... args);
+
+        List<T> doQueryAll(String sql, Object... args);
+
+        Set<T> doQueryAllDistinct(String sql, Object... args);
+
+        Optional<T> doQueryNoCache(String sql, Object... args);
+
+        List<T> doQueryAllNoCache(String sql, Object... args);
+
+        Set<T> doQueryAllDistinctNoCache(String sql, Object... args);
+
+
+        Optional<T> doQueryValue(String sql, Object... args);
+
+        Optional<T> doQueryValueNoCache(String sql, Object... args);
+
+        Optional<T> doQueryJoin(String whereClause, Object... args);
+
+        int doUpdate(String sql, Object... args);
+
+
+        void createSchema();
+        void updateSchema();
+
+    }
 
 }

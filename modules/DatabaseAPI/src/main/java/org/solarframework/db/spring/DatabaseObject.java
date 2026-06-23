@@ -7,13 +7,13 @@ import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
 public class DatabaseObject<T> {
     protected static final Map<Class<?>, IDatabaseService> serviceCache = new HashMap<>();
+    protected static final Map<Class<?>, IDatabaseService.ENTITY<?>> entityServiceCache = new HashMap<>();
     private static final Logger log = LoggerFactory.getLogger(DatabaseObject.class);
     private transient IDBObjectService<T> service;
 
@@ -31,6 +31,19 @@ public class DatabaseObject<T> {
                 return null;
             }
         });
+    }
+    @SuppressWarnings("unchecked")
+    public static <T> IDatabaseService.ENTITY<T> retrieveEntityServiceFor(Class<T> clazz) {
+        IDatabaseService.ENTITY<?> C = entityServiceCache.computeIfAbsent(clazz, _ -> {
+            try {
+                Class<?> databaseRegistry = Class.forName("org.solarframework.db.spring.DatabaseRegistry");
+                Object SolarDBManager = databaseRegistry.getField("SolarDBManager").get(null);
+                return ((IDatabaseService.ENTITY<?>) SolarDBManager.getClass().getMethod("getEntityService", Class.class).invoke(SolarDBManager, clazz));
+            } catch (Exception ignored) {
+                return null;
+            }
+        });
+        return (IDatabaseService.ENTITY<T>) C;
     }
 
     public DatabaseObject() {

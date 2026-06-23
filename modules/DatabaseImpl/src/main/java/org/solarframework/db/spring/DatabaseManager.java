@@ -4,7 +4,6 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import jakarta.persistence.Entity;
-import org.pf4j.PluginWrapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.solarframework.db.api.DatabaseType;
@@ -20,14 +19,12 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Constructor;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.*;
 
 import static org.solarframework.core.util.ClassUtils.copyObject;
 import static org.solarframework.core.util.ClassUtils.isClassRelated;
-import static org.solarframework.db.spring.DBObjectService.*;
+import static org.solarframework.db.spring.DBInstanceService.*;
 import static org.solarframework.db.spring.DatabaseObject.serviceCache;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
@@ -151,12 +148,14 @@ public class DatabaseManager {
     }
 
     public IDatabaseService getService(String name) {
-        if (IsSingleSource) return getDefaultService();
-        return getSourceByName(name).getService();
+        return IsSingleSource ? getDefaultService() : getSourceByName(name).getService();
     }
+
     public IDatabaseService getService(Class<?> entity) {
-        if (IsSingleSource) return getDefaultService();
-        return getSourceByEntity(entity).getService();
+        return IsSingleSource ? getDefaultService() : getSourceByEntity(entity).getService();
+    }
+    public <T> IDatabaseService.ENTITY<T> getEntityService(Class<T> entity) {
+        return new DatabaseService.ENTITY<>(entity, IsSingleSource ? getDefaultService() : getSourceByEntity(entity).getService());
     }
 
     public AvailableDataSource getSourceById(String id) {

@@ -5,7 +5,6 @@ import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -17,7 +16,7 @@ import static org.solarframework.db.spring.DatabaseUtils.*;
 import static org.solarframework.json.JSONItem.GSON;
 
 @SuppressWarnings("all")
-public class DBObjectService<T> implements IDBObjectService<T> {
+public class DBInstanceService<T> implements IDBObjectService<T> {
     protected static final Map<Class<?>, String> TableNames = new HashMap<>();
     protected static final Map<Class<?>, List<Field>> IdFields = new HashMap<>();
     protected static final Map<Class<?>, List<Field>> CachedFields = new HashMap<>();
@@ -34,7 +33,7 @@ public class DBObjectService<T> implements IDBObjectService<T> {
         return cacheHashes;
     }
 
-    public DBObjectService(IDatabaseService service, DatabaseObject<T> obj) {
+    public DBInstanceService(IDatabaseService service, DatabaseObject<T> obj) {
         this.dbService = service;
         this.dbObject = obj;
         this.entityClass = (Class<T>) dbObject.getClass();
