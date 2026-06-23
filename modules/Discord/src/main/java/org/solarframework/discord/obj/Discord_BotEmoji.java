@@ -50,16 +50,16 @@ public class Discord_BotEmoji extends DatabaseObject.ID_OBJ<Long, Discord_BotEmo
     }
 
     public static Discord_BotEmoji getById(long emojiId) {
-        if (IsTestMode) return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
-        return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "ID = ?", emojiId).orElse(null);
+        if (IsTestMode) return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
+        return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("ID = ?", emojiId).orElse(null);
     }
     public static Discord_BotEmoji getByName(String name) {
-        if (IsTestMode) return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
-        return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "Name = ?", name).orElse(null);
+        if (IsTestMode) return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
+        return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Name = ?", name).orElse(null);
     }
     public static Discord_BotEmoji getByFormatted(String formatted) {
-        if (IsTestMode) return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
-        return retrieveServiceFor(Discord_BotEmoji.class).getWhere(Discord_BotEmoji.class, "Formatted = ?", formatted).orElse(null);
+        if (IsTestMode) return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
+        return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Formatted = ?", formatted).orElse(null);
     }
 
     public Emoji retrieve() {

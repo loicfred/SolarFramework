@@ -3,18 +3,25 @@ package org.solarframework.auth.obj;
 import jakarta.persistence.*;
 import org.solarframework.db.spring.DatabaseObject;
 
-import java.security.Principal;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.Period;
+import java.util.List;
+import java.util.Set;
 
 @Entity
-@Table(name = "account_user")
+@Table(name = "account_role")
 public class Account_Role extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Role> {
+
+    @ManyToMany
+    @JoinTable(name = "account_role_to_permission",
+            joinColumns = @JoinColumn(name = "RoleID"),
+            inverseJoinColumns = @JoinColumn(name = "PermissionID")
+    )
+    private transient Set<Account_Permission> permissions;
+
 
     @Column(name = "Name", nullable = false, length = 50)
     private String name;
-    @Column(name = "access_level", nullable = false)
+    @Column(name = "AccessLevel", nullable = false)
     private Integer accessLevel = 0;
 
     public String getName() {
@@ -35,8 +42,11 @@ public class Account_Role extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Rol
         this.ID = Instant.now().toEpochMilli();
     }
 
+    public Set<Account_Permission> getPermissions() {
+        return permissions == null ? permissions = retrieveEntityServiceFor(Account_Permission.class).doQueryAllDistinct("SELECT * FROM account_permission WHERE ID IN (SELECT PermissionID FROM account_role_to_permission WHERE RoleID = ?)", getID()) : permissions;
+    }
 
     public static Account_Role getByName(String name) {
-        return retrieveServiceFor(Account_Role.class).getWhere(Account_Role.class, "Name = ?", name).orElse(null);
+        return retrieveEntityServiceFor(Account_Role.class).getWhere("Name = ?", name).orElse(null);
     }
 }

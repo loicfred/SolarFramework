@@ -7,8 +7,10 @@ import org.solarframework.auth.obj.enums.UserStatus;
 import org.solarframework.lang.Nationalities;
 import org.solarframework.db.spring.DatabaseObject;
 
+import java.security.Permission;
 import java.security.Principal;
 import java.time.*;
+import java.util.Set;
 
 @Entity
 @Table(name = "account_user")
@@ -256,17 +258,19 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
     public Account_Role getRole() {
         return role == null ? role = retrieveEntityServiceFor(Account_Role.class).getById(getRoleId()).orElse(null) : null;
     }
+    public Set<Account_Permission> getPermissions() {
+        return getRole().getPermissions();
+    }
 
 
     public static Account_User getByEmail(String email) {
-        return retrieveServiceFor(Account_User.class).getWhere(Account_User.class, "Email = ?", email).orElse(null);
+        return retrieveEntityServiceFor(Account_User.class).getWhere("Email = ?", email).orElse(null);
     }
     public static Account_User getByPhone(String phone) {
-        return retrieveServiceFor(Account_User.class).getWhere(Account_User.class, "Phone = ?", phone).orElse(null);
+        return retrieveEntityServiceFor(Account_User.class).getWhere("Phone = ?", phone).orElse(null);
     }
     public static Account_User getByAuthentication(Principal principal) {
-        if (principal == null) return null;
-        return retrieveServiceFor(Account_User.class).getWhere(Account_User.class, "Email = ?", principal.getName()).orElse(null);
+        return principal == null ? null : retrieveEntityServiceFor(Account_User.class).getWhere("Email = ?", principal.getName()).orElse(null);
     }
 
     public int getAge() {

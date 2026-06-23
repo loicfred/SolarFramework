@@ -68,6 +68,6 @@ public class Account_Notification extends DatabaseObject.ID_OBJ<Long, Account_No
     }
 
     public static List<Account_Notification> ofUser(long userID, int limit) {
-        return retrieveServiceFor(Account_Notification.class).getAllWhere(Account_Notification.class, "UserID = ? ORDER BY ID DESC LIMIT ?;", userID, limit);
+        return retrieveEntityServiceFor(Account_Notification.class).getAllWhere("UserID = ? ORDER BY ID DESC LIMIT ?;", userID, limit);
     }
 }

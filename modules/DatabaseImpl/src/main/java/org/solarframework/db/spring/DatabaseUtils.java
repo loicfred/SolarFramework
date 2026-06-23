@@ -220,7 +220,7 @@ public class DatabaseUtils {
                         setValueWhileConvertingDBToObject(JoinItem, singleRow.get(mainJoinField.getName() + "." + joinObjectField.getName().toLowerCase()).orElse(null), joinObjectField);
                     }
                 }
-                if (JoinItem instanceof List<?> joinItemList) {
+                if (JoinItem instanceof Collection<?> joinItemList) {
                     for (Object joinListItem : joinItemList) {
                         assignMainToJoinItem(mainJoinField, joinListItem, mainItem);
                     }
@@ -296,7 +296,7 @@ public class DatabaseUtils {
                     JoinItem = json != null ? GSON.fromJson(json, mainJoinField.getType()) : null;
                 }
                 if (JoinItem == null) continue;
-                if (JoinItem instanceof List<?> joinItemList) {
+                if (JoinItem instanceof Collection<?> joinItemList) {
                     for (Object joinListItem : joinItemList) {
                         assignMainToJoinItem(mainJoinField, joinListItem, mainItem);
                     }

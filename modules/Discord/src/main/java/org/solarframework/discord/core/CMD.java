@@ -31,9 +31,8 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.TimeUtils.getNow;
-import static org.solarframework.db.spring.DatabaseObject.retrieveServiceFor;
+import static org.solarframework.db.spring.DatabaseObject.retrieveEntityServiceFor;
 import static org.solarframework.discord.core.BotBuilder.LogChannel;
-import static org.solarframework.discord.lang.L10N.SYSL;
 
 public class CMD {
     protected Interaction IT;
@@ -53,7 +52,7 @@ public class CMD {
     }
 
     public Discord_GuildInfo currentGuild() {
-        return GI == null && IT.isFromAttachedGuild() ? GI = retrieveServiceFor(Discord_GuildInfo.class).getById(Discord_GuildInfo.class, IT.getGuild().getIdLong()).orElse(null) : GI;
+        return GI == null && IT.isFromAttachedGuild() ? GI = retrieveEntityServiceFor(Discord_GuildInfo.class).getById(IT.getGuild().getIdLong()).orElse(null) : GI;
     }
 
     public void Log(String logMsg) {

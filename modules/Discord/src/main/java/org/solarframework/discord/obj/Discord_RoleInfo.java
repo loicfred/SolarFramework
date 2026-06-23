@@ -80,7 +80,7 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
     }
 
     public Discord_BotEmoji getEmoji() {
-        return retrieveServiceFor(Discord_BotEmoji.class).getById(Discord_BotEmoji.class, EmojiID).orElse(null);
+        return retrieveEntityServiceFor(Discord_BotEmoji.class).getById(EmojiID).orElse(null);
     }
     public void setEmoji(Discord_BotEmoji emoji) {
         EmojiID = emoji != null ? emoji.getID() : null;

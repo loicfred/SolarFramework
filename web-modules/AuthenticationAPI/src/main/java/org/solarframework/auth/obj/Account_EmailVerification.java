@@ -63,15 +63,15 @@ public class Account_EmailVerification extends DatabaseObject.ID_OBJ<Long, Accou
 
 
     public static Account_EmailVerification getByToken(String token) {
-        return retrieveServiceFor(Account_EmailVerification.class).getWhere(Account_EmailVerification.class, "Token = ?", token).orElse(null);
+        return retrieveEntityServiceFor(Account_EmailVerification.class).getWhere("Token = ?", token).orElse(null);
     }
 
     public Account_User getUser() {
-        return U == null ? U = retrieveServiceFor(Account_User.class).getById(Account_User.class, userID).orElse(null) : U;
+        return U == null ? U = retrieveEntityServiceFor(Account_User.class).getById(userID).orElse(null) : U;
     }
 
     public static void ClearUnregisterUsers() {
-        for (Account_EmailVerification vToken : retrieveServiceFor(Account_EmailVerification.class).getAllWhere(Account_EmailVerification.class, "Type = ? AND ExpiryDate < ?","REGISTRATION", Instant.now().toEpochMilli())) {
+        for (Account_EmailVerification vToken : retrieveEntityServiceFor(Account_EmailVerification.class).getAllWhere("Type = ? AND ExpiryDate < ?","REGISTRATION", Instant.now().toEpochMilli())) {
             vToken.getUser().Delete();
         }
     }
