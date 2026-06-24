@@ -33,6 +33,10 @@ public class Web_PathAuthorizedRole extends DatabaseObject<Web_PathAuthorizedRol
     }
 
     protected Web_PathAuthorizedRole() {}
+    public Web_PathAuthorizedRole(Long pathId, Long roleId) {
+        this.pathId = pathId;
+        this.roleId = roleId;
+    }
 
     public Account_Role getRole() {
         return retrieveEntityServiceFor(Account_Role.class).getById(getRoleId()).orElse(null);

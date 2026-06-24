@@ -6,6 +6,7 @@ import org.solarframework.db.spring.DatabaseObject;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
+import java.util.function.Supplier;
 
 @Entity
 @Table(name = "account_role")
@@ -38,8 +39,16 @@ public class Account_Role extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Rol
         this.accessLevel = access_level;
     }
 
-    public Account_Role() {
+    protected Account_Role() {}
+    public Account_Role(Long ID, String name, Integer accessLevel) {
+        this.ID = ID;
+        this.name = name;
+        this.accessLevel = accessLevel;
+    }
+    public Account_Role(String name, Integer accessLevel) {
         this.ID = Instant.now().toEpochMilli();
+        this.name = name;
+        this.accessLevel = accessLevel;
     }
 
     public Set<Account_Permission> getPermissions() {
@@ -49,4 +58,5 @@ public class Account_Role extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Rol
     public static Account_Role getByName(String name) {
         return retrieveEntityServiceFor(Account_Role.class).getWhere("Name = ?", name).orElse(null);
     }
+
 }

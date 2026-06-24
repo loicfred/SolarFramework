@@ -5,10 +5,11 @@ import org.solarframework.db.spring.DatabaseObject;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 public interface IDBObjectService<T> {
 
-    List<String> getCacheHashes();
+    Set<String> getCacheHashes();
     String getHashedIdentifier();
 
     String toJSON();
@@ -18,8 +19,9 @@ public interface IDBObjectService<T> {
     Optional<T> WriteThenReturn();
 
     int Upsert();
-
     Optional<T> UpsertThenReturn();
+    int Upsert(List<String> conflictCols);
+    Optional<T> UpsertThenReturn(List<String> conflictCols);
 
     int IncrementColumn(String column, int amount);
     int IncrementColumns(Map<String, Double> parameters);

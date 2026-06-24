@@ -24,7 +24,7 @@ public class Account_EmailVerification extends DatabaseObject.ID_OBJ<Long, Accou
     @Column(name = "ExpiryDate", nullable = false)
     public Long expiryDate = Instant.now().plus(24, ChronoUnit.HOURS).toEpochMilli();
 
-    public Account_EmailVerification() {}
+    protected Account_EmailVerification() {}
     public Account_EmailVerification(Account_User authAccountUser, String token, EmailVerificationType type) {
         this.ID = Instant.now().toEpochMilli();
         this.userID = authAccountUser.ID;

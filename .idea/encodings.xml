@@ -27,7 +27,7 @@
     <file url="file://$PROJECT_DIR$/web-modules/AuthenticationAPI/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/web-modules/AuthenticationImpl/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/web-modules/DatabaseEditor/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/web-modules/WebTemplates/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/web-modules/WebUtils/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/web-modules/src/main/java" charset="UTF-8" />
   </component>
 </project>

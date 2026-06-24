@@ -1,6 +1,7 @@
 package org.solarframework.db.api;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 public enum DatabaseType {
 
@@ -197,8 +198,7 @@ public enum DatabaseType {
             boolean supportsSequences,
             boolean supportsIdentity,
             boolean supportsSchemas,
-            boolean supportsTransactions
-    ) {
+            boolean supportsTransactions) {
         this.displayName = displayName;
         this.driverClass = driverClass;
         this.jdbcPrefix = jdbcPrefix;
@@ -255,4 +255,25 @@ public enum DatabaseType {
     public static DatabaseType fromDriver(String driver) {
         return Arrays.stream(values()).filter(type -> type.getDriverClass().equalsIgnoreCase(driver)).findFirst().orElse(null);
     }
+
+
+    public boolean supportsUpsert() { return this == POSTGRESQL || this == MYSQL || this == MARIADB || this == SQLITE || this == ORACLE || this == SQLSERVER || this == H2; }
+
+    public String Upsert(String table, String columns, String questionMarks, String duplicateKeyUpdateClause, String conflictColumn) {
+        return switch (this) {
+            case MYSQL, MARIADB -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON DUPLICATE KEY UPDATE " + duplicateKeyUpdateClause : "");
+            case POSTGRESQL, SQLITE, H2, COCKROACHDB  -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON CONFLICT" + (conflictColumn != null ? "(" + conflictColumn + ")" : "") + " DO UPDATE SET " + duplicateKeyUpdateClause : "");
+            default -> throw new UnsupportedOperationException(name() + " does not support UPSERT");
+        };
+    }
+
+    public String UpsertExcludedReference(String column) {
+        return switch (this) {
+            case MYSQL, MARIADB -> column + " = VALUES(" + column + ")";
+            case POSTGRESQL, SQLITE, H2, COCKROACHDB  -> column + " = excluded." + column;
+            default -> throw new UnsupportedOperationException(name() + " does not support UPSERT");
+        };
+    }
+
 }
+

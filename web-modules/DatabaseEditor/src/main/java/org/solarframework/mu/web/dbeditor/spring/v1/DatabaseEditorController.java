@@ -2,6 +2,7 @@ package org.solarframework.mu.web.dbeditor.spring.v1;
 
 import jakarta.persistence.Column;
 import org.solarframework.db.spring.DatabaseObject;
+import org.solarframework.web.spring.WebUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
@@ -32,15 +33,7 @@ public class DatabaseEditorController {
     @GetMapping("/{item}/edit/{id}")
     public String adminEdit(Model model, Principal loggedUser, @PathVariable String item, @PathVariable Long id) {
         if (loggedUser == null) return "redirect:/auth/v1/login";
-        try {
-            Class<?> Account_User = Class.forName("org.solarframework.web.auth.obj.Account_User");
-            Object result = Account_User.getDeclaredMethod("getByAuthentication", Principal.class).invoke(null, loggedUser);
-            String role = (String) result.getClass().getMethod("getRole").invoke(result);
-            if (!"ADMIN".equalsIgnoreCase(role)) return "redirect:/home";
-            Class.forName("org.solarframework.web.auth.spring.Constants")
-                    .getDeclaredMethod("addEssential", Model.class, Principal.class, Account_User)
-                    .invoke(null, model, loggedUser, result);
-        } catch (Exception ignored) {}
+        if (!WebUtils.canAccessPage(model, loggedUser, "/admin/db/**")) return "redirect:/";
         try {
             item = item.substring(0,1).toUpperCase() + item.substring(1);
             List<FieldMeta> fields = new ArrayList<>();
@@ -78,15 +71,7 @@ public class DatabaseEditorController {
     @PostMapping("/{objectName}/update/{id}")
     public String updateItem(Model model, Principal loggedUser, RedirectAttributes redirectAttributes, @PathVariable String objectName, @PathVariable Object id, @ModelAttribute UniversalForm form) {
         if (loggedUser == null) return "redirect:/auth/v1/login";
-        try {
-            Class<?> Account_User = Class.forName("org.solarframework.web.auth.obj.Account_User");
-            Object result = Account_User.getDeclaredMethod("getByAuthentication", Principal.class).invoke(null, loggedUser);
-            String role = (String) result.getClass().getMethod("getRole").invoke(result);
-            if (!"ADMIN".equalsIgnoreCase(role)) return "redirect:/home";
-            Class.forName("org.solarframework.web.auth.spring.Constants")
-                    .getDeclaredMethod("addEssential", Model.class, Principal.class, Account_User)
-                    .invoke(null, model, loggedUser, result);
-        } catch (Exception ignored) {}
+        if (!WebUtils.canAccessPage(model, loggedUser, "/admin/db/**")) return "redirect:/";
         try {
             objectName = objectName.substring(0,1).toUpperCase() + objectName.substring(1);
             @SuppressWarnings("unchecked")

@@ -6,8 +6,8 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
-        <module name="WebTemplates" />
         <module name="DatabaseEditor" />
+        <module name="WebUtils" />
         <module name="AI" />
         <module name="JSON" />
         <module name="DatabaseAPI" />
@@ -49,7 +49,7 @@
       <module name="Plugin" options="-parameters" />
       <module name="SSLServer" options="-parameters" />
       <module name="SolarFramework" options="-parameters" />
-      <module name="WebTemplates" options="-parameters" />
+      <module name="WebUtils" options="-parameters" />
       <module name="ZIP" options="-parameters" />
       <module name="core" options="-parameters" />
       <module name="web-modules" options="-parameters" />

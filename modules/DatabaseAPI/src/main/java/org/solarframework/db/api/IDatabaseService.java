@@ -11,6 +11,7 @@ import java.util.Set;
 
 public interface IDatabaseService {
 
+    DatabaseType getDatabaseType();
     <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject);
 
 
@@ -86,22 +87,15 @@ public interface IDatabaseService {
         IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject);
 
         Optional<T> getByIdWithJoins(Object... id);
-        Optional<T> getById(String select, Object... id);
         Optional<T> getById(Object... id);
         Optional<T> getWhereWithJoins(String whereClause, Object... args);
-        Optional<T> getWhere(String select, String whereClause, Object... args);
         Optional<T> getWhere(String whereClause, Object... args);
-        List<T> getAll(String select);
         List<T> getAll();
-        List<T> getAllWhere(String select, String whereClause, Object... args);
         List<T> getAllWhere(String whereClause, Object... args);
-        Set<T> getAllWhereDistinct(String select, String whereClause, Object... args);
         Set<T> getAllWhereDistinct(String whereClause, Object... args);
         int Count();
         int Count(String whereClause, Object... args);
-        T getRandom(String select);
         T getRandom();
-        T getRandom(String select, String whereClause, Object... args);
         T getRandom(String whereClause, Object... args);
 
 

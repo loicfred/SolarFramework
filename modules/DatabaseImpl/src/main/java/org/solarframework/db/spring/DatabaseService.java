@@ -49,12 +49,12 @@ public class DatabaseService implements IDatabaseService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    public DatabaseType getDatabaseType() {
-        return availableSource.getType();
-    }
-
     public CacheManager getDbCacheManager() {
         return dbCacheManager;
+    }
+
+    public DatabaseType getDatabaseType() {
+        return availableSource.getType();
     }
 
     public <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject) {
@@ -62,7 +62,6 @@ public class DatabaseService implements IDatabaseService {
     }
 
     public <O> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id) {
-        if (IdFields.isEmpty()) SolarDBManager.verifyEntities();
         return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + IdFields.get(table).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")) + " LIMIT 1;", id);
     }
     public <O> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args) {
@@ -73,11 +72,9 @@ public class DatabaseService implements IDatabaseService {
     // ====== SHORT CUTS ======
 
     public <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object... id) {
-        if (IdFields.isEmpty()) SolarDBManager.verifyEntities();
         return this.doQueryJoin(clazz, IdFields.get(clazz).stream().map(f -> "MAIN." + f.getName() + " = ?").collect(Collectors.joining(" AND ")), id);
     }
     public <T> Optional<T> getById(String select, Class<T> clazz, Object... id) {
-        if (IdFields.isEmpty()) SolarDBManager.verifyEntities();
         return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + IdFields.get(clazz).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")) + " LIMIT 1;", id);
     }
     public <T> Optional<T> getById(Class<T> clazz, Object... id) {
@@ -302,9 +299,11 @@ public class DatabaseService implements IDatabaseService {
 
     public void createSchema(List<Class<?>> clz) {
         appendSchema(clz, "create");
+        for (Class<?> c : clz) SolarDBManager.verifyEntity(availableSource, c);
     }
     public void updateSchema(List<Class<?>> clz) {
         appendSchema(clz, "update");
+        for (Class<?> c : clz) SolarDBManager.verifyEntity(availableSource, c);
     }
 
     private void appendSchema(List<Class<?>> clz, String action) {
@@ -358,11 +357,6 @@ public class DatabaseService implements IDatabaseService {
         }
 
         @Override
-        public Optional<T> getById(String select, Object... id) {
-            return service.getById(select, clazz, id);
-        }
-
-        @Override
         public Optional<T> getById(Object... id) {
             return service.getById(clazz, id);
         }
@@ -373,18 +367,8 @@ public class DatabaseService implements IDatabaseService {
         }
 
         @Override
-        public Optional<T> getWhere(String select, String whereClause, Object... args) {
-            return service.getWhere(select, clazz, whereClause, args);
-        }
-
-        @Override
         public Optional<T> getWhere(String whereClause, Object... args) {
             return service.getWhere(clazz, whereClause, args);
-        }
-
-        @Override
-        public List<T> getAll(String select) {
-            return service.getAll(select, clazz);
         }
 
         @Override
@@ -393,18 +377,8 @@ public class DatabaseService implements IDatabaseService {
         }
 
         @Override
-        public List<T> getAllWhere(String select, String whereClause, Object... args) {
-            return service.getAllWhere(select, clazz, whereClause, args);
-        }
-
-        @Override
         public List<T> getAllWhere(String whereClause, Object... args) {
             return service.getAllWhere(clazz, whereClause, args);
-        }
-
-        @Override
-        public Set<T> getAllWhereDistinct(String select, String whereClause, Object... args) {
-            return service.getAllWhereDistinct(select, clazz, whereClause, args);
         }
 
         @Override
@@ -423,18 +397,8 @@ public class DatabaseService implements IDatabaseService {
         }
 
         @Override
-        public T getRandom(String select) {
-            return service.getRandom(select, clazz);
-        }
-
-        @Override
         public T getRandom() {
             return service.getRandom(clazz);
-        }
-
-        @Override
-        public T getRandom(String select, String whereClause, Object... args) {
-            return service.getRandom(select, clazz, whereClause, args);
         }
 
         @Override

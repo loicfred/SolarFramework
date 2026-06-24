@@ -3,6 +3,7 @@ package org.solarframework.auth.obj;
 import jakarta.persistence.*;
 import org.solarframework.db.spring.DatabaseObject;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -37,6 +38,16 @@ public class Web_PathAccessLevel extends DatabaseObject.ID_OBJ<Long, Web_PathAcc
     }
 
     protected Web_PathAccessLevel() {}
+    public Web_PathAccessLevel(Long ID, String path, Integer minimumAccessLevel) {
+        this.ID = ID;
+        this.path = path;
+        this.minimumAccessLevel = minimumAccessLevel;
+    }
+    public Web_PathAccessLevel(String path, Integer minimumAccessLevel) {
+        this.ID = Instant.now().toEpochMilli();
+        this.path = path;
+        this.minimumAccessLevel = minimumAccessLevel;
+    }
 
     public Set<Account_Role> getAuthorizedRoles() {
         authorizedRoles = authorizedRoles == null ? retrieveEntityServiceFor(Web_PathAuthorizedRole.class).getAllWhereDistinct("PathID=?", getID()) : authorizedRoles;

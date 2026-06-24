@@ -250,18 +250,37 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
         this.accountProvider = accountProvider;
     }
 
-    public Account_User() {
+    protected Account_User() {}
+    public Account_User(String username, String email, String passwordHash) {
         this.ID = Instant.now().toEpochMilli();
+        this.username = username;
+        this.email = email;
+        this.passwordHash = passwordHash;
     }
 
 
     public Account_Role getRole() {
-        return role == null ? role = retrieveEntityServiceFor(Account_Role.class).getById(getRoleId()).orElse(null) : null;
+        if (role != null) return role;
+        role = retrieveEntityServiceFor(Account_Role.class).getById(getRoleId()).orElse(null);
+        return role == null ? role = new Account_Role("Guest", 0) : role;
     }
     public Set<Account_Permission> getPermissions() {
         return getRole().getPermissions();
     }
 
+    public boolean hasAccessToPath(String urlPath) {
+        System.err.println(urlPath);
+        System.err.println(urlPath.trim());
+        Web_PathAccessLevel pathData = retrieveEntityServiceFor(Web_PathAccessLevel.class).getWhere("Path = ?", urlPath.trim()).orElse(null);
+        System.err.println(pathData);
+        if (pathData == null) return false;
+        if (pathData.getMinimumAccessLevel() > getRole().getAccessLevel())
+            return pathData.getAuthorizedRoles().contains(getRole());
+        return true;
+    }
+    public boolean hasPermission(Account_Permission permission) {
+        return getRole().getPermissions().contains(permission);
+    }
 
     public static Account_User getByEmail(String email) {
         return retrieveEntityServiceFor(Account_User.class).getWhere("Email = ?", email).orElse(null);

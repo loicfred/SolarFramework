@@ -23,7 +23,7 @@ public class Account_Notification extends DatabaseObject.ID_OBJ<Long, Account_No
     @Column(name = "Opened", nullable = false, columnDefinition = "TINYINT(1)")
     public boolean opened = false;
 
-    public Account_Notification() {}
+    protected Account_Notification() {}
     public Account_Notification(Long userID, String title, String message) {
         this.ID = Instant.now().toEpochMilli();
         this.userID = userID;

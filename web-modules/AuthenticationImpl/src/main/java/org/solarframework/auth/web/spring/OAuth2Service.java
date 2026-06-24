@@ -30,17 +30,14 @@ public class OAuth2Service extends DefaultOAuth2UserService {
 
         Account_User user = Account_User.getByEmail(email);
         if (user == null) {
-            user = new Account_User();
-            user.setEmail(email);
-            user.setFirstName(firstName);
-            user.setLastName(lastName);
-            user.setEmailVerified(true);
-            user.setPasswordHash(UUID.randomUUID().toString());
-
             String normalizedFirstName = normalizeToAscii(firstName != null ? firstName : "");
             String normalizedLastName = normalizeToAscii(lastName != null ? lastName : "");
             String username = (normalizedFirstName + normalizedLastName + GenerateRandomNumber(1,10000)).toLowerCase();
-            user.setUsername(username);
+
+            user = new Account_User(email, username, UUID.randomUUID().toString());
+            user.setFirstName(firstName);
+            user.setLastName(lastName);
+            user.setEmailVerified(true);
             user.setAccountProvider(AccountProvider.GOOGLE);
             user.Write();
         }

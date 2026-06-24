@@ -1,7 +1,6 @@
 package org.solarframework.auth.web.spring;
 
-import org.solarframework.auth.obj.Account_User;
-import org.solarframework.auth.obj.PersistentLogins;
+import org.solarframework.auth.obj.*;
 import org.solarframework.db.spring.DatabaseManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,6 +31,7 @@ public class SecurityConfig {
         this.oAuth2UserService = oAuth2UserService;
         this.databaseManager = databaseManager;
     }
+
 
     // Password Encoder
     @Bean
@@ -103,9 +103,8 @@ public class SecurityConfig {
     @Bean
     public PersistentTokenRepository persistentTokenRepository() {
         JdbcTokenRepositoryImpl repo = new JdbcTokenRepositoryImpl();
-        if (databaseManager.getSourceByEntity(PersistentLogins.class).getMissingEntitiesClasses().contains(PersistentLogins.class)) {
+        if (databaseManager.getSourceByEntity(PersistentLogins.class).getMissingEntitiesClasses().contains(PersistentLogins.class))
             databaseManager.getService(PersistentLogins.class).createSchema(List.of(PersistentLogins.class));
-        }
         repo.setDataSource(databaseManager.getSourceByEntity(PersistentLogins.class).getDataSource());
         return repo;
     }
@@ -113,14 +112,17 @@ public class SecurityConfig {
     // Security Filter Chain
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, RememberMeServices rememberMeServices) {
-        String[] publicPaths = {
-                "/", "/home", "/auth/v1/**", "/auth/v2/**", "/api/v1/**", "/api/v2/**", "/error",
-                "/static/**"
-        };
+        List<String> publicPaths = new java.util.ArrayList<>(
+                List.of("/", "/home", "/error", "/auth/**", "/api/**", "/img/**", "/css/**", "/js/**")
+        );
+        try {
+            publicPaths.addAll(databaseManager.getAllWhere(Web_PathAccessLevel.class, "MinimumAccessLevel <= ?", 0).stream().map(Web_PathAccessLevel::getPath).toList());
+        } catch (Exception ignored) {}
+        System.err.println(publicPaths);
         return http
                 // Authorization
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(publicPaths).permitAll()
+                        .requestMatchers(publicPaths.toArray(new String[0])).permitAll()
                         .anyRequest().authenticated()
                 )
                 // CSRF

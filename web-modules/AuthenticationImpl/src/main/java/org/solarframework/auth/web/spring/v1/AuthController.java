@@ -17,6 +17,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.security.Principal;
 import java.time.LocalDate;
+import java.time.Period;
 import java.util.UUID;
 
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
@@ -50,16 +51,15 @@ public class AuthController {
     public String register(HttpServletRequest request, UserModel model) {
         if (!validatePassword(model.Password)) return "redirect:/accounts/signup?badpassword";
         if (Account_User.getByEmail(model.Email) != null) return "redirect:/accounts/signup?bademail";
-        //if (user.DateOfBirth < 18) return "redirect:/accounts/signup?badage";
+        if (Period.between(model.getDateOfBirth(), LocalDate.now()).getYears() < 18) return "redirect:/accounts/signup?badage";
         clearFailedLogins(model.Email);
 
-        Account_User u = new Account_User();
+        Account_User u = new Account_User(model.Email, UUID.randomUUID().toString(), passwordEncoder.encode(model.Password));
         u.setFirstName(model.FirstName);
         u.setLastName(model.LastName);
         u.setGender(model.Gender);
-        //u.setAddress(model.Address);
+        u.setAddress(model.Address);
         u.setDateOfBirth(model.DateOfBirth);
-        u.setPasswordHash(passwordEncoder.encode(model.Password));
         u.Write();
         String token = UUID.randomUUID().toString();
         new Account_EmailVerification(u, token, EmailVerificationType.REGISTRATION);

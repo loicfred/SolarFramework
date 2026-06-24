@@ -8,8 +8,10 @@ import org.solarframework.db.api.IDatabaseService;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 public class DatabaseObject<T> {
     protected static final Map<Class<?>, IDatabaseService> serviceCache = new HashMap<>();
@@ -49,9 +51,7 @@ public class DatabaseObject<T> {
     public DatabaseObject() {
         try {
             service = retrieveServiceFor(this.getClass()).makeObjectManager(this);
-        } catch (NullPointerException ignored) {
-            log.warn("The entity {} doesn't have any linked data source. Operations will not be available.", this.getClass().getSimpleName());
-        }
+        } catch (NullPointerException ignored) {}
     }
 
     public String getHashedIdentifier() {
@@ -109,7 +109,6 @@ public class DatabaseObject<T> {
     public <A> A refetchAttribute(String attributeName, Class<A> attributeType) {
         return service.refetchAttribute(attributeName, attributeType);
     }
-
 
     @PrePersist
     protected void onCreate() {}

@@ -1,6 +1,9 @@
 package org.solarframework.db.spring;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Id;
+import org.jspecify.annotations.NonNull;
+import org.solarframework.db.api.DatabaseType;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
 
@@ -18,18 +21,18 @@ import static org.solarframework.json.JSONItem.GSON;
 @SuppressWarnings("all")
 public class DBInstanceService<T> implements IDBObjectService<T> {
     protected static final Map<Class<?>, String> TableNames = new HashMap<>();
-    protected static final Map<Class<?>, List<Field>> IdFields = new HashMap<>();
-    protected static final Map<Class<?>, List<Field>> CachedFields = new HashMap<>();
+    protected static final Map<Class<?>, Set<Field>> IdFields = new HashMap<>();
+    protected static final Map<Class<?>, Set<Field>> CachedFields = new HashMap<>();
 
     protected transient DatabaseObject<T> dbObject;
     protected transient IDatabaseService dbService;
     protected transient Class<T> entityClass;
     protected transient String tableName;
-    protected transient List<Field> cachedFields = new ArrayList<>();
-    protected transient List<Field> idFields = new ArrayList<>();
-    protected transient List<String> cacheHashes = new ArrayList<>();
+    protected transient Set<Field> cachedFields = new HashSet<>();
+    protected transient Set<Field> idFields = new HashSet<>();
+    protected transient Set<String> cacheHashes = new HashSet<>();
 
-    public List<String> getCacheHashes() {
+    public Set<String> getCacheHashes() {
         return cacheHashes;
     }
 
@@ -39,14 +42,26 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         this.entityClass = (Class<T>) dbObject.getClass();
 
         this.tableName = TableNames.computeIfAbsent(entityClass, c -> getTableName(entityClass));
-        this.cachedFields = CachedFields.computeIfAbsent(entityClass, c -> getSerializableFieldsOfClassFamily(entityClass).stream().filter(f -> dbService.getTableStats(tableName).getColumnNames().contains(f.getName().toLowerCase())).collect(Collectors.toList()));
-        this.idFields = IdFields.computeIfAbsent(entityClass, c -> CachedFields.get(entityClass).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toList()));
+        this.cachedFields = CachedFields.computeIfAbsent(entityClass, c -> getSerializableFieldsOfClassFamily(entityClass).stream().filter(f -> dbService.getTableStats(tableName).getColumnNames().contains(f.getName().toLowerCase())).collect(Collectors.toSet()));
+        this.idFields = IdFields.computeIfAbsent(entityClass, c -> CachedFields.get(entityClass).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toSet()));
     }
 
+    private Set<Field> getIdAndUniqueFields() {
+        Set<Field> fs = CachedFields.get(entityClass).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toSet());
+        fs.addAll(CachedFields.get(entityClass).stream().filter(f -> f.isAnnotationPresent(Column.class) && f.getAnnotation(Column.class).unique()).collect(Collectors.toSet()));
+        return fs;
+    }
+    private Set<Field> getUniqueFields() {
+        return CachedFields.get(entityClass).stream().filter(f -> f.isAnnotationPresent(Column.class) && f.getAnnotation(Column.class).unique()).collect(Collectors.toSet());
+    }
 
     public String getHashedIdentifier() {
         List<Object> ids = cachedFields.stream().filter(f -> idFields.contains(f.getName().toLowerCase())).map(f -> getFieldValue(f, dbObject)).toList();
         return entityClass.getName() + String.valueOf(ids.stream().map(Object::toString).collect(Collectors.joining("/")).hashCode());
+    }
+
+    public DatabaseType getDatabaseType() {
+        return dbService.getDatabaseType();
     }
 
     @Override
@@ -57,9 +72,9 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public int Write() {
         try {
-            ParameterManager parameterManager = getResult(false);
-            String sql = "INSERT INTO " + tableName + " (" + parameterManager.columnsSeparatedByComma() + ") VALUES (" + parameterManager.questionMarksSeparatedByComma() + ")";
-            return dbService.doUpdate(sql, parameterManager.currentValuesList());
+            InsertArgumentManager insertArgMgr = makeInsertManager(false);
+            String sql = getDatabaseType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), null, getUniqueFields().stream().map(f -> f.getName()).collect(Collectors.joining(", ")));
+            return dbService.doUpdate(sql, insertArgMgr.currentValuesList());
         } catch (Exception e) {
             throw new RuntimeException("Failed to write object", e);
         } finally {
@@ -69,9 +84,9 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public Optional<T> WriteThenReturn() {
         try {
-            ParameterManager parameterManager = getResult(false);
-            String sql = "INSERT INTO " + tableName + " (" + parameterManager.columnsSeparatedByComma() + ") VALUES (" + parameterManager.questionMarksSeparatedByComma() + ") RETURNING *";
-            return dbService.doQueryNoCache(entityClass, sql, parameterManager.currentValuesList());
+            InsertArgumentManager insertArgMgr = makeInsertManager(false);
+            String sql = getDatabaseType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), null, getUniqueFields().stream().map(f -> f.getName()).collect(Collectors.joining(", "))) + " RETURNING *";
+            return dbService.doQueryNoCache(entityClass, sql, insertArgMgr.currentValuesList());
         } catch (Exception e) {
             throw new RuntimeException("Failed to insert object", e);
         } finally {
@@ -81,10 +96,18 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
 
     @Override
     public int Upsert() {
+        return Upsert(null);
+    }
+    @Override
+    public Optional<T> UpsertThenReturn() {
+        return UpsertThenReturn(null);
+    }
+    @Override
+    public int Upsert(List<String> conflictCols) {
         try {
-            ParameterManager parameterManager = getResult(true);
-            String sql = "INSERT INTO " + tableName + " (" + parameterManager.columnsSeparatedByComma() + ") VALUES (" + parameterManager.questionMarksSeparatedByComma() + ") ON DUPLICATE KEY UPDATE " + parameterManager.duplicateKeyUpdateClause();
-            return dbService.doUpdate(sql, parameterManager.currentValuesList());
+            InsertArgumentManager insertArgMgr = makeInsertManager(true);
+            String sql = getDatabaseType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), insertArgMgr.duplicateKeyUpdateClause(), conflictCols == null || conflictCols.isEmpty() ? null : conflictCols.stream().collect(Collectors.joining(", ")));
+            return dbService.doUpdate(sql, insertArgMgr.currentValuesList());
         } catch (Exception e) {
             throw new RuntimeException("Failed to upsert object", e);
         } finally {
@@ -92,11 +115,11 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         }
     }
     @Override
-    public Optional<T> UpsertThenReturn() {
+    public Optional<T> UpsertThenReturn(List<String> conflictCols) {
         try {
-            ParameterManager parameterManager = getResult(true);
-            String sql = "INSERT INTO " + tableName + " (" + parameterManager.columnsSeparatedByComma() + ") VALUES (" + parameterManager.questionMarksSeparatedByComma() + ") ON DUPLICATE KEY UPDATE " + parameterManager.duplicateKeyUpdateClause() + " RETURNING *";
-            return dbService.doQueryNoCache(entityClass, sql, parameterManager.currentValuesList());
+            InsertArgumentManager insertArgMgr = makeInsertManager(true);
+            String sql = getDatabaseType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), insertArgMgr.duplicateKeyUpdateClause(), conflictCols == null || conflictCols.isEmpty() ? null : conflictCols.stream().collect(Collectors.joining(", "))) + " RETURNING *";
+            return dbService.doQueryNoCache(entityClass, sql, insertArgMgr.currentValuesList());
         } catch (Exception e) {
             throw new RuntimeException("Failed to upsert object", e);
         } finally {
@@ -236,8 +259,8 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     }
 
 
-    private record ParameterManager(String columnsSeparatedByComma, String questionMarksSeparatedByComma, Object[] currentValuesList, String duplicateKeyUpdateClause) {}
-    private ParameterManager getResult(boolean update) {
+    protected record InsertArgumentManager(String columns, String questionMarks, String duplicateKeyUpdateClause, Object[] currentValuesList) {}
+    private InsertArgumentManager makeInsertManager(boolean update) {
         Set<Field> nonNullFields = cachedFields.stream().filter(f -> getFieldValue(f, dbObject) != null).collect(Collectors.toSet());
 
         String columnsSeparatedByComma = nonNullFields.stream().map(Field::getName).collect(Collectors.joining(", "));
@@ -245,9 +268,9 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
 
         List<Object> currentValuesList = cleanParameterList(nonNullFields.stream().map(f -> getFieldValue(f, dbObject)).collect(Collectors.toList()));
 
-        if (!update) return new ParameterManager(columnsSeparatedByComma, questionMarksSeparatedByComma, currentValuesList.toArray(), null);
-        String duplicateKeyUpdateClause = cachedFields.stream().map(f -> f.getName() + " = VALUES(" + f.getName() + ")").collect(Collectors.joining(", "));
-        return new ParameterManager(columnsSeparatedByComma, questionMarksSeparatedByComma, currentValuesList.toArray(), duplicateKeyUpdateClause);
+        if (!update) return new InsertArgumentManager(columnsSeparatedByComma, questionMarksSeparatedByComma, null, currentValuesList.toArray());
+        String duplicateKeyUpdateClause = cachedFields.stream().map(f -> getDatabaseType().UpsertExcludedReference(f.getName())).collect(Collectors.joining(", "));
+        return new InsertArgumentManager(columnsSeparatedByComma, questionMarksSeparatedByComma, duplicateKeyUpdateClause, currentValuesList.toArray());
     }
 
 }

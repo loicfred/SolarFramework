@@ -6,6 +6,7 @@ import io.github.classgraph.ScanResult;
 import jakarta.persistence.Entity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.solarframework.db.api.BundleEntities;
 import org.solarframework.db.api.DatabaseType;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
@@ -21,6 +22,7 @@ import org.springframework.stereotype.Service;
 import java.lang.reflect.Constructor;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.ClassUtils.copyObject;
 import static org.solarframework.core.util.ClassUtils.isClassRelated;
@@ -28,6 +30,7 @@ import static org.solarframework.db.spring.DBInstanceService.*;
 import static org.solarframework.db.spring.DatabaseObject.serviceCache;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
+import static org.solarframework.db.spring.DatabaseUtils.getTableName;
 import static org.solarframework.json.JSONItem.ReadJSON;
 
 @Service
@@ -36,6 +39,7 @@ public class DatabaseManager {
     private transient List<ClassLoader> entityClassloaders = new java.util.ArrayList<>(List.of(Thread.currentThread().getContextClassLoader()));
     private transient final CacheManager dbCacheManager;
     private final List<AvailableDataSource> dataSources = new java.util.ArrayList<>();
+    private transient List<DatabaseObject<?>> bundleObjects;
 
     private transient boolean IsSingleSource = true;
     private transient Instant Cooldown = Instant.now().minusSeconds(5);
@@ -84,9 +88,16 @@ public class DatabaseManager {
                 getDefaultAvailableSource().clearEntities();
                 getDefaultAvailableSource().addEntities(entities.toArray(new Class<?>[0]));
             }
-            for (Class<?> e : entities)
+            for (Class<?> e : entities) {
+                try {
+                    Constructor<?> constructor = e.getDeclaredConstructor();
+                    constructor.setAccessible(true);
+                    constructor.newInstance();
+                } catch (Exception ignored) {}
                 if (getSourceByEntity(e) == null)
                     getDefaultAvailableSource().addEntities(e);
+            }
+            scanBundleContainers();
         }
     }
 
@@ -98,23 +109,26 @@ public class DatabaseManager {
         }
     }
 
-    protected static void verifyEntity(AvailableDataSource ds, Class<?> C) {
+    protected void verifyEntity(AvailableDataSource ds, Class<?> C) {
         try {
             Constructor<?> constructor = C.getDeclaredConstructor();
             constructor.setAccessible(true);
             if (ds.getMissingEntitiesClasses().contains(C)) {
                 log.error("Entity [{}] is registered for [{}] but is missing from the database.", C.getName(), ds.getName());
             } else if (constructor.newInstance() instanceof DatabaseObject<?>) {
-                 if (ds.getUpdatableEntitiesClasses().contains(C)) {
+                if (ds.getUpdatableEntitiesClasses().contains(C)) {
                     log.warn("Entity [{}] is registered for [{}] but needs to be updated.", C.getName(), ds.getName());
                 } else {
                     log.info("Entity [{}] is registered for [{}].", C.getName(), ds.getName());
+
+                    for (Object item : bundleObjects.stream().filter(bo -> bo.getClass() == C).toList())
+                        if (item instanceof DatabaseObject<?> i)
+                            i.Write();
                 }
             } else {
                 log.error("Entity class [{}] is NOT CHILD of DatabaseObject<>.", C.getName());
             }
         } catch (Exception ignored) {
-            ignored.printStackTrace();
             log.error("{} does not have a default constructor.", C.getName());
         }
     }
@@ -267,7 +281,7 @@ public class DatabaseManager {
                 }
             } else if (cacheItem instanceof List<?> V2) { // If the item cached is a list
                 if (V2.isEmpty()) cache.evict(key);
-                if (V2.getFirst() instanceof DatabaseObject<?>) { // Check if the datatype of the cache list is the same as the current item
+                else if (V2.getFirst() instanceof DatabaseObject<?>) { // Check if the datatype of the cache list is the same as the current item
                     Object found = V2.stream().filter(dbo -> ((DatabaseObject<?>)dbo).getService().getCacheHashes().contains(dbobject.getHashedIdentifier())).findFirst().orElseGet(() -> {
                         cache.evict(key);
                         return null;
@@ -331,6 +345,21 @@ public class DatabaseManager {
         }
         return L;
     }
+    private void scanBundleContainers() {
+        bundleObjects = new ArrayList<>();
+        if (entityClassloaders.isEmpty()) entityClassloaders.add(Thread.currentThread().getContextClassLoader());
+        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(entityClassloaders.toArray(new ClassLoader[]{})).scan()) {
+            for (ClassInfo classInfo : scanResult.getClassesImplementing(BundleEntities.class).stream().toList()) {
+                Constructor<?> cons = classInfo.loadClass().getDeclaredConstructor();
+                cons.setAccessible(true);
+                if (cons.newInstance() instanceof BundleEntities BE && BE.bundleEntities() != null && BE.bundleEntities().get() != null) {
+                    bundleObjects.addAll(BE.bundleEntities().get());
+                }
+            }
+        } catch (Exception _) {}
+    }
+
+
 
     public void LoadFromFile(String path) {
         DataSourceFile db;
