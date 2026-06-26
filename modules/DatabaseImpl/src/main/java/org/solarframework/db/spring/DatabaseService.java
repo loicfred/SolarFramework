@@ -135,11 +135,11 @@ public class DatabaseService implements IDatabaseService {
     private <T> T getCachedOrCompute(String cacheName, String cacheKey, java.util.function.Supplier<T> supplier) {
         Cache cache = dbCacheManager.getCache(cacheName);
         if (cache != null) {
-            Cache.ValueWrapper cached = cache.get(availableSource.getId() + cacheKey);
+            Cache.ValueWrapper cached = cache.get(availableSource.getConnectionString().hashCode() + cacheKey);
             if (cached != null) return (T) cached.get();
         }
         T result = supplier.get();
-        if (cache != null && result != null) cache.put(availableSource.getId() + cacheKey, result);
+        if (cache != null && result != null) cache.put(availableSource.getConnectionString().hashCode() + cacheKey, result);
         return result;
     }
 
@@ -282,6 +282,8 @@ public class DatabaseService implements IDatabaseService {
                     if (count.next()) {
                         stats.totalRows = count.getLong(1);
                     }
+                } catch (Exception e) {
+                    if (e.getMessage().contains("doesn't exist")) createSchema(List.of(availableSource.getClassOfTable(name)));
                 }
                 return null;
             });

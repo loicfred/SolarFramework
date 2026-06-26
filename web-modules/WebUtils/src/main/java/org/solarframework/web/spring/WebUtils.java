@@ -32,18 +32,12 @@ public class WebUtils {
     }
     public static boolean canAccessPage(Map<String, Object> model, Principal loggedUser, String path) {
         try {
-            System.err.println("1");
             Class<?> Account_User = Class.forName("org.solarframework.auth.obj.Account_User");
-            System.err.println("2");
             Object result = Account_User.getDeclaredMethod("getByAuthentication", Principal.class).invoke(null, loggedUser);
-            System.err.println("3");
             if (!(boolean)result.getClass().getMethod("hasAccessToPath", String.class).invoke(result, path)) return false;
-            System.err.println("4");
             Class.forName("org.solarframework.auth.web.spring.AuthUtils").getDeclaredMethod("addEssential", Map.class, Principal.class, Account_User).invoke(null, model, loggedUser, result);
-            System.err.println("5");
             return true;
         } catch (Exception ignored) {
-            System.err.println("0");
             ignored.printStackTrace();
             return false;
         }

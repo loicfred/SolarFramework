@@ -34,7 +34,7 @@ public class OAuth2Service extends DefaultOAuth2UserService {
             String normalizedLastName = normalizeToAscii(lastName != null ? lastName : "");
             String username = (normalizedFirstName + normalizedLastName + GenerateRandomNumber(1,10000)).toLowerCase();
 
-            user = new Account_User(email, username, UUID.randomUUID().toString());
+            user = new Account_User(username, email, UUID.randomUUID().toString());
             user.setFirstName(firstName);
             user.setLastName(lastName);
             user.setEmailVerified(true);

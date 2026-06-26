@@ -24,6 +24,7 @@ import java.util.stream.Stream;
 
 import static org.solarframework.core.util.ClassUtils.copyObject;
 import static org.solarframework.core.util.ClassUtils.getAllFieldsOfClassFamily;
+import static org.solarframework.db.spring.DatabaseManager.defaultConnectionString;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 
 public class AvailableDataSource extends JSONItem<AvailableDataSource> {
@@ -35,8 +36,6 @@ public class AvailableDataSource extends JSONItem<AvailableDataSource> {
     private transient Long ping;
     private transient String pingError;
 
-    private boolean Default = false;
-    private final String id = UUID.randomUUID().toString();
     private String name;
     private String username;
     private String password;
@@ -56,20 +55,20 @@ public class AvailableDataSource extends JSONItem<AvailableDataSource> {
     }
 
     public void setEntities(List<Class<?>> entities) {
-        this.entities = entities.stream().map(Class::getName).collect(Collectors.toList());
         clearEntities();
+        this.entities = entities.stream().map(Class::getName).collect(Collectors.toList());
     }
     public void addEntities(Class<?>... entities) {
-        this.entities.addAll(Stream.of(entities).map(Class::getName).toList());
         clearEntitiesClasses();
+        this.entities.addAll(Stream.of(entities).map(Class::getName).toList());
     }
     public void removeEntities(Class<?>... entities) {
-        this.entities.removeAll(Stream.of(entities).map(Class::getName).toList());
         clearEntitiesClasses();
+        this.entities.removeAll(Stream.of(entities).map(Class::getName).toList());
     }
     public void clearEntities() {
-        this.entities.clear();
         clearEntitiesClasses();
+        this.entities.clear();
     }
     private void clearEntitiesClasses() {
         entitiesClasses = null;
@@ -78,9 +77,6 @@ public class AvailableDataSource extends JSONItem<AvailableDataSource> {
         installedClasses = null;
     }
 
-    public String getId() {
-        return id;
-    }
     public String getName() {
         return name;
     }
@@ -97,7 +93,7 @@ public class AvailableDataSource extends JSONItem<AvailableDataSource> {
         return type;
     }
     public boolean isDefault() {
-        return Default;
+        return Objects.equals(getConnectionString(), defaultConnectionString);
     }
     public int getMaxPoolSize() {
         return maxPoolSize;
@@ -144,9 +140,6 @@ public class AvailableDataSource extends JSONItem<AvailableDataSource> {
     }
     public void setConnectionTimeout(long connectionTimeout) {
         this.connectionTimeout = connectionTimeout;
-    }
-    protected void asDefault() {
-        this.Default = true;
     }
 
     public long getPing() {

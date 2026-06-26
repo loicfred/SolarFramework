@@ -43,6 +43,7 @@ public class DatabaseManager {
 
     private transient boolean IsSingleSource = true;
     private transient Instant Cooldown = Instant.now().minusSeconds(5);
+    protected static String defaultConnectionString;
 
     protected DatabaseManager(@Qualifier("databaseCacheManager") CacheManager dbCacheManager,
                               @Value("${spring.datasource.url:#{null}}") String connectionString,
@@ -56,6 +57,7 @@ public class DatabaseManager {
                               @Value("${spring.datasource.hikari.max-lifetime:#{null}}") Long maxLifetime,
                               @Value("${spring.datasource.hikari.connection-timeout:#{null}}") Long connectionTimeout,
                               DatabaseService defaultService) {
+        defaultConnectionString = connectionString;
         this.dbCacheManager = dbCacheManager;
         AvailableDataSource s = new AvailableDataSource(this);
         s.setName("Database (Default)");
@@ -68,7 +70,6 @@ public class DatabaseManager {
         s.setIdleTimeout(idleTimeout);
         s.setMaxLifetime(maxLifetime);
         s.setConnectionTimeout(connectionTimeout);
-        s.asDefault();
         addSource(s);
         DefaultDBService = defaultService;
         SolarDBManager = this;
@@ -77,7 +78,7 @@ public class DatabaseManager {
 
     public void reload() {
         if (Instant.now().isAfter(Cooldown)) {
-            Cooldown = Instant.now().plusSeconds(90);
+            Cooldown = Instant.now().plusSeconds(5);
             IdFields.clear();
             TableNames.clear();
             CachedFields.clear();
@@ -147,14 +148,20 @@ public class DatabaseManager {
 
     public boolean addSource(AvailableDataSource ds) {
         if (ds.getConnectionString().isEmpty() || ds.getName().isEmpty() || ds.getPassword().isEmpty() || ds.getUsername().isEmpty() || getSources().stream().anyMatch(d -> d.getConnectionString().equalsIgnoreCase(ds.getConnectionString()) || d.getName().equals(ds.getName()))) return false;
+        if (getDefaultAvailableSource() != null && ds.isDefault()) return false;
         dataSources.add(ds);
-        IsSingleSource = dataSources.size() == 1;
+        IsSingleSource = getSources().size() == 1;
         return true;
     }
-    public boolean removeSource(String id) {
-        if (getSources().stream().anyMatch(ds -> ds.getId().equals(id) && ds.isDefault())) return false;
-        getSources().removeIf(ds -> ds.getId().equals(id));
-        IsSingleSource = dataSources.size() == 1;
+    public boolean removeSource(String connectionString) {
+        if (getSources().stream().anyMatch(ds -> ds.getConnectionString().equals(connectionString) && ds.isDefault())) return false;
+        getSources().removeIf(ds -> ds.getConnectionString().equals(connectionString));
+        IsSingleSource = getSources().size() == 1;
+        return true;
+    }
+    public boolean clearSources() {
+        getSources().removeIf(ds -> !ds.isDefault());
+        IsSingleSource = getSources().size() == 1;
         return true;
     }
     public List<AvailableDataSource> getSources() {
@@ -172,10 +179,6 @@ public class DatabaseManager {
         return new DatabaseService.ENTITY<>(entity, IsSingleSource ? getDefaultService() : getSourceByEntity(entity).getService());
     }
 
-    public AvailableDataSource getSourceById(String id) {
-        if (IsSingleSource) return getDefaultAvailableSource();
-        return getSources().stream().filter(ds -> ds.getId().equals(id)).findFirst().orElse(null);
-    }
     public AvailableDataSource getSourceByName(String name) {
         if (IsSingleSource) return getDefaultAvailableSource();
         return getSources().stream().filter(ds -> ds.getName().equalsIgnoreCase(name)).findFirst().orElse(null);
@@ -189,7 +192,7 @@ public class DatabaseManager {
     }
 
     public AvailableDataSource getDefaultAvailableSource() {
-        return getSources().stream().filter(AvailableDataSource::isDefault).findFirst().orElseThrow();
+        return getSources().stream().filter(AvailableDataSource::isDefault).findFirst().orElse(null);
     }
     public IDatabaseService getDefaultService() {
         return getDefaultAvailableSource().getService();
@@ -335,9 +338,12 @@ public class DatabaseManager {
         return entityClassloaders;
     }
 
-    private List<Class<?>> scanEntities() {
-        List<Class<?>> L = new ArrayList<>();
+    public List<Class<?>> scanEntities() {
         if (entityClassloaders.isEmpty()) entityClassloaders.add(Thread.currentThread().getContextClassLoader());
+        return scanEntities(entityClassloaders);
+    }
+    public List<Class<?>> scanEntities(List<ClassLoader> entityClassloaders) {
+        List<Class<?>> L = new ArrayList<>();
         try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(entityClassloaders.toArray(new ClassLoader[]{})).scan()) {
             for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(Entity.class).stream().toList()) {
                 L.add(classInfo.loadClass());

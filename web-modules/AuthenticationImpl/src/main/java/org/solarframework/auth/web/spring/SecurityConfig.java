@@ -60,10 +60,12 @@ public class SecurityConfig {
         return (request, response, authentication) -> {
             System.out.println(authentication.getName() + " logged in (form)!");
             Account_User user = Account_User.getByEmail(authentication.getName());
-            user.setLoginCount(user.getLoginCount() + 1);
-            user.setLastLoginAt(Instant.now());
-            user.setLastSeenAt(Instant.now());
-            user.UpdateOnly("LoginCount", "LastLoginAt", "LastSeenAt");
+            if (user != null) {
+                user.setLoginCount(user.getLoginCount() + 1);
+                user.setLastLoginAt(Instant.now());
+                user.setLastSeenAt(Instant.now());
+                user.UpdateOnly("LoginCount", "LastLoginAt", "LastSeenAt");
+            }
             response.sendRedirect("/home");
         };
     }
@@ -74,10 +76,12 @@ public class SecurityConfig {
             System.out.println(authentication.getName() + " logged in (OAuth2)!");
             rememberMeServices.loginSuccess(request, response, authentication);
             Account_User user = Account_User.getByEmail(authentication.getName());
-            user.setLoginCount(user.getLoginCount() + 1);
-            user.setLastLoginAt(Instant.now());
-            user.setLastSeenAt(Instant.now());
-            user.UpdateOnly("LoginCount", "LastLoginAt", "LastSeenAt");
+            if (user != null) {
+                user.setLoginCount(user.getLoginCount() + 1);
+                user.setLastLoginAt(Instant.now());
+                user.setLastSeenAt(Instant.now());
+                user.UpdateOnly("LoginCount", "LastLoginAt", "LastSeenAt");
+            }
             response.sendRedirect("/home");
         };
     }

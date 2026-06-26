@@ -59,7 +59,7 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
     @Column(name = "LastSeenAt")
     private Instant lastSeenAt;
     @Column(name = "LoginCount")
-    private Integer loginCount = 0;
+    private Integer loginCount = 1;
     @Column(name = "AccountLockedUntil")
     private LocalDateTime accountLockedUntil;
     @Enumerated(EnumType.STRING)
