@@ -27,9 +27,11 @@
         <module>web-modules/WebUtils</module>
         <module>web-modules/DatabaseEditor</module>
         <module>web-modules/ProxyServerAPI</module>
-        <module>web-modules/ProxyServerImplV1</module>
-        <module>web-modules/ProxyServerImplV2</module>
+        <module>web-modules/NettyProxyServerImpl</module>
+        <module>web-modules/SpringProxyServerImplV1</module>
+        <module>web-modules/SpringProxyServerImplV2</module>
         <module>misc-modules/Discord</module>
+        <module>misc-modules/CertificateGenerator</module>
     </modules>
 
     <repositories>
@@ -84,11 +86,6 @@
             </dependency>
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
-                <artifactId>Discord</artifactId>
-                <version>1.0</version>
-            </dependency>
-            <dependency>
-                <groupId>org.solarframework.mu</groupId>
                 <artifactId>Excel</artifactId>
                 <version>1.0</version>
             </dependency>
@@ -136,12 +133,28 @@
             </dependency>
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
-                <artifactId>ProxyServerImplV1</artifactId>
+                <artifactId>NettyProxyServerImpl</artifactId>
                 <version>1.0</version>
             </dependency>
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
-                <artifactId>ProxyServerImplV2</artifactId>
+                <artifactId>SpringProxyServerImplV1</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>SpringProxyServerImplV2</artifactId>
+                <version>1.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>Discord</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>CertificateGenerator</artifactId>
                 <version>1.0</version>
             </dependency>
 

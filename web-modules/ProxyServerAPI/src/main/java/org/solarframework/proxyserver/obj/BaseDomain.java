@@ -9,7 +9,6 @@ import java.time.Instant;
 
 @MappedSuperclass
 public abstract class BaseDomain<T> extends DatabaseObject.ID_OBJ<Long, T> {
-    protected transient HttpHeaders headers = new HttpHeaders();
 
     @Column(name = "IP", nullable = false)
     private String ip;
@@ -42,10 +41,6 @@ public abstract class BaseDomain<T> extends DatabaseObject.ID_OBJ<Long, T> {
     }
 
     public abstract String getHost();
-
-    public HttpHeaders getHeaders() {
-        return headers;
-    }
 
     protected BaseDomain() {
         this.ID = Instant.now().toEpochMilli();

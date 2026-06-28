@@ -18,7 +18,7 @@ public class Domain extends BaseDomain<Domain> {
 
     protected Domain() {}
     public Domain(String ip, String name) {
-        super(ip, name, "./WAMP/domain/" + name + "/_");
+        super(ip, name, "./config/domain/" + name + "/_");
     }
     public Domain(String ip, String name, String path) {
         super(ip, name, path);
@@ -39,12 +39,6 @@ public class Domain extends BaseDomain<Domain> {
         Subdomain sub = getSubdomains().stream().filter(s -> s.getHost().equals(subdomain)).findFirst().orElse(null);
         return sub == null ? null : sub.getPath();
     }
-    public HttpHeaders getHeaders(String subdomain) {
-        if (Objects.equals(subdomain, getName())) return getHeaders();
-        Subdomain sub = getSubdomains().stream().filter(s -> s.getHost().equals(subdomain)).findFirst().orElse(null);
-        return sub == null ? null : sub.getHeaders();
-    }
-
     public List<String> getHosts() {
         List<String> hosts = new java.util.ArrayList<>();
         hosts.add(getHost());
@@ -61,8 +55,4 @@ public class Domain extends BaseDomain<Domain> {
         return subdomains.getLast();
     }
 
-    public Domain headers(HttpHeaders headers) {
-        this.headers = headers;
-        return this;
-    }
 }

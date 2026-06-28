@@ -23,7 +23,7 @@ public class Subdomain extends BaseDomain<Subdomain> {
 
     protected Subdomain() {}
     protected Subdomain(Domain rootDomain, String name) {
-        super(rootDomain.getIp(), name, "./WAMP/domain/" + rootDomain.getName() + "/_" + name);
+        super(rootDomain.getIp(), name, "./config/domain/" + rootDomain.getName() + "/_" + name);
         this.rootDomain = rootDomain;
     }
     protected Subdomain(Domain rootDomain, String name, String path) {
@@ -40,8 +40,4 @@ public class Subdomain extends BaseDomain<Subdomain> {
         return getName() + "." + getRootDomain().getName();
     }
 
-    public Subdomain headers(HttpHeaders headers) {
-        this.headers = headers;
-        return this;
-    }
 }

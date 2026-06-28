@@ -10,7 +10,7 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>ProxyServerAPI</artifactId>
+    <artifactId>NettyProxyServerImpl</artifactId>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -19,14 +19,22 @@
     </properties>
 
     <dependencies>
+        <!-- gateway pulls in WebFlux + Reactor Netty -->
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty-http</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
+            <artifactId>ProxyServerAPI</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
+            <artifactId>CertificateGenerator</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.solarframework.mu</groupId>
             <artifactId>DatabaseAPI</artifactId>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
             <scope>provided</scope>
         </dependency>
     </dependencies>

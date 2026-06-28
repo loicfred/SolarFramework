@@ -19,6 +19,7 @@
     <file url="file://$PROJECT_DIR$/core-modules/ZIP/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core/src/main/resources" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/misc-modules/CertificateGenerator/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/misc-modules/Discord/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
@@ -27,9 +28,11 @@
     <file url="file://$PROJECT_DIR$/web-modules/AuthenticationAPI/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/web-modules/AuthenticationImpl/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/web-modules/DatabaseEditor/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/web-modules/NettyProxyServerImpl/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/web-modules/ProxyServer/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/web-modules/ProxyServerAPI/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/web-modules/ProxyServerImplV1/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/web-modules/ProxyServerImplV2/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/web-modules/SpringProxyServerImplV1/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/web-modules/SpringProxyServerImplV2/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/web-modules/WebUtils/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/web-modules/src/main/java" charset="UTF-8" />
   </component>

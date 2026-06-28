@@ -245,7 +245,7 @@ public class Main {
 }
 ```
 
-The default path of files are stored the root ./WAMP/domains. The root domain files (ex. `mysite.com`) are stored in "mysite.com/_" and subdomains files (ex. `www.mysite.com`) are stored in "mysite.com/_www".  
+The default path of files are stored the root ./config/domains. The root domain files (ex. `mysite.com`) are stored in "mysite.com/_" and subdomains files (ex. `www.mysite.com`) are stored in "mysite.com/_www".  
 The url `http://localhost:8080` is another spring web application which can use the domain `myothersite.com` for free local HTTPS access.
 
 <img width="600" alt="image" src="https://github.com/authAccountUser-attachments/assets/b4bd2b06-fb33-49d4-ad9c-0e95069c024d" />

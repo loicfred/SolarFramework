@@ -274,11 +274,45 @@ public class DatabaseService implements IDatabaseService {
                 stats.schemaName = getSchema();
                 stats.tableName = name.toLowerCase();
                 DatabaseMetaData metaData = con.getMetaData();
-                try (ResultSet columns = metaData.getColumns(con.getCatalog(), null, stats.tableName, null)) {
-                    while (columns.next()) {
-                        stats.columnNames.add(columns.getString("COLUMN_NAME").toLowerCase());
+
+                // Get primary keys
+                Set<String> primaryKeys = new HashSet<>();
+                try (ResultSet pk = metaData.getPrimaryKeys(con.getCatalog(), null, stats.tableName)) {
+                    while (pk.next()) {
+                        primaryKeys.add(pk.getString("COLUMN_NAME").toLowerCase());
                     }
                 }
+
+                // Get unique constraints
+                Set<String> uniqueColumns = new HashSet<>();
+                try (ResultSet indexes = metaData.getIndexInfo(con.getCatalog(), null, stats.tableName, true, false)) {
+                    while (indexes.next()) {
+                        uniqueColumns.add(indexes.getString("COLUMN_NAME").toLowerCase());
+                    }
+                } catch (Exception e) {
+                    // Some databases may not support this
+                }
+
+                // Get column details
+                try (ResultSet columns = metaData.getColumns(con.getCatalog(), null, stats.tableName, null)) {
+                    while (columns.next()) {
+                        String columnName = columns.getString("COLUMN_NAME").toLowerCase();
+                        TableStats.ColumnDetail detail = new TableStats.ColumnDetail();
+                        detail.name = columnName;
+                        detail.type = columns.getString("TYPE_NAME");
+                        detail.size = columns.getInt("COLUMN_SIZE");
+                        detail.decimalDigits = columns.getInt("DECIMAL_DIGITS");
+                        detail.nullable = columns.getInt("NULLABLE") == 1;
+                        detail.isAutoIncrement = "YES".equals(columns.getString("IS_AUTOINCREMENT"));
+                        detail.isPrimaryKey = primaryKeys.contains(columnName);
+                        detail.isUnique = uniqueColumns.contains(columnName);
+                        detail.defaultValue = columns.getString("COLUMN_DEF");
+                        detail.remarks = columns.getString("REMARKS");
+
+                        stats.columnDetails.add(detail);
+                    }
+                }
+
                 try (ResultSet count = con.createStatement().executeQuery("SELECT COUNT(*) FROM " + stats.tableName)) {
                     if (count.next()) {
                         stats.totalRows = count.getLong(1);
@@ -286,6 +320,7 @@ public class DatabaseService implements IDatabaseService {
                 } catch (Exception e) {
                     createSchema(List.of(availableSource.getClassOfTable(name)));
                 }
+
                 return null;
             });
             return stats;
