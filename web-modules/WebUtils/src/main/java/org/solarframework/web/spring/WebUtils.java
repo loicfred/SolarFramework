@@ -42,4 +42,15 @@ public class WebUtils {
             return false;
         }
     }
+    public static boolean canAccessPage(Principal loggedUser, String path) {
+        try {
+            Class<?> Account_User = Class.forName("org.solarframework.auth.obj.Account_User");
+            Object result = Account_User.getDeclaredMethod("getByAuthentication", Principal.class).invoke(null, loggedUser);
+            if (!(boolean)result.getClass().getMethod("hasAccessToPath", String.class).invoke(result, path)) return false;
+            return true;
+        } catch (Exception ignored) {
+            ignored.printStackTrace();
+            return false;
+        }
+    }
 }

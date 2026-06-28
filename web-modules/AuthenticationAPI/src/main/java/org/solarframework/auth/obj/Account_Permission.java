@@ -6,7 +6,7 @@ import org.solarframework.db.spring.DatabaseObject;
 import java.time.Instant;
 
 @Entity
-@Table(name = "account_rolepermission")
+@Table(name = "account_permission")
 public class Account_Permission extends DatabaseObject.ID_OBJ<Long, Account_Permission> {
 
     @Column(name = "Name", nullable = false)

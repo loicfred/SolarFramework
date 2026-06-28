@@ -269,10 +269,7 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
     }
 
     public boolean hasAccessToPath(String urlPath) {
-        System.err.println(urlPath);
-        System.err.println(urlPath.trim());
         Web_PathAccessLevel pathData = retrieveEntityServiceFor(Web_PathAccessLevel.class).getWhere("Path = ?", urlPath.trim()).orElse(null);
-        System.err.println(pathData);
         if (pathData == null) return false;
         if (pathData.getMinimumAccessLevel() > getRole().getAccessLevel())
             return pathData.getAuthorizedRoles().contains(getRole());

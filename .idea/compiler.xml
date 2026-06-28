@@ -10,7 +10,10 @@
         <module name="WebUtils" />
         <module name="AI" />
         <module name="JSON" />
+        <module name="ProxyServerImplV2" />
+        <module name="ProxyServerImplV1" />
         <module name="DatabaseAPI" />
+        <module name="ProxyServerAPI" />
         <module name="DatabaseA" />
         <module name="AuthenticationImpl" />
         <module name="core" />
@@ -19,7 +22,6 @@
         <module name="Language" />
         <module name="DatabaseImpl" />
         <module name="Discord" />
-        <module name="SSLServer" />
         <module name="Plugin" />
       </profile>
     </annotationProcessing>
@@ -28,6 +30,7 @@
       <module name="DatabaseA" target="25" />
       <module name="DatabaseCommon" target="25" />
       <module name="File" target="25" />
+      <module name="ProxyServerImpl" target="25" />
       <module name="web-modules" target="25" />
       <module name="ZIP" target="25" />
     </bytecodeTargetLevel>
@@ -47,7 +50,10 @@
       <module name="JSON" options="-parameters" />
       <module name="Language" options="-parameters" />
       <module name="Plugin" options="-parameters" />
-      <module name="SSLServer" options="-parameters" />
+      <module name="ProxyServerAPI" options="-parameters" />
+      <module name="ProxyServerImpl" options="-parameters" />
+      <module name="ProxyServerImplV1" options="-parameters" />
+      <module name="ProxyServerImplV2" options="-parameters" />
       <module name="SolarFramework" options="-parameters" />
       <module name="WebUtils" options="-parameters" />
       <module name="ZIP" options="-parameters" />

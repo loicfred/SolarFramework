@@ -10,23 +10,38 @@
         <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>AuthenticationAPI</artifactId>
-
-    <properties>
-        <maven.compiler.source>25</maven.compiler.source>
-        <maven.compiler.target>25</maven.compiler.target>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    </properties>
+    <artifactId>ProxyServerImplV1</artifactId>
 
     <dependencies>
         <dependency>
             <groupId>org.solarframework.mu</groupId>
-            <artifactId>Language</artifactId>
+            <artifactId>ProxyServerAPI</artifactId>
         </dependency>
         <dependency>
             <groupId>org.solarframework.mu</groupId>
             <artifactId>DatabaseAPI</artifactId>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
+            <artifactId>core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>net.lingala.zip4j</groupId>
+            <artifactId>zip4j</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
+
 </project>

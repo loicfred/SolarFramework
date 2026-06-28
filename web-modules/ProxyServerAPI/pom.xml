@@ -7,10 +7,9 @@
         <groupId>org.solarframework.mu</groupId>
         <artifactId>SolarFramework</artifactId>
         <version>1.0</version>
-        <relativePath>../../pom.xml</relativePath>
     </parent>
 
-    <artifactId>AuthenticationAPI</artifactId>
+    <artifactId>ProxyServerAPI</artifactId>
 
     <properties>
         <maven.compiler.source>25</maven.compiler.source>
@@ -21,11 +20,12 @@
     <dependencies>
         <dependency>
             <groupId>org.solarframework.mu</groupId>
-            <artifactId>Language</artifactId>
+            <artifactId>DatabaseAPI</artifactId>
+            <scope>provided</scope>
         </dependency>
         <dependency>
-            <groupId>org.solarframework.mu</groupId>
-            <artifactId>DatabaseAPI</artifactId>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
             <scope>provided</scope>
         </dependency>
     </dependencies>

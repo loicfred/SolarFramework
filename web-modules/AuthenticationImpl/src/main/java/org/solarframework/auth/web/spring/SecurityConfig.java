@@ -1,5 +1,7 @@
 package org.solarframework.auth.web.spring;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.solarframework.auth.obj.*;
 import org.solarframework.db.spring.DatabaseManager;
 import org.springframework.context.annotation.Bean;
@@ -24,6 +26,7 @@ import java.util.List;
 @Configuration
 public class SecurityConfig {
 
+    private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
     private final OAuth2Service oAuth2UserService;
     private final DatabaseManager databaseManager;
 
@@ -122,7 +125,7 @@ public class SecurityConfig {
         try {
             publicPaths.addAll(databaseManager.getAllWhere(Web_PathAccessLevel.class, "MinimumAccessLevel <= ?", 0).stream().map(Web_PathAccessLevel::getPath).toList());
         } catch (Exception ignored) {}
-        System.err.println(publicPaths);
+        log.info("Setting public paths as: {}", publicPaths);
         return http
                 // Authorization
                 .authorizeHttpRequests(auth -> auth

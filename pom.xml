@@ -6,7 +6,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.1.0-M3</version>
+        <version>4.1.0</version>
     </parent>
 
     <groupId>org.solarframework.mu</groupId>
@@ -15,19 +15,21 @@
     <packaging>pom</packaging>
     <modules>
         <module>core</module>
-        <module>modules/DatabaseImpl</module>
-        <module>modules/DatabaseAPI</module>
-        <module>modules/AI</module>
-        <module>modules/Discord</module>
-        <module>modules/Excel</module>
-        <module>modules/SSLServer</module>
-        <module>modules/Plugin</module>
-        <module>modules/Language</module>
-        <module>modules/JSON</module>
+        <module>core-modules/DatabaseImpl</module>
+        <module>core-modules/DatabaseAPI</module>
+        <module>core-modules/AI</module>
+        <module>core-modules/Excel</module>
+        <module>core-modules/Plugin</module>
+        <module>core-modules/Language</module>
+        <module>core-modules/JSON</module>
         <module>web-modules/AuthenticationAPI</module>
         <module>web-modules/AuthenticationImpl</module>
         <module>web-modules/WebUtils</module>
         <module>web-modules/DatabaseEditor</module>
+        <module>web-modules/ProxyServerAPI</module>
+        <module>web-modules/ProxyServerImplV1</module>
+        <module>web-modules/ProxyServerImplV2</module>
+        <module>misc-modules/Discord</module>
     </modules>
 
     <repositories>
@@ -92,11 +94,6 @@
             </dependency>
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
-                <artifactId>SSLServer</artifactId>
-                <version>1.0</version>
-            </dependency>
-            <dependency>
-                <groupId>org.solarframework.mu</groupId>
                 <artifactId>JSON</artifactId>
                 <version>1.0</version>
             </dependency>
@@ -130,6 +127,21 @@
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
                 <artifactId>WebUtils</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>ProxyServerAPI</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>ProxyServerImplV1</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>ProxyServerImplV2</artifactId>
                 <version>1.0</version>
             </dependency>
 
