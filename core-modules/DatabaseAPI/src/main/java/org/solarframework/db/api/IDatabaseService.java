@@ -5,6 +5,7 @@ import org.solarframework.db.api.dto.Row;
 import org.solarframework.db.api.dto.TableStats;
 import org.solarframework.db.spring.DatabaseObject;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -78,9 +79,9 @@ public interface IDatabaseService {
 
     String getSchema();
 
-    void createSchema(List<Class<?>> clz);
+    void createSchema(Collection<Class<?>> clz);
 
-    void updateSchema(List<Class<?>> clz);
+    void updateSchema(Collection<Class<?>> clz);
 
     interface ENTITY<T> {
 

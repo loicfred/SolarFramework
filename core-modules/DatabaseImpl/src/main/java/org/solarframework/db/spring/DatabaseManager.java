@@ -1,17 +1,15 @@
 package org.solarframework.db.spring;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
-import jakarta.persistence.Entity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.solarframework.db.api.BundleEntities;
-import org.solarframework.db.api.DatabaseType;
-import org.solarframework.db.api.IDBObjectService;
-import org.solarframework.db.api.IDatabaseService;
+import org.solarframework.db.api.*;
 import org.solarframework.db.api.dto.DatabaseStats;
 import org.solarframework.db.api.dto.TableStats;
+import org.solarframework.db.api.IEntityInfo;
 import org.solarframework.json.JSONItem;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,27 +21,31 @@ import org.springframework.stereotype.Service;
 import java.lang.reflect.Constructor;
 import java.time.Instant;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.ClassUtils.copyObject;
 import static org.solarframework.core.util.ClassUtils.isClassRelated;
 import static org.solarframework.db.spring.DBInstanceService.*;
-import static org.solarframework.db.spring.DatabaseObject.getTableName;
-import static org.solarframework.db.spring.DatabaseObject.serviceCache;
+import static org.solarframework.db.spring.DatabaseObject.*;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
-import static org.solarframework.json.JSONItem.ReadJSON;
+import static org.solarframework.db.spring.DatabaseConfig.defaultConnectionString;
+import static org.solarframework.json.JSONItem.GSON;
 
 @Service
-public class DatabaseManager {
+public class DatabaseManager implements IDatabaseManager {
     private static final Logger log = LoggerFactory.getLogger(DatabaseManager.class);
-    private transient List<ClassLoader> entityClassloaders = new java.util.ArrayList<>(List.of(Thread.currentThread().getContextClassLoader()));
-    private transient final CacheManager dbCacheManager;
-    private final List<AvailableDataSource> dataSources = new java.util.ArrayList<>();
-    private transient List<DatabaseObject<?>> bundleObjects;
 
-    private transient boolean IsSingleSource = true;
+    @JsonIgnore
+    private transient final Map<String, ClassLoader> entityClassloaders = new HashMap<>(Map.of("app", Thread.currentThread().getContextClassLoader()));
+    @JsonIgnore
+    private transient final Set<IStoredDataSource> storedDataSources = new HashSet<>();
+    @JsonIgnore
+    private transient final CacheManager dbCacheManager;
+    @JsonIgnore
+    private transient List<DatabaseObject<?>> bundleObjects;
+    @JsonIgnore
     private transient Instant Cooldown = Instant.now().minusSeconds(5);
-    protected static String defaultConnectionString;
 
     protected DatabaseManager(@Qualifier("databaseCacheManager") CacheManager dbCacheManager,
                               @Value("${spring.datasource.url:#{null}}") String connectionString,
@@ -59,7 +61,7 @@ public class DatabaseManager {
                               DatabaseService defaultService) {
         defaultConnectionString = connectionString;
         this.dbCacheManager = dbCacheManager;
-        AvailableDataSource s = new AvailableDataSource(this);
+        IStoredDataSource s = makeNewSource(new HashSet<>());
         s.setName("Database (Default)");
         s.setConnectionString(connectionString);
         s.setUsername(username);
@@ -84,33 +86,39 @@ public class DatabaseManager {
             CachedFields.clear();
             serviceCache.clear();
             resetAllCaches();
-            List<Class<?>> entities = scanEntities();
-            if (IsSingleSource) {
-                getDefaultAvailableSource().clearEntities();
-                getDefaultAvailableSource().addEntities(entities.toArray(new Class<?>[0]));
-            }
-            for (Class<?> e : entities) {
-                try {
-                    Constructor<?> constructor = e.getDeclaredConstructor();
-                    constructor.setAccessible(true);
-                    constructor.newInstance();
-                } catch (Exception ignored) {}
-                if (getSourceByEntity(e) == null)
-                    getDefaultAvailableSource().addEntities(e);
+
+            if (IsSingleSource()) {
+                if (entityClassloaders.isEmpty()) entityClassloaders.put("app", Thread.currentThread().getContextClassLoader());
+                DatabaseUtils.scanEntitiesOfLoaders(new HashSet<>(entityClassloaders.values()), classes -> {
+                    getDefaultAvailableSource().setEntities(classes.stream().map((c) -> new EntityInfo(c, getEntityClassloaderKey(c.getClassLoader()))).collect(Collectors.toSet()));
+                });
+            } else {
+                for (IStoredDataSource ds : getSources()) {
+                    for (IEntityInfo EI : ds.getEntities()) {
+                        entityClassloaders.entrySet().stream().filter(cl -> Objects.equals(cl.getKey(), EI.getClassLoader())).findFirst().ifPresent((cl) -> {
+                            try {
+                                EI.Update(cl.getValue().loadClass(EI.getClassName()));
+                            } catch (ClassNotFoundException _) {}
+                        });
+                    }
+                }
             }
             scanBundleContainers();
         }
     }
 
+    public boolean IsSingleSource() {
+        return getSources().size() == 1;
+    }
+
     public void verifyEntities() {
-        for (AvailableDataSource ds : dataSources) {
+        for (IStoredDataSource ds : storedDataSources) {
             DatabaseStats stats = ds.getService().getDatabaseStats();
             log.info("Verifying entities for [{}] - {} Tables - {} Views - {} Rows", ds.getName(), stats.totalTables, stats.totalViews, stats.totalRows);
             for (Class<?> C : ds.getEntitiesClasses()) verifyEntity(ds, C);
         }
     }
-
-    protected void verifyEntity(AvailableDataSource ds, Class<?> C) {
+    public void verifyEntity(IStoredDataSource ds, Class<?> C) {
         try {
             Constructor<?> constructor = C.getDeclaredConstructor();
             constructor.setAccessible(true);
@@ -124,7 +132,7 @@ public class DatabaseManager {
 
                     for (Object item : bundleObjects.stream().filter(bo -> bo.getClass() == C).toList())
                         if (item instanceof DatabaseObject<?> i)
-                            i.Write();
+                            i.Upsert();
                 }
             } else {
                 log.error("Entity class [{}] is NOT CHILD of DatabaseObject<>.", C.getName());
@@ -134,65 +142,63 @@ public class DatabaseManager {
         }
     }
 
+    public IStoredDataSource makeNewSource(Set<IEntityInfo> entities) {
+        IStoredDataSource es = new StoredDataSource(this);
+        es.setEntities(entities);
+        return es;
+    }
 
     public void createAllSchemas() {
-        for (AvailableDataSource ds : dataSources) {
+        for (IStoredDataSource ds : storedDataSources) {
             ds.getService().createSchema(ds.getEntitiesClasses());
         }
     }
     public void updateAllSchemas() {
-        for (AvailableDataSource ds : dataSources) {
+        for (IStoredDataSource ds : storedDataSources) {
             ds.getService().updateSchema(ds.getEntitiesClasses());
         }
     }
 
-    public boolean addSource(AvailableDataSource ds) {
+    public boolean addSource(IStoredDataSource ds) {
         if (ds.getConnectionString().isEmpty() || ds.getName().isEmpty() || ds.getPassword().isEmpty() || ds.getUsername().isEmpty() || getSources().stream().anyMatch(d -> d.getConnectionString().equalsIgnoreCase(ds.getConnectionString()) || d.getName().equals(ds.getName()))) return false;
         if (getDefaultAvailableSource() != null && ds.isDefault()) return false;
-        dataSources.add(ds);
-        IsSingleSource = getSources().size() == 1;
+        storedDataSources.add(ds);
         return true;
     }
     public boolean removeSource(String connectionString) {
         if (getSources().stream().anyMatch(ds -> ds.getConnectionString().equals(connectionString) && ds.isDefault())) return false;
         getSources().removeIf(ds -> ds.getConnectionString().equals(connectionString));
-        IsSingleSource = getSources().size() == 1;
         return true;
     }
-    public boolean clearSources() {
-        getSources().removeIf(ds -> !ds.isDefault());
-        IsSingleSource = getSources().size() == 1;
-        return true;
-    }
-    public List<AvailableDataSource> getSources() {
-        return dataSources;
+    public Set<IStoredDataSource> getSources() {
+        return storedDataSources;
     }
 
     public IDatabaseService getService(String name) {
-        return IsSingleSource ? getDefaultService() : getSourceByName(name).getService();
+        return IsSingleSource() ? getDefaultService() : getSourceByName(name).getService();
     }
-
     public IDatabaseService getService(Class<?> entity) {
-        return IsSingleSource ? getDefaultService() : getSourceByEntity(entity).getService();
-    }
-    public <T> IDatabaseService.ENTITY<T> getEntityService(Class<T> entity) {
-        return new DatabaseService.ENTITY<>(entity, IsSingleSource ? getDefaultService() : getSourceByEntity(entity).getService());
+        return IsSingleSource() ? getDefaultService() : getSourceByEntity(entity).getService();
     }
 
-    public AvailableDataSource getSourceByName(String name) {
-        if (IsSingleSource) return getDefaultAvailableSource();
+    public <T> IDatabaseService.ENTITY<T> getEntityService(Class<T> entity) {
+        return new DatabaseService.ENTITY<>(entity, IsSingleSource() ? getDefaultService() : getSourceByEntity(entity).getService());
+    }
+
+    public IStoredDataSource getSourceByName(String name) {
+        if (IsSingleSource()) return getDefaultAvailableSource();
         return getSources().stream().filter(ds -> ds.getName().equalsIgnoreCase(name)).findFirst().orElse(null);
     }
-    public AvailableDataSource getSourceByEntity(String name) {
-        if (IsSingleSource) return getDefaultAvailableSource();
-        return getSources().stream().filter(ds -> ds.getEntities().contains(name)).findFirst().orElse(null);
+    public IStoredDataSource getSourceByEntity(String className) {
+        if (IsSingleSource()) return getDefaultAvailableSource();
+        return getSources().stream().filter(ds -> ds.getEntities().stream().anyMatch(e -> e.getClassName().equals(className))).findFirst().orElse(null);
     }
-    public AvailableDataSource getSourceByEntity(Class<?> entity) {
+    public IStoredDataSource getSourceByEntity(Class<?> entity) {
         return getSourceByEntity(entity.getName());
     }
 
-    public AvailableDataSource getDefaultAvailableSource() {
-        return getSources().stream().filter(AvailableDataSource::isDefault).findFirst().orElse(null);
+    public IStoredDataSource getDefaultAvailableSource() {
+        return getSources().stream().filter(IStoredDataSource::isDefault).findFirst().orElse(null);
     }
     public IDatabaseService getDefaultService() {
         return getDefaultAvailableSource().getService();
@@ -240,7 +246,6 @@ public class DatabaseManager {
     public <T> Set<T> getAllWhereDistinct(Class<T> clazz, String whereClause, Object... args) {
         return getService(clazz).getAllWhereDistinct(clazz, whereClause, args);
     }
-
 
     public <T> int Count(Class<T> clazz) {
         return getService(clazz).Count(clazz);
@@ -294,15 +299,15 @@ public class DatabaseManager {
             }
         });
     }
-    public void resetCacheForClass(Class<?> dbclazz, boolean items, boolean lists) {
+    public void resetCacheForClass(Class<?> dbClazz, boolean items, boolean lists) {
         Cache cache = dbCacheManager.getCache("DBObject");
         if (cache == null || (!items && !lists)) return;
         com.github.benmanes.caffeine.cache.Cache<Object, Object> nativeCache = (com.github.benmanes.caffeine.cache.Cache<Object, Object>) cache.getNativeCache();
         nativeCache.asMap().forEach((key, cacheItem) -> {
-            if (items && cacheItem instanceof DatabaseObject<?> V && isClassRelated(V, dbclazz)) {
+            if (items && cacheItem instanceof DatabaseObject<?> V && isClassRelated(V, dbClazz)) {
                 cache.evict(key);
             } else if (lists && cacheItem instanceof List<?> V2) { // If the item cached is a list
-                if (!V2.isEmpty() && V2.getFirst() instanceof DatabaseObject<?> V3 && isClassRelated(V3, dbclazz)) { // Check if the datatype of the cache list is the same as the current item
+                if (!V2.isEmpty() && V2.getFirst() instanceof DatabaseObject<?> V3 && isClassRelated(V3, dbClazz)) { // Check if the datatype of the cache list is the same as the current item
                     cache.evict(key);
                 }
             }
@@ -312,7 +317,7 @@ public class DatabaseManager {
     @Cacheable(value = "DBData", key = "'ALLDBSTATISTICS'", unless = "#result == null", cacheManager = "databaseCacheManager")
     public DatabaseStats getAllDatabaseStats() {
         DatabaseStats full = new DatabaseStats();
-        for (AvailableDataSource ds : getSources()) {
+        for (IStoredDataSource ds : getSources()) {
             try {
                 DatabaseStats stats = ds.getService().getDatabaseStats();
                 full.totalRows += stats.totalRows;
@@ -327,38 +332,31 @@ public class DatabaseManager {
         }
         return full;
     }
-
     public <T> TableStats getTableStats(Class<T> clazz) {
         return getService(clazz).getTableStats(getTableName(clazz));
     }
 
-    public void addEntityClassLoaders(ClassLoader entityClassloaders) {
-        this.entityClassloaders.add(entityClassloaders);
+    public void setEntityClassLoaders(Map<String, ClassLoader> entityClassloaders) {
+        this.entityClassloaders.clear();
+        this.entityClassloaders.putAll(entityClassloaders);
     }
-    public void setEntityClassLoaders(List<ClassLoader> entityClassloaders) {
-        this.entityClassloaders = entityClassloaders;
+    public void addEntityClassLoader(String name, ClassLoader entityClassloaders) {
+        this.entityClassloaders.put(name, entityClassloaders);
     }
-    public List<ClassLoader> getEntityClassloaders() {
-        return entityClassloaders;
+    public Set<ClassLoader> getEntityClassloaders() {
+        return new HashSet<>(entityClassloaders.values());
+    }
+    public ClassLoader getEntityClassloader(String key) {
+        return entityClassloaders.get(key);
+    }
+    public String getEntityClassloaderKey(ClassLoader key) {
+        return entityClassloaders.entrySet().stream().filter(e -> Objects.equals(e.getValue(), key)).findFirst().map(Map.Entry::getKey).orElse(null);
     }
 
-    public List<Class<?>> scanEntities() {
-        if (entityClassloaders.isEmpty()) entityClassloaders.add(Thread.currentThread().getContextClassLoader());
-        return scanEntities(entityClassloaders);
-    }
-    public List<Class<?>> scanEntities(List<ClassLoader> entityClassloaders) {
-        List<Class<?>> L = new ArrayList<>();
-        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(entityClassloaders.toArray(new ClassLoader[]{})).scan()) {
-            for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(Entity.class).stream().toList()) {
-                L.add(classInfo.loadClass());
-            }
-        }
-        return L;
-    }
     private void scanBundleContainers() {
         bundleObjects = new ArrayList<>();
-        if (entityClassloaders.isEmpty()) entityClassloaders.add(Thread.currentThread().getContextClassLoader());
-        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(entityClassloaders.toArray(new ClassLoader[]{})).scan()) {
+        if (entityClassloaders.isEmpty()) entityClassloaders.put("app", Thread.currentThread().getContextClassLoader());
+        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(entityClassloaders.values().toArray(new ClassLoader[]{})).scan()) {
             for (ClassInfo classInfo : scanResult.getClassesImplementing(BundleEntities.class).stream().toList()) {
                 Constructor<?> cons = classInfo.loadClass().getDeclaredConstructor();
                 cons.setAccessible(true);
@@ -372,59 +370,69 @@ public class DatabaseManager {
 
 
     public void LoadFromFile(String path) {
-        DataSourceFile db;
-        try {
-            db = ReadJSON(path, DataSourceFile.class);
-            if (db == null) throw new Exception();
-        } catch (Exception e) {
-            db = new DataSourceFile(this).WriteJSON(path) instanceof DataSourceFile dbf ? dbf : new DataSourceFile(this);
-        }
-        List<AvailableDataSource> readSources = db.getSources();
+        DataSourceFile db = DataSourceFile.ReadFrom(path);
+        List<StoredDataSource> readSources = db.getSources();
         if (readSources.isEmpty()) {
-            readSources = new DataSourceFile(this).Write(path).getSources();
+            readSources = new DataSourceFile(this).WriteTo(path).getSources();
             log.warn("No database sources found, re-creating source file using default sources.");
         }
-        if (readSources.stream().filter(AvailableDataSource::isDefault).count() != 1) {
-            readSources = new DataSourceFile(this).Write(path).getSources();
+        if (readSources.stream().filter(IStoredDataSource::isDefault).count() != 1) {
+            readSources = new DataSourceFile(this).WriteTo(path).getSources();
             log.warn("None or multiple default database sources found, re-creating source file using default sources.");
         }
 
-        for (AvailableDataSource ds : readSources) ds.manager = this;
-        AvailableDataSource defaultSource = readSources.stream().filter(AvailableDataSource::isDefault).findFirst().orElseThrow();
-        List<AvailableDataSource> otherSources = readSources.stream().filter((AvailableDataSource s) -> !s.isDefault()).toList();
+        StoredDataSource defaultSource = readSources.stream().filter(IStoredDataSource::isDefault).findFirst().orElseThrow();
+        List<StoredDataSource> otherSources = readSources.stream().filter((IStoredDataSource s) -> !s.isDefault()).toList();
 
-        getDefaultAvailableSource().setEntities(defaultSource.getEntitiesClasses());
-        for (AvailableDataSource ds : otherSources) addSource(ds);
-        Cooldown = Instant.now().minusSeconds(5);
+        getDefaultAvailableSource().setEntities(defaultSource.getEntities());
+        getSources().removeIf(ds -> !ds.isDefault());
+        for (StoredDataSource ds : otherSources) {
+            ds.setManager(this);
+            addSource(ds);
+        }
+
+        Cooldown = Instant.now().minusSeconds(1);
         reload();
     }
-
     public void SaveAsFile(String path) {
         if (getSources().isEmpty()) {
             log.error("Failed to write data source file, no database sources found.");
-        } else if (getSources().stream().filter(AvailableDataSource::isDefault).count() != 1) {
+        } else if (getSources().stream().filter(IStoredDataSource::isDefault).count() != 1) {
             log.warn("Failed to write data source file, none or multiple default database sources found.");
         } else {
-            new DataSourceFile(this).Write(path);
+            new DataSourceFile(this).WriteTo(path);
         }
     }
 
 
     protected static class DataSourceFile extends JSONItem<DataSourceFile> {
-        private final List<AvailableDataSource> sources;
-        public DataSourceFile(DatabaseManager manager) {
-            sources = new ArrayList<>(manager.getSources());
+        private final List<StoredDataSource> sources = new ArrayList<>();
+        public DataSourceFile(IDatabaseManager manager) {
+            for (IStoredDataSource ds : manager.getSources()) {
+                sources.add((StoredDataSource) ds);
+            }
         }
 
-        public List<AvailableDataSource> getSources() {
+        public List<StoredDataSource> getSources() {
             return sources;
         }
-        public DataSourceFile Write(String path) {
+        public DataSourceFile WriteTo(String path) {
             try {
                 return WriteJSON(path);
             } catch (Exception _) {
                 return null;
             }
+        }
+
+        public static DataSourceFile ReadFrom(String path) {
+            DataSourceFile db;
+            try {
+                db = ReadJSON(path, DataSourceFile.class);
+                if (db == null) throw new Exception();
+            } catch (Exception e) {
+                db = new DataSourceFile(SolarDBManager).WriteTo(path) instanceof DataSourceFile dbf ? dbf : new DataSourceFile(SolarDBManager);
+            }
+            return db;
         }
     }
 }

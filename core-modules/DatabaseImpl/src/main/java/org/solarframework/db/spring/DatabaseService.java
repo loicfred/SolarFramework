@@ -12,6 +12,7 @@ import org.solarframework.db.api.IDatabaseService;
 import org.solarframework.db.api.dto.DatabaseStats;
 import org.solarframework.db.api.dto.Row;
 import org.solarframework.db.api.dto.TableStats;
+import org.solarframework.db.v1.DatabaseManager;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
@@ -42,7 +43,7 @@ public class DatabaseService implements IDatabaseService {
     protected ApplicationContext context;
     protected CacheManager dbCacheManager;
     protected JdbcTemplate jdbcTemplate;
-    protected AvailableDataSource availableSource;
+    protected StoredDataSource availableSource;
 
     public DatabaseService(ApplicationContext context, @Qualifier("databaseCacheManager") CacheManager dbCacheManager, JdbcTemplate jdbcTemplate) {
         this.context = context;
@@ -63,7 +64,7 @@ public class DatabaseService implements IDatabaseService {
     }
 
     public <O> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id) {
-        return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + IdFields.get(table).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")) + " LIMIT 1;", id);
+        return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + IdFields.get(table.getName()).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")) + " LIMIT 1;", id);
     }
     public <O> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args) {
         return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + where + " LIMIT 1;", args);
@@ -73,10 +74,10 @@ public class DatabaseService implements IDatabaseService {
     // ====== SHORT CUTS ======
 
     public <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object... id) {
-        return this.doQueryJoin(clazz, IdFields.get(clazz).stream().map(f -> "MAIN." + f.getName() + " = ?").collect(Collectors.joining(" AND ")), id);
+        return this.doQueryJoin(clazz, IdFields.get(clazz.getName()).stream().map(f -> "MAIN." + f.getName() + " = ?").collect(Collectors.joining(" AND ")), id);
     }
     public <T> Optional<T> getById(String select, Class<T> clazz, Object... id) {
-        return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + IdFields.get(clazz).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")) + " LIMIT 1;", id);
+        return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + IdFields.get(clazz.getName()).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")) + " LIMIT 1;", id);
     }
     public <T> Optional<T> getById(Class<T> clazz, Object... id) {
         return getById("*", clazz, id);
@@ -271,6 +272,8 @@ public class DatabaseService implements IDatabaseService {
         return getCachedOrCompute("DBData", "TABLE-" + name, () -> {
             TableStats stats = new TableStats();
             jdbcTemplate.execute((Connection con) -> {
+                stats.sourceName = availableSource.getName();
+                stats.sourceType = availableSource.getType();
                 stats.schemaName = getSchema();
                 stats.tableName = name.toLowerCase();
                 DatabaseMetaData metaData = con.getMetaData();
@@ -281,6 +284,8 @@ public class DatabaseService implements IDatabaseService {
                     while (pk.next()) {
                         primaryKeys.add(pk.getString("COLUMN_NAME").toLowerCase());
                     }
+                } catch (Exception e) {
+                    createSchema(List.of(availableSource.getClassOfTable(name)));
                 }
 
                 // Get unique constraints
@@ -317,8 +322,6 @@ public class DatabaseService implements IDatabaseService {
                     if (count.next()) {
                         stats.totalRows = count.getLong(1);
                     }
-                } catch (Exception e) {
-                    createSchema(List.of(availableSource.getClassOfTable(name)));
                 }
 
                 return null;
@@ -335,19 +338,19 @@ public class DatabaseService implements IDatabaseService {
         });
     }
 
-    public void createSchema(List<Class<?>> clz) {
+    public void createSchema(Collection<Class<?>> clz) {
         appendSchema(clz, "create");
         for (Class<?> c : clz) SolarDBManager.verifyEntity(availableSource, c);
     }
-    public void updateSchema(List<Class<?>> clz) {
+    public void updateSchema(Collection<Class<?>> clz) {
         appendSchema(clz, "update");
         for (Class<?> c : clz) SolarDBManager.verifyEntity(availableSource, c);
     }
 
-    private void appendSchema(List<Class<?>> clz, String action) {
-        List<ClassLoader> loaders = clz.stream().map(Class::getClassLoader).distinct().collect(Collectors.toList());
+    private void appendSchema(Collection<Class<?>> clz, String action) {
+        Set<ClassLoader> loaders = clz.stream().map(Class::getClassLoader).distinct().collect(Collectors.toSet());
         for (ClassLoader cl : loaders) {
-            List<Class<?>> clz2 = clz.stream().filter(c -> c.getClassLoader() == cl).collect(Collectors.toList());
+            Set<Class<?>> clz2 = clz.stream().filter(c -> c.getClassLoader() == cl).collect(Collectors.toSet());
             try (SessionFactory sess = getSessionFactory(cl, clz2, action)) {
                 log.info(capitalize(action) + "d tables for class: \n" + clz.stream().map((Class c ) -> "- " + c.getSimpleName()).collect(Collectors.joining("\n")));
             } catch (Exception e) {
@@ -355,7 +358,7 @@ public class DatabaseService implements IDatabaseService {
             }
         }
     }
-    private SessionFactory getSessionFactory(ClassLoader loader, List<Class<?>> clz, String action) {
+    private SessionFactory getSessionFactory(ClassLoader loader, Set<Class<?>> clz, String action) {
         ClassLoader original = Thread.currentThread().getContextClassLoader();
         try {
             Thread.currentThread().setContextClassLoader(loader);

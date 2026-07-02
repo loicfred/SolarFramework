@@ -3,6 +3,7 @@
   <component name="Encoding">
     <file url="file://$USER_HOME$/src/main/java" charset="UTF-8" />
     <file url="file://C:/Windows/System32/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/DatabaseREST/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/File/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/ProxyServerImpl/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/AI/src/main/java" charset="UTF-8" />

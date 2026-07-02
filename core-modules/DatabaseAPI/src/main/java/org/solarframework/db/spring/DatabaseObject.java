@@ -6,6 +6,8 @@ import org.slf4j.LoggerFactory;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
 
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -13,9 +15,12 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Supplier;
 
+import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
+
 public class DatabaseObject<T> {
-    protected static final Map<Class<?>, IDatabaseService> serviceCache = new HashMap<>();
-    protected static final Map<Class<?>, IDatabaseService.ENTITY<?>> entityServiceCache = new HashMap<>();
+    protected static final Map<String, String> TableNames = new HashMap<>();
+    protected static final Map<String, IDatabaseService> serviceCache = new HashMap<>();
+    protected static final Map<String, IDatabaseService.ENTITY<?>> entityServiceCache = new HashMap<>();
     private transient IDBObjectService<T> service;
 
     public IDBObjectService<T> getService() {
@@ -23,11 +28,9 @@ public class DatabaseObject<T> {
     }
 
     public static IDatabaseService retrieveServiceFor(Class<?> clazz) {
-        return serviceCache.computeIfAbsent(clazz, _ -> {
+        return serviceCache.computeIfAbsent(clazz.getName(), _ -> {
             try {
-                Class<?> databaseRegistry = Class.forName("org.solarframework.db.spring.DatabaseRegistry");
-                Object SolarDBManager = databaseRegistry.getField("SolarDBManager").get(null);
-                return ((IDatabaseService) SolarDBManager.getClass().getMethod("getService", Class.class).invoke(SolarDBManager, clazz));
+                return SolarDBManager.getService(clazz);
             } catch (Exception ignored) {
                 return null;
             }
@@ -35,11 +38,9 @@ public class DatabaseObject<T> {
     }
     @SuppressWarnings("unchecked")
     public static <T> IDatabaseService.ENTITY<T> retrieveEntityServiceFor(Class<T> clazz) {
-        IDatabaseService.ENTITY<?> C = entityServiceCache.computeIfAbsent(clazz, _ -> {
+        IDatabaseService.ENTITY<?> C = entityServiceCache.computeIfAbsent(clazz.getName(), _ -> {
             try {
-                Class<?> databaseRegistry = Class.forName("org.solarframework.db.spring.DatabaseRegistry");
-                Object SolarDBManager = databaseRegistry.getField("SolarDBManager").get(null);
-                return ((IDatabaseService.ENTITY<?>) SolarDBManager.getClass().getMethod("getEntityService", Class.class).invoke(SolarDBManager, clazz));
+                return SolarDBManager.getEntityService(clazz);
             } catch (Exception ignored) {
                 return null;
             }
@@ -113,9 +114,11 @@ public class DatabaseObject<T> {
         return getTableName(getClass());
     }
     public static String getTableName(Class<?> clazz) {
-        Table annotation = clazz.getAnnotation(Table.class);
-        if (annotation != null && !annotation.name().isEmpty()) return annotation.name().toLowerCase();
-        return clazz.getSimpleName().toLowerCase();
+        return TableNames.computeIfAbsent(clazz.getName(), _ -> {
+            Table annotation = clazz.getAnnotation(Table.class);
+            if (annotation != null && !annotation.name().isEmpty()) return annotation.name().toLowerCase();
+            return clazz.getSimpleName().toLowerCase();
+        });
     }
 
 

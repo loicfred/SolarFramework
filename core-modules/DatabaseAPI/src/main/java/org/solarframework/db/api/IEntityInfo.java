@@ -1,0 +1,104 @@
+package org.solarframework.db.api;
+
+import jakarta.persistence.*;
+import org.solarframework.db.api.dto.TableStats;
+
+import java.lang.reflect.Field;
+import java.util.HashSet;
+import java.util.Set;
+
+public class IEntityInfo {
+    protected String className;
+    protected String simpleClassName;
+    protected String tableName;
+    protected final String classLoader;
+    protected final Set<FieldInfo> fields = new java.util.HashSet<>();
+    protected final Set<Relation> relations = new java.util.HashSet<>();
+
+
+    protected IEntityInfo(Class<?> clazz, String classLoaderKey) {
+        this.classLoader = classLoaderKey;
+        Update(clazz);
+    }
+
+    public void Update(Class<?> clazz) {}
+
+    public String getClassName() {
+        return className;
+    }
+    public String getSimpleClassName() {
+        return simpleClassName;
+    }
+    public String getTableName() {
+        return tableName;
+    }
+    public String getClassLoader() {
+        return classLoader;
+    }
+    public Set<FieldInfo> getFields() {
+        return fields;
+    }
+    public Set<Relation> getRelations() {
+        return new HashSet<>(relations);
+    }
+    public Class<?> getEntityClass() { return null;}
+    public TableStats getTableStats() { return null;}
+
+    public static class FieldInfo {
+        private final String variableName;
+        private final String columnName;
+        private final String type;
+        private final boolean primaryKey;
+        private final boolean unique;
+        private final boolean nullable;
+
+        public FieldInfo(Field f) {
+            variableName = f.getName();
+            type = f.getType().getName();
+            primaryKey = f.getAnnotation(Id.class) != null;
+            unique = f.getAnnotation(Column.class) != null && f.getAnnotation(Column.class).unique();
+            nullable = f.getAnnotation(Column.class) != null && f.getAnnotation(Column.class).nullable();
+            columnName = f.getAnnotation(Column.class) instanceof Column C ? C.name() : variableName;
+        }
+
+        public String getVariableName() {
+            return variableName;
+        }
+        public String getColumnName() {
+            return columnName;
+        }
+        public String getType() {
+            return type;
+        }
+        public boolean isPrimaryKey() {
+            return primaryKey;
+        }
+        public boolean isUnique() {
+            return unique;
+        }
+        public boolean isNullable() {
+            return nullable;
+        }
+    }
+    public static class Relation {
+        private final String variableName;
+        private final String foreignClassName;
+        private final String relationType;
+
+        public Relation(Field f) {
+            variableName = f.getName();
+            foreignClassName = f.getAnnotation(ManyToOne.class) != null ? "ManyToOne" : f.getAnnotation(OneToMany.class) != null ? "OneToMany" : f.getAnnotation(OneToOne.class) != null ? "OneToOne" : f.getAnnotation(ManyToMany.class) != null ? "ManyToMany" : f.getType().getName();
+            relationType = f.getAnnotation(ManyToOne.class) != null ? "ManyToOne" : f.getAnnotation(OneToMany.class) != null ? "OneToMany" : f.getAnnotation(OneToOne.class) != null ? "OneToOne" : "ManyToMany";
+        }
+
+        public String getVariableName() {
+            return variableName;
+        }
+        public String getForeignClassName() {
+            return foreignClassName;
+        }
+        public String getRelationType() {
+            return relationType;
+        }
+    }
+}

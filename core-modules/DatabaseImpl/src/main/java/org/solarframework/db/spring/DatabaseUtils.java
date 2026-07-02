@@ -1,6 +1,9 @@
 package org.solarframework.db.spring;
 
 import com.google.gson.*;
+import io.github.classgraph.ClassGraph;
+import io.github.classgraph.ClassInfo;
+import io.github.classgraph.ScanResult;
 import jakarta.persistence.*;
 import org.solarframework.db.api.IDatabaseService;
 import org.solarframework.db.api.dto.Row;
@@ -9,15 +12,16 @@ import org.springframework.stereotype.Component;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.sql.Date;
 import java.sql.ResultSet;
 import java.sql.Time;
 import java.sql.Timestamp;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.*;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static org.solarframework.db.spring.DatabaseObject.getTableName;
@@ -323,56 +327,108 @@ public class DatabaseUtils {
             }
         }
     }
-    protected static void setValueWhileConvertingDBToObject(Object item, Object value, Field f) throws IllegalAccessException {
-        if (f.getType().isEnum()) {
-            Object enu = value == null ? null : Arrays.stream(f.getType().getEnumConstants()).filter(o -> o.toString().equals(value.toString())).findFirst().orElse(null);
+
+    protected static void setValueWhileConvertingDBToObject(Object item, Object dbValue, Field f) throws IllegalAccessException {
+        Class<?> targetType = resolveTargetType(item, f);
+        if (targetType != null && targetType.isEnum()) {
+            Object enu = dbValue == null ? null : Arrays.stream(targetType.getEnumConstants()).filter(o -> o.toString().equals(dbValue.toString())).findFirst().orElse(null);
             f.set(item, enu);
             return;
         }
-        final boolean b = f.getType() == boolean.class || f.getType() == Boolean.class;
-        switch (value) {
-            case Date D -> f.set(item, D.toLocalDate());
-            case Timestamp D -> {
-                if (f.getType() == LocalDateTime.class) {
-                    f.set(item, D.toLocalDateTime());
-                } else if (f.getType() == Instant.class) {
-                    f.set(item, D.toInstant());
-                } else {
-                    f.set(item, D.toString());
-                }
-            }
-            case Time D -> f.set(item, D.toLocalTime());
-            case BigDecimal D -> {
-                if (f.getType() == long.class || f.getType() == Long.class) {
-                    f.set(item, D.longValue());
-                } else if (f.getType() == int.class || f.getType() == Integer.class) {
-                    f.set(item, D.intValue());
-                } else if (f.getType() == double.class || f.getType() == Double.class) {
-                    f.set(item, D.doubleValue());
-                } else if (f.getType() == short.class || f.getType() == Short.class) {
-                    f.set(item, D.shortValue());
-                } else if (f.getType() == float.class || f.getType() == Float.class) {
-                    f.set(item, D.floatValue());
-                } else if (f.getType() == byte.class || f.getType() == Byte.class) {
-                    f.set(item, D.byteValue());
-                } else {
-                    f.set(item, D);
-                }
-            }
-            case Integer I -> f.set(item, b ? I != 0 : value);
-            case String S -> {
-                if (f.getType() == LocalDateTime.class) {
-                    f.set(item, LocalDateTime.parse(S));
-                } else if (f.getType() == LocalDate.class) {
-                    f.set(item, LocalDate.parse(S));
-                } else if (f.getType() == Instant.class) {
-                    f.set(item, Instant.parse(S));
-                } else {
-                    f.set(item, b ? "1".equals(S) || "true".equalsIgnoreCase(S) : value);
-                }
-            }
-            case null, default -> f.set(item, value);
+
+        switch (dbValue) {
+            case null -> f.set(item, null);
+            case Number n -> setNumeric(item, f, targetType, n);
+            case java.util.Date d -> setTemporal(item, f, targetType, d);
+            case String s -> setFromString(item, f, targetType, s);
+            default -> f.set(item, dbValue);
         }
+    }
+
+    private static Class<?> resolveTargetType(Object item, Field f) {
+        if (f.getType() != Object.class) return f.getType();
+        Class<?> resolved = resolveGenericIdType(item.getClass());
+        return resolved != null ? resolved : Object.class;
+    }
+
+    private static void setNumeric(Object item, Field f, Class<?> targetType, Number n) throws IllegalAccessException {
+        Object value;
+        if (targetType == long.class || targetType == Long.class) {
+            value = n.longValue();
+        } else if (targetType == int.class || targetType == Integer.class) {
+            value = n.intValue();
+        } else if (targetType == short.class || targetType == Short.class) {
+            value = n.shortValue();
+        } else if (targetType == byte.class || targetType == Byte.class) {
+            value = n.byteValue();
+        } else if (targetType == double.class || targetType == Double.class) {
+            value = n.doubleValue();
+        } else if (targetType == float.class || targetType == Float.class) {
+            value = n.floatValue();
+        } else if (targetType == BigDecimal.class) {
+            value = (n instanceof BigDecimal bd) ? bd : new BigDecimal(n.toString());
+        } else if (targetType == String.class) {
+            value = n.toString();
+        } else if (targetType == Boolean.class || targetType == boolean.class) {
+            value = n.longValue() != 0;
+        } else {
+            value = n; // Number/Object/unresolved — store as-is, no narrowing
+        }
+        f.set(item, value);
+    }
+
+    private static void setTemporal(Object item, Field f, Class<?> targetType, java.util.Date d) throws IllegalAccessException {
+        Object value;
+        if (targetType == LocalDate.class) {
+            value = (d instanceof java.sql.Date sd) ? sd.toLocalDate() : d.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
+        } else if (targetType == LocalDateTime.class) {
+            value = (d instanceof Timestamp ts) ? ts.toLocalDateTime() : d.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+        } else if (targetType == LocalTime.class) {
+            value = (d instanceof java.sql.Time st) ? st.toLocalTime() : d.toInstant().atZone(ZoneId.systemDefault()).toLocalTime();
+        } else if (targetType == Instant.class) {
+            value = d.toInstant();
+        } else if (targetType == Long.class || targetType == long.class) {
+            value = d.getTime();
+        } else if (targetType == String.class) {
+            value = d.toString();
+        } else {
+            value = d;
+        }
+        f.set(item, value);
+    }
+
+    private static void setFromString(Object item, Field f, Class<?> targetType, String s) throws IllegalAccessException {
+        Object value;
+        if (targetType == LocalDateTime.class) {
+            value = LocalDateTime.parse(s);
+        } else if (targetType == LocalDate.class) {
+            value = LocalDate.parse(s);
+        } else if (targetType == LocalTime.class) {
+            value = LocalTime.parse(s);
+        } else if (targetType == Instant.class) {
+            value = Instant.parse(s);
+        } else if (targetType == Boolean.class || targetType == boolean.class) {
+            value = "1".equals(s) || "true".equalsIgnoreCase(s);
+        } else if (targetType == Long.class || targetType == long.class) {
+            value = Long.parseLong(s);
+        } else if (targetType == Integer.class || targetType == int.class) {
+            value = Integer.parseInt(s);
+        } else if (targetType == BigDecimal.class) {
+            value = new BigDecimal(s);
+        } else {
+            value = s;
+        }
+        f.set(item, value);
+    }
+    private static Class<?> resolveGenericIdType(Class<?> entityClass) {
+        Type superclass = entityClass.getGenericSuperclass();
+        if (superclass instanceof ParameterizedType pt) {
+            Type actual = pt.getActualTypeArguments()[0]; // assumes T is the first param
+            if (actual instanceof Class<?> cls) {
+                return cls;
+            }
+        }
+        return null; // couldn't resolve, fall back to raw value
     }
 
     protected static class SQLCleaner {
@@ -448,4 +504,17 @@ public class DatabaseUtils {
         }
     }
 
+    public static void scanEntitiesOfLoaders(Collection<ClassLoader> entityClassloaders, Consumer<List<Class<?>>> consumer) {
+        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(entityClassloaders.toArray(new ClassLoader[]{})).scan()) {
+            List<Class<?>> L = new ArrayList<>();
+            for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(Entity.class).stream().toList()) {
+                if (classInfo.extendsSuperclass(DatabaseObject.class)) {
+                    L.add(classInfo.loadClass());
+                }
+            }
+            consumer.accept(L);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 }

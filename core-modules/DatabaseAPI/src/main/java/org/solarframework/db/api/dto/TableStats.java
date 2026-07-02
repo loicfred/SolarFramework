@@ -1,14 +1,24 @@
 package org.solarframework.db.api.dto;
 
+import org.solarframework.db.api.DatabaseType;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class TableStats {
+    public String sourceName;
+    public DatabaseType sourceType;
     public String schemaName;
     public String tableName;
     public long totalRows = 0;
     public List<ColumnDetail> columnDetails = new ArrayList<>();
 
+    public String getSourceName() {
+        return sourceName;
+    }
+    public DatabaseType getSourceType() {
+        return sourceType;
+    }
     public String getSchemaName() {
         return schemaName;
     }
@@ -24,6 +34,7 @@ public class TableStats {
     public List<String> getColumnNames() {
         return columnDetails.stream().map(ColumnDetail::getName).toList();
     }
+
 
     public static class ColumnDetail {
         public String name;

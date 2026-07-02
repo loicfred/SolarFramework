@@ -24,6 +24,7 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 @Configuration
 @EnableCaching
 public class DatabaseConfig {
+    protected static String defaultConnectionString;
 
     @Bean("databaseCacheManager")
     public CacheManager databaseCacheManager() {
@@ -42,26 +43,5 @@ public class DatabaseConfig {
         manager.setCaffeine(Caffeine.newBuilder().expireAfterWrite(30, TimeUnit.MINUTES).maximumSize(50_000));
         return manager;
     }
-
-    @Value("${spring.datasource.url:#{null}}")
-    private String connectionString;
-    @Value("${spring.datasource.username:#{null}}")
-    public String username;
-    @Value("${spring.datasource.password:#{null}}")
-    public String password;
-    @Value("${spring.datasource.driver-class-name:#{null}}")
-    public String type;
-    @Value("${spring.datasource.hikari.pool-name:#{null}}")
-    public String name;
-    @Value("${spring.datasource.hikari.maximum-pool-size:#{null}}")
-    public int maxPoolSize;
-    @Value("${spring.datasource.hikari.minimum-idle:#{null}}")
-    public int minimumIdle;
-    @Value("${spring.datasource.hikari.idle-timeout:#{null}}")
-    public long idleTimeout;
-    @Value("${spring.datasource.hikari.max-lifetime:#{null}}")
-    public long maxLifetime;
-    @Value("${spring.datasource.hikari.connection-timeout:#{null}}")
-    public long connectionTimeout;
 
 }

@@ -1,38 +1,34 @@
 package org.solarframework.db.spring;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import jakarta.persistence.Column;
-import org.solarframework.db.api.DatabaseType;
-import org.solarframework.db.api.IDatabaseService;
+import org.solarframework.db.api.*;
+import org.solarframework.db.api.dto.TableStats;
+import org.solarframework.db.api.IEntityInfo;
 import org.solarframework.json.JSONItem;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import javax.sql.DataSource;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.solarframework.core.util.ClassUtils.copyObject;
-import static org.solarframework.core.util.ClassUtils.getAllFieldsOfClassFamily;
-import static org.solarframework.db.spring.DatabaseManager.defaultConnectionString;
-import static org.solarframework.db.spring.DatabaseObject.getTableName;
+import static org.solarframework.db.spring.DatabaseConfig.defaultConnectionString;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 
-public class AvailableDataSource extends JSONItem<AvailableDataSource> {
-    protected transient DatabaseManager manager;
+public class StoredDataSource extends JSONItem<StoredDataSource> implements IStoredDataSource {
+    @JsonIgnore
+    protected transient IDatabaseManager manager;
+    @JsonIgnore
     private transient DatabaseService service;
+    @JsonIgnore
     private transient DataSource dataSource;
-
 
     private transient Long ping;
     private transient String pingError;
@@ -49,33 +45,24 @@ public class AvailableDataSource extends JSONItem<AvailableDataSource> {
     private long maxLifetime = 1800000;
     private long connectionTimeout = 20000;
 
-    private List<String> entities = new ArrayList<>();
+    private Set<IEntityInfo> entities = new HashSet<>();
 
-    public AvailableDataSource(DatabaseManager manager) {
+    protected StoredDataSource(IDatabaseManager manager) {
         this.manager = manager;
     }
 
-    public void setEntities(List<Class<?>> entities) {
+    public void setEntities(Set<IEntityInfo> entities) {
         clearEntities();
-        this.entities = entities.stream().map(Class::getName).collect(Collectors.toList());
+        this.entities = entities;
     }
-    public void addEntities(Class<?>... entities) {
-        clearEntitiesClasses();
-        this.entities.addAll(Stream.of(entities).map(Class::getName).toList());
+    public void addEntities(IEntityInfo... entities) {
+        this.entities.addAll(Arrays.stream(entities).toList());
     }
-    public void removeEntities(Class<?>... entities) {
-        clearEntitiesClasses();
-        this.entities.removeAll(Stream.of(entities).map(Class::getName).toList());
+    public void removeEntities(IEntityInfo... entities) {
+        Stream.of(entities).toList().forEach(this.entities::remove);
     }
     public void clearEntities() {
-        clearEntitiesClasses();
         this.entities.clear();
-    }
-    private void clearEntitiesClasses() {
-        entitiesClasses = null;
-        missingClasses = null;
-        updatableClasses = null;
-        installedClasses = null;
     }
 
     public String getName() {
@@ -190,69 +177,45 @@ public class AvailableDataSource extends JSONItem<AvailableDataSource> {
         return dataSource = new HikariDataSource(config);
     }
 
-
-    protected transient List<Class<?>> entitiesClasses;
-    protected transient List<Class<?>> updatableClasses;
-    protected transient List<Class<?>> installedClasses;
-    protected transient List<Class<?>> missingClasses;
-
-
-    public List<String> getEntities() {
+    public Set<IEntityInfo> getEntities() {
         return entities;
     }
-    public List<Class<?>> getEntitiesClasses() {
-        return entitiesClasses == null ? entitiesClasses = getEntities().stream().map(entityName -> {
-            for (ClassLoader cl : manager.getEntityClassloaders()) {
-                try {
-                    return cl.loadClass(entityName);
-                } catch (ClassNotFoundException _) {}
-            }
-            return null;
-        }).filter(Objects::nonNull).collect(Collectors.toList()) : entitiesClasses;
+    public Set<Class<?>> getEntitiesClasses() {
+        return getEntities().stream().map(IEntityInfo::getEntityClass).collect(Collectors.toSet());
     }
 
-    public List<String> getInstalledEntities() {
-        return getInstalledEntitiesClasses().stream().map(Class::getName).toList();
+    public Set<IEntityInfo> getInstalledEntities() {
+        return getEntities().stream().filter(e -> getService().getDatabaseStats().getTableNames().contains(e.getTableName())).collect(Collectors.toSet());
     }
-    public List<Class<?>> getInstalledEntitiesClasses() {
-        return installedClasses == null ? installedClasses = getService().getDatabaseStats().getTableNames().stream().map(this::getClassOfTable).filter(Objects::nonNull).collect(Collectors.toList()) : installedClasses;
-    }
-
-
-    public List<String> getMissingEntities() {
-        return getMissingEntitiesClasses().stream().map(Class::getName).toList();
-    }
-    public List<Class<?>> getMissingEntitiesClasses() {
-        return missingClasses == null ? missingClasses = getEntitiesClasses().stream().filter(e -> !getInstalledEntitiesClasses().contains(e)).collect(Collectors.toList()) : missingClasses;
+    public Set<Class<?>> getInstalledEntitiesClasses() {
+        return getInstalledEntities().stream().map(IEntityInfo::getEntityClass).collect(Collectors.toSet());
     }
 
-    public List<String> getUpdatableEntities() {
-        return getUpdatableEntitiesClasses().stream().map(Class::getName).toList();
+    public Set<IEntityInfo> getMissingEntities() {
+        return getEntities().stream().filter(e -> !getService().getDatabaseStats().getTableNames().contains(e.getTableName())).collect(Collectors.toSet());
     }
-    public List<Class<?>> getUpdatableEntitiesClasses() {
-        if (updatableClasses != null) return updatableClasses;
-        List<Class<?>> entities = new ArrayList<>();
-        for (String table : getService().getDatabaseStats().getTableNames()) {
-            Class<?> entity = getClassOfTable(table);
-            if (entity == null) continue;
-            List<String> columns = getService().getTableStats(table).getColumnNames();
-            List<Field> fields = getAllFieldsOfClassFamily(entity).stream().filter(f -> !Modifier.isTransient(f.getModifiers()) && !Modifier.isStatic(f.getModifiers())).toList();
-            if (columns.size() != fields.size()) {
-                entities.add(entity);
-                continue;
-            }
-            for (Field field : fields) {
-                String fieldName = field.getAnnotation(Column.class) != null && !field.getAnnotation(Column.class).name().isEmpty() ? field.getAnnotation(Column.class).name() : field.getName();
-                if (columns.stream().noneMatch(column -> column.equalsIgnoreCase(fieldName))) {
-                    entities.add(entity);
-                    break;
-                }
-            }
-        }
-        return updatableClasses = entities;
+    public Set<Class<?>> getMissingEntitiesClasses() {
+        return getMissingEntities().stream().map(IEntityInfo::getEntityClass).collect(Collectors.toSet());
+    }
+
+    public Set<IEntityInfo> getUpdatableEntities() {
+        return getEntities().stream().filter(e -> {
+            TableStats stats = e.getTableStats();
+            if (stats.getColumnNames().size() != e.getFields().size()) return true;
+            if (stats.getColumnNames().stream().allMatch(cn -> e.getFields().stream().anyMatch(fn -> Objects.equals(cn, fn.getColumnName())))) return true;
+            return false;
+        }).collect(Collectors.toSet());
+    }
+    public Set<Class<?>> getUpdatableEntitiesClasses() {
+        return getUpdatableEntities().stream().map(IEntityInfo::getEntityClass).collect(Collectors.toSet());
     }
 
     public Class<?> getClassOfTable(String name) {
-        return getEntitiesClasses().stream().filter(availableEntity -> getTableName(availableEntity).equalsIgnoreCase(name)).findFirst().orElse(null);
+        return getEntities().stream().filter(availableEntity -> availableEntity.getTableName().equals(name)).map(IEntityInfo::getEntityClass).findFirst().orElse(null);
+    }
+
+    @Override
+    public void setManager(IDatabaseManager manager) {
+        this.manager = manager;
     }
 }

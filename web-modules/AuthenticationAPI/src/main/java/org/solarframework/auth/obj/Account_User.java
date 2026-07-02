@@ -26,7 +26,7 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
     @Column(name = "PasswordHash", length = 512, nullable = false)
     private String passwordHash;
     @Column(name = "RoleID")
-    private Long roleId = 0L;
+    private Long roleId = 1L;
     @Column(name = "FirstName", length = 100)
     private String firstName;
     @Column(name = "LastName", length = 100)

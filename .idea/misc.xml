@@ -9,6 +9,7 @@
     </option>
     <option name="ignoredFiles">
       <set>
+        <option value="$PROJECT_DIR$/DatabaseREST/pom.xml" />
         <option value="$PROJECT_DIR$/modules/DatabaseCommon/pom.xml" />
         <option value="$PROJECT_DIR$/web-modules/ProxyServer/pom.xml" />
         <option value="$PROJECT_DIR$/web-modules/pom.xml" />

@@ -14,15 +14,15 @@ import java.util.stream.Collectors;
 import static org.solarframework.core.util.ClassUtils.*;
 import static org.solarframework.core.util.ClassUtils.getAllFieldsOfClassFamily;
 import static org.solarframework.core.util.ClassUtils.setFieldValue;
+import static org.solarframework.db.spring.DatabaseObject.TableNames;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.db.spring.DatabaseUtils.*;
 import static org.solarframework.json.JSONItem.GSON;
 
 @SuppressWarnings("all")
 public class DBInstanceService<T> implements IDBObjectService<T> {
-    protected static final Map<Class<?>, String> TableNames = new HashMap<>();
-    protected static final Map<Class<?>, Set<Field>> IdFields = new HashMap<>();
-    protected static final Map<Class<?>, Set<Field>> CachedFields = new HashMap<>();
+    protected static final Map<String, Set<Field>> IdFields = new HashMap<>();
+    protected static final Map<String, Set<Field>> CachedFields = new HashMap<>();
 
     protected transient DatabaseObject<T> dbObject;
     protected transient IDatabaseService dbService;
@@ -41,18 +41,18 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         this.dbObject = obj;
         this.entityClass = (Class<T>) dbObject.getClass();
 
-        this.tableName = TableNames.computeIfAbsent(entityClass, c -> obj.getTableName());
-        this.cachedFields = CachedFields.computeIfAbsent(entityClass, c -> getSerializableFieldsOfClassFamily(entityClass).stream().filter(f -> dbService.getTableStats(tableName).getColumnNames().contains(f.getName().toLowerCase())).collect(Collectors.toSet()));
-        this.idFields = IdFields.computeIfAbsent(entityClass, c -> CachedFields.get(entityClass).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toSet()));
+        this.tableName = obj.getTableName();
+        this.cachedFields = CachedFields.computeIfAbsent(entityClass.getName(), c -> getSerializableFieldsOfClassFamily(entityClass).stream().filter(f -> dbService.getTableStats(tableName).getColumnNames().contains(f.getName().toLowerCase())).collect(Collectors.toSet()));
+        this.idFields = IdFields.computeIfAbsent(entityClass.getName(), c -> CachedFields.get(entityClass.getName()).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toSet()));
     }
 
     private Set<Field> getIdAndUniqueFields() {
-        Set<Field> fs = CachedFields.get(entityClass).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toSet());
-        fs.addAll(CachedFields.get(entityClass).stream().filter(f -> f.isAnnotationPresent(Column.class) && f.getAnnotation(Column.class).unique()).collect(Collectors.toSet()));
+        Set<Field> fs = CachedFields.get(entityClass.getName()).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toSet());
+        fs.addAll(CachedFields.get(entityClass.getName()).stream().filter(f -> f.isAnnotationPresent(Column.class) && f.getAnnotation(Column.class).unique()).collect(Collectors.toSet()));
         return fs;
     }
     private Set<Field> getUniqueFields() {
-        return CachedFields.get(entityClass).stream().filter(f -> f.isAnnotationPresent(Column.class) && f.getAnnotation(Column.class).unique()).collect(Collectors.toSet());
+        return CachedFields.get(entityClass.getName()).stream().filter(f -> f.isAnnotationPresent(Column.class) && f.getAnnotation(Column.class).unique()).collect(Collectors.toSet());
     }
 
     public String getHashedIdentifier() {
