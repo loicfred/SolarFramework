@@ -2,6 +2,7 @@ package org.solarframework.auth.web.spring;
 
 import org.solarframework.auth.obj.Account_User;
 import org.solarframework.auth.obj.enums.AccountProvider;
+import org.solarframework.auth.obj.enums.UserStatus;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -38,6 +39,7 @@ public class OAuth2Service extends DefaultOAuth2UserService {
             user.setFirstName(firstName);
             user.setLastName(lastName);
             user.setEmailVerified(true);
+            user.setStatus(UserStatus.ACTIVE);
             user.setAccountProvider(AccountProvider.GOOGLE);
             user.Write();
         }

@@ -8,6 +8,7 @@ import org.solarframework.db.api.IEntityInfo;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.util.HashSet;
 
 import static org.solarframework.core.util.ClassUtils.getAllFieldsOfClassFamily;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
@@ -35,13 +36,13 @@ public class EntityInfo extends IEntityInfo {
             constructor.newInstance();
         } catch (Exception _) {}
 
+        relations.clear();
+        fields.clear();
         for (Field f : getAllFieldsOfClassFamily(clazz)) {
             if (!Modifier.isStatic(f.getModifiers())) {
-                if (Modifier.isTransient(f.getModifiers())) {
-                    if (f.getAnnotation(JoinColumn.class) != null || f.getAnnotation(JoinTable.class) != null || f.getAnnotation(JoinColumns.class) != null) {
-                        relations.add(new Relation(f));
-                    }
-                } else {
+                if (f.getAnnotation(OneToMany.class) != null || f.getAnnotation(ManyToOne.class) != null || f.getAnnotation(OneToOne.class) != null || f.getAnnotation(ManyToMany.class) != null) {
+                    relations.add(new Relation(f));
+                } else if (f.getAnnotation(Column.class) != null) {
                     fields.add(new FieldInfo(f));
                 }
             }

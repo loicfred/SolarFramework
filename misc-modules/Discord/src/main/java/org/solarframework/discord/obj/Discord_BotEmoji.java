@@ -21,7 +21,7 @@ public class Discord_BotEmoji extends DatabaseObject.ID_OBJ<Long, Discord_BotEmo
 
     @Column(name = "ChannelID", nullable = false)
     public String Name;
-    @Column(name = "Formatted")
+    @Column(name = "Formatted", nullable = false)
     public String Formatted;
     @Column(name = "ServerID")
     public Long ServerID = null;

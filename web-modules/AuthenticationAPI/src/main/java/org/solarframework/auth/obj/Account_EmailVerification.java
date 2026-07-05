@@ -1,5 +1,6 @@
 package org.solarframework.auth.obj;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.solarframework.auth.obj.enums.EmailVerificationType;
 import org.solarframework.db.spring.DatabaseObject;
@@ -10,9 +11,10 @@ import java.time.temporal.ChronoUnit;
 @Entity
 @Table(name = "account_emailverification")
 public class Account_EmailVerification extends DatabaseObject.ID_OBJ<Long, Account_EmailVerification> {
-    @ManyToOne
-    @JoinColumn(referencedColumnName = "ID", name = "UserID")
-    private transient Account_User U;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "UserID", referencedColumnName = "ID", nullable = false, insertable = false, updatable = false)
+    private Account_User user;
 
     @Column(name = "UserID", nullable = false)
     public Long userID;
@@ -67,7 +69,7 @@ public class Account_EmailVerification extends DatabaseObject.ID_OBJ<Long, Accou
     }
 
     public Account_User getUser() {
-        return U == null ? U = retrieveEntityServiceFor(Account_User.class).getById(userID).orElse(null) : U;
+        return user == null ? user = retrieveEntityServiceFor(Account_User.class).getById(userID).orElse(null) : user;
     }
 
     public static void ClearUnregisterUsers() {

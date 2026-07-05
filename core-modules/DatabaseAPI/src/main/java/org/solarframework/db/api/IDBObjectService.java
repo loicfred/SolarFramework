@@ -33,4 +33,5 @@ public interface IDBObjectService<T> {
     <A> A refetchAttribute(String attributeName, Class<A> attributeType);
 
     DatabaseObject<T> getDBObject();
+
 }

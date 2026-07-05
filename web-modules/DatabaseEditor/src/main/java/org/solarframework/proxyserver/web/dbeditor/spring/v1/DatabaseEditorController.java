@@ -37,7 +37,7 @@ public class DatabaseEditorController {
         try {
             item = item.substring(0,1).toUpperCase() + item.substring(1);
             List<FieldMeta> fields = new ArrayList<>();
-            Class<?> objClass = SolarDBManager.getSourceByEntity(item).getClassOfTable(item);
+            Class<?> objClass = SolarDBManager.getServiceByEntity(item).getClassOfTable(item);
             Object entity = id != null ? SolarDBManager.getById(objClass, id).orElseThrow() : null;
             for (Field field : objClass.getDeclaredFields()) {
                 field.setAccessible(true);
@@ -75,7 +75,7 @@ public class DatabaseEditorController {
         try {
             objectName = objectName.substring(0,1).toUpperCase() + objectName.substring(1);
             @SuppressWarnings("unchecked")
-            Class<? extends DatabaseObject.ID_OBJ<?, ?>> objClass = (Class<? extends DatabaseObject.ID_OBJ<?, ?>>) SolarDBManager.getSourceByEntity(objectName).getClassOfTable(objectName).asSubclass(DatabaseObject.class);
+            Class<? extends DatabaseObject.ID_OBJ<?, ?>> objClass = (Class<? extends DatabaseObject.ID_OBJ<?, ?>>) SolarDBManager.getServiceByEntity(objectName).getClassOfTable(objectName).asSubclass(DatabaseObject.class);
             DatabaseObject.ID_OBJ<?,?> entity = id != null ? SolarDBManager.getById(objClass, id).orElseThrow() : null;
             if (entity == null) {
                 Constructor<DatabaseObject.ID_OBJ<?,?>> ctor = (Constructor<DatabaseObject.ID_OBJ<?,?>>) objClass.getDeclaredConstructor();
@@ -131,8 +131,8 @@ public class DatabaseEditorController {
         } catch (Exception ignored) {}
         try {
             item = item.substring(0, 1).toUpperCase() + item.substring(1);
-            Class<?> objClass = SolarDBManager.getSourceByEntity(item).getClassOfTable(item);
-            return Map.of("tblstats", SolarDBManager.getService(objClass).getTableStats(item), "items", SolarDBManager.getAll(objClass));
+            Class<?> objClass = SolarDBManager.getServiceByEntity(item).getClassOfTable(item);
+            return Map.of("tblstats", SolarDBManager.getServiceByEntity(objClass).getTableStats(item), "items", SolarDBManager.getAll(objClass));
         } catch (Exception e) {
             return null;
         }

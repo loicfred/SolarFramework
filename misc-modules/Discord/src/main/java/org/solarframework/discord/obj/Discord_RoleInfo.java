@@ -13,6 +13,10 @@ import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 @Table(name = "discord_roleinfo")
 @IdClass(ActionServerID.class)
 public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
+    @ManyToOne
+    @JoinColumn(referencedColumnName = "ID", name = "ServerID", nullable = false, insertable = false, updatable = false)
+    private Discord_GuildInfo DGI;
+
     private transient Guild G;
     private transient Role R;
 

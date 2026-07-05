@@ -1,11 +1,17 @@
 package org.solarframework.db.api.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.solarframework.db.api.DatabaseType;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 public class TableStats {
+    @JsonIgnore
+    private transient Set<String> timeColumns;
+
     public String sourceName;
     public DatabaseType sourceType;
     public String schemaName;
@@ -35,7 +41,11 @@ public class TableStats {
         return columnDetails.stream().map(ColumnDetail::getName).toList();
     }
 
+    private static final Set<String> TEMPORAL_TYPES = Set.of("DATETIME", "TIMESTAMP", "DATE", "TIME");
 
+    public Set<String> getTimeColumns() {
+        return timeColumns == null ? timeColumns = getColumnDetails().stream().filter(c -> TEMPORAL_TYPES.contains(c.getType().toUpperCase())).map(c -> c.getName().toLowerCase()).collect(Collectors.toSet()) : timeColumns;
+    }
     public static class ColumnDetail {
         public String name;
         public String type;

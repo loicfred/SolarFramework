@@ -10,11 +10,11 @@ public class AuthBundle implements BundleEntities {
     @Override
     public Supplier<List<? extends DatabaseObject<?>>> bundleEntities() {
         return () -> List.of(
-                new Account_Role(1L, "USER", 0),
-                new Account_Role(2L, "MODERATOR", 50),
-                new Account_Role(3L, "STAFF", 75),
-                new Account_Role(4L, "ADMIN", 85),
-                new Account_Role(5L, "CEO", 100)
+                new Account_Role(1L, "USER"),
+                new Account_Role(2L, "MODERATOR"),
+                new Account_Role(3L, "STAFF"),
+                new Account_Role(4L, "ADMIN"),
+                new Account_Role(5L, "CEO")
         );
     }
 }

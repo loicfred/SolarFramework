@@ -18,9 +18,12 @@ import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 @Table(name = "discord_channelinfo")
 @IdClass(ActionServerID.class)
 public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
-    @OneToMany
-    @JoinColumn(referencedColumnName = "ID", name = "ServerID")
-    private transient List<Discord_MessageInfo> Messages;
+    @ManyToOne
+    @JoinColumn(referencedColumnName = "ID", name = "ServerID", nullable = false, insertable = false, updatable = false)
+    private Discord_GuildInfo DGI;
+
+    @OneToMany(mappedBy = "DCI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Discord_MessageInfo> Messages;
 
     private transient Guild G;
     private transient GuildChannel C;

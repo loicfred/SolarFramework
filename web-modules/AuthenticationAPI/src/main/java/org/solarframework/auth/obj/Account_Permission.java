@@ -1,16 +1,27 @@
 package org.solarframework.auth.obj;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
+import java.util.Set;
 
 @Entity
 @Table(name = "account_permission")
 public class Account_Permission extends DatabaseObject.ID_OBJ<Long, Account_Permission> {
 
-    @Column(name = "Name", nullable = false)
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "account_role_to_permission",
+            joinColumns = @JoinColumn(name = "PermissionID"),
+            inverseJoinColumns = @JoinColumn(name = "RoleID")
+    )
+    private Set<Account_Role> roles;
+    
+    @Column(name = "Name", unique = true, nullable = false)
     private String name;
+    @Column(name = "Description", nullable = false)
+    private String description;
 
     public String getName() {
         return name;
@@ -19,9 +30,20 @@ public class Account_Permission extends DatabaseObject.ID_OBJ<Long, Account_Perm
         this.name = name;
     }
 
+    public String getDescription() {
+        return description;
+    }
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
     protected Account_Permission() {}
-    public Account_Permission(String name) {
-        this.ID = Instant.now().toEpochMilli();
+    public Account_Permission(Long id, String name, String description) {
+        this.ID = id;
         this.name = name;
+        this.description = description;
+    }
+    public Account_Permission(String name, String description) {
+        this(Instant.now().toEpochMilli(), name, description);
     }
 }

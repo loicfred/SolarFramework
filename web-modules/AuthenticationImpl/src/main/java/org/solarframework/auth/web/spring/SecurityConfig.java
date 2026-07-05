@@ -101,7 +101,7 @@ public class SecurityConfig {
     @Bean
     public RememberMeServices rememberMeServices(UserDetailsService userDetailsService) {
         PersistentTokenBasedRememberMeServices services = new PersistentTokenBasedRememberMeServices("my-remember-me-key", userDetailsService, persistentTokenRepository());
-        services.setAlwaysRemember(false);
+        services.setAlwaysRemember(true);
         services.setCookieName("remember-me");
         services.setTokenValiditySeconds(1209600);
         return services;
@@ -110,9 +110,9 @@ public class SecurityConfig {
     @Bean
     public PersistentTokenRepository persistentTokenRepository() {
         JdbcTokenRepositoryImpl repo = new JdbcTokenRepositoryImpl();
-        if (databaseManager.getSourceByEntity(PersistentLogins.class).getMissingEntitiesClasses().contains(PersistentLogins.class))
-            databaseManager.getService(PersistentLogins.class).createSchema(List.of(PersistentLogins.class));
-        repo.setDataSource(databaseManager.getSourceByEntity(PersistentLogins.class).getDataSource());
+        if (databaseManager.getServiceByEntity(PersistentLogins.class).getMissingEntitiesClasses().contains(PersistentLogins.class))
+            databaseManager.getServiceByEntity(PersistentLogins.class).createSchemaIfMissing(List.of(PersistentLogins.class));
+        repo.setDataSource(databaseManager.getServiceByEntity(PersistentLogins.class).getDataSource());
         return repo;
     }
 
@@ -120,10 +120,10 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, RememberMeServices rememberMeServices) {
         List<String> publicPaths = new java.util.ArrayList<>(
-                List.of("/", "/home", "/error", "/auth/**", "/api/**", "/img/**", "/css/**", "/js/**")
+                List.of("/", "/home", "/error", "/unauthorized", "/auth/**", "/api/**", "/img/**", "/css/**", "/js/**")
         );
         try {
-            publicPaths.addAll(databaseManager.getAllWhere(Web_PathAccessLevel.class, "MinimumAccessLevel <= ?", 0).stream().map(Web_PathAccessLevel::getPath).toList());
+            publicPaths.addAll(databaseManager.getAllWhereDistinct(Web_PathPermission.class, "PermissionID IS NULL").stream().map(Web_PathPermission::getPath).toList());
         } catch (Exception ignored) {}
         log.info("Setting public paths as: {}", publicPaths);
         return http

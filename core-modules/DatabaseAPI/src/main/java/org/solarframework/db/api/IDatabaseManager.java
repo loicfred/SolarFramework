@@ -2,12 +2,10 @@ package org.solarframework.db.api;
 
 import org.solarframework.db.api.dto.DatabaseStats;
 import org.solarframework.db.api.dto.TableStats;
+import org.solarframework.db.exception.DataMigrationException;
 import org.solarframework.db.spring.DatabaseObject;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 public interface IDatabaseManager {
 
@@ -16,44 +14,32 @@ public interface IDatabaseManager {
     boolean IsSingleSource();
 
     void verifyEntities();
-    void verifyEntity(IStoredDataSource ds, Class<?> C);
+    void verifyEntity(IDatabaseService ds, Class<?> C);
 
 
-    void createAllSchemas();
+    void createAllSchemasIfMissing();
 
-    void updateAllSchemas();
+    IDatabaseService makeNewSource(Set<IEntityInfo> entities);
 
-    IStoredDataSource makeNewSource(Set<IEntityInfo> entities);
+    boolean addSource(IDatabaseService ds);
 
-    boolean addSource(IStoredDataSource ds);
+    boolean removeNonDefaultSources();
 
-    boolean removeSource(String connectionString);
-
-    Set<IStoredDataSource> getSources();
-
-    IDatabaseService getService(String name);
-
-    IDatabaseService getService(Class<?> entity);
+    Set<IDatabaseService> getSources();
 
     <T> IDatabaseService.ENTITY<T> getEntityService(Class<T> entity);
 
-    IStoredDataSource getSourceByName(String name);
+    IDatabaseService getService(String name);
 
-    IStoredDataSource getSourceByEntity(String className);
+    IDatabaseService getServiceByEntity(String className);
 
-    IStoredDataSource getSourceByEntity(Class<?> entity);
-
-    IStoredDataSource getDefaultAvailableSource();
+    IDatabaseService getServiceByEntity(Class<?> entity);
 
     IDatabaseService getDefaultService();
-
-    <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object... id);
 
     <T> Optional<T> getById(String select, Class<T> clazz, Object... id);
 
     <T> Optional<T> getById(Class<T> clazz, Object... id);
-
-    <T> Optional<T> getWhereWithJoins(Class<T> clazz, String whereClause, Object... args);
 
     <T> Optional<T> getWhere(String select, Class<T> clazz, String whereClause, Object... args);
 
@@ -110,4 +96,9 @@ public interface IDatabaseManager {
     void LoadFromFile(String path);
 
     void SaveAsFile(String path);
+
+
+    long migrate(IDatabaseService oldSource, IDatabaseService newSource, IEntityInfo entity) throws DataMigrationException;
+    List<String> migrate(IDatabaseService oldSource, IDatabaseService newSource, Collection<IEntityInfo> entity) throws DataMigrationException;
+
 }

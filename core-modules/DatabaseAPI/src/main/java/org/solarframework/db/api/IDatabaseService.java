@@ -5,23 +5,83 @@ import org.solarframework.db.api.dto.Row;
 import org.solarframework.db.api.dto.TableStats;
 import org.solarframework.db.spring.DatabaseObject;
 
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
+import javax.sql.DataSource;
+import java.util.*;
+
+import static org.solarframework.db.spring.DatabaseObject.getTableName;
 
 public interface IDatabaseService {
 
-    DatabaseType getDatabaseType();
     <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject);
+
+    IDatabaseManager getManager();
+    void setManager(IDatabaseManager manager);
+
+
+    String getName();
+    String getUsername();
+    String getPassword();
+    String getConnectionString();
+    DatabaseType getDatabaseType();
+    boolean isDefault();
+    int getMaxPoolSize();
+    int getMinimumIdle();
+    long getIdleTimeout();
+    long getMaxLifetime();
+    long getConnectionTimeout();
+
+    void setName(String name);
+    void setUsername(String username);
+    void setPassword(String password);
+    void setConnectionString(String connectionString);
+    void setDatabaseType(DatabaseType type);
+    void setMaxPoolSize(int maxPoolSize);
+    void setMinimumIdle(int minimumIdle);
+    void setIdleTimeout(long idleTimeout);
+    void setMaxLifetime(long maxLifetime);
+    void setConnectionTimeout(long connectionTimeout);
+
+
+    void setEntities(Collection<IEntityInfo> entities);
+    void addEntities(IEntityInfo... entities);
+    void removeEntities(IEntityInfo... entities);
+    void clearEntities();
+
+
+    List<IEntityInfo> getEntities();
+    List<Class<?>> getEntitiesClasses();
+
+    List<IEntityInfo> getInstalledEntities();
+    List<Class<?>> getInstalledEntitiesClasses();
+
+    List<IEntityInfo> getMissingEntities();
+    List<Class<?>> getMissingEntitiesClasses();
+
+    List<IEntityInfo> getUpdatableEntities();
+    List<Class<?>> getUpdatableEntitiesClasses();
+
+    Class<?> getClassOfTable(String name);
+
+
+    long getPing();
+    String getPingError();
+    void resetPing();
+
+
+
+    void reload();
 
 
     <O> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id);
     <O> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args);
-    <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object... id);
+
+
+    <T> int InsertBatch(List<T> items);
+    <T> int UpsertBatch(List<T> items);
+    <T> int UpsertBatch(List<T> items, List<String> conflictCols);
+
     <T> Optional<T> getById(String select, Class<T> clazz, Object... id);
     <T> Optional<T> getById(Class<T> clazz, Object... id);
-    <T> Optional<T> getWhereWithJoins(Class<T> clazz, String whereClause, Object... args);
     <T> Optional<T> getWhere(String select, Class<T> clazz, String whereClause, Object... args);
     <T> Optional<T> getWhere(Class<T> clazz, String whereClause, Object... args);
     <T> List<T> getAll(String select, Class<T> clazz);
@@ -39,57 +99,37 @@ public interface IDatabaseService {
 
 
     <T> Optional<T> doQuery(Class<T> clazz, String sql, Object... args);
-
     <T> List<T> doQueryAll(Class<T> clazz, String sql, Object... args);
-
     <T> Set<T> doQueryAllDistinct(Class<T> clazz, String sql, Object... args);
-
     <T> Optional<T> doQueryNoCache(Class<T> clazz, String sql, Object... args);
-
     <T> List<T> doQueryAllNoCache(Class<T> clazz, String sql, Object... args);
-
     <T> Set<T> doQueryAllDistinctNoCache(Class<T> clazz, String sql, Object... args);
-
     Optional<Row> doQuery(String sql, Object... args);
-
     List<Row> doQueryAll(String sql, Object... args);
-
     Set<Row> doQueryAllDistinct(String sql, Object... args);
-
     Optional<Row> doQueryNoCache(String sql, Object... args);
-
     List<Row> doQueryAllNoCache(String sql, Object... args);
-
     Set<Row> doQueryAllDistinctNoCache(String sql, Object... args);
-
     <T> Optional<T> doQueryValue(Class<T> clazz, String sql, Object... args);
-
     <T> Optional<T> doQueryValueNoCache(Class<T> clazz, String sql, Object... args);
 
-    <T> Optional<T> doQueryJoin(Class<T> clazz, String whereClause, Object... args);
 
     int doUpdate(String sql, Object... args);
-
     int doUpdate(Class<?> clazz, String sql, Object... args);
 
 
     DatabaseStats getDatabaseStats();
-
     TableStats getTableStats(String name);
-
+    boolean doesTableExist(Class<?> clazz);
     String getSchema();
 
-    void createSchema(Collection<Class<?>> clz);
-
-    void updateSchema(Collection<Class<?>> clz);
+    void createSchemaIfMissing(Collection<Class<?>> clz);
 
     interface ENTITY<T> {
 
         IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject);
 
-        Optional<T> getByIdWithJoins(Object... id);
         Optional<T> getById(Object... id);
-        Optional<T> getWhereWithJoins(String whereClause, Object... args);
         Optional<T> getWhere(String whereClause, Object... args);
         List<T> getAll();
         List<T> getAllWhere(String whereClause, Object... args);
@@ -117,14 +157,25 @@ public interface IDatabaseService {
 
         Optional<T> doQueryValueNoCache(String sql, Object... args);
 
-        Optional<T> doQueryJoin(String whereClause, Object... args);
-
         int doUpdate(String sql, Object... args);
 
 
-        void createSchema();
-        void updateSchema();
-
+        void createSchemaIfMissing();
     }
 
+
+
+
+
+
+
+
+
+
+
+
+    DataSource getDataSource();
+
+
+    void close();
 }

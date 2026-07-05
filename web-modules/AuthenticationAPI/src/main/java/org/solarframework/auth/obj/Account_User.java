@@ -1,5 +1,6 @@
 package org.solarframework.auth.obj;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.solarframework.auth.obj.enums.AccountProvider;
 import org.solarframework.auth.obj.enums.Gender;
@@ -7,17 +8,23 @@ import org.solarframework.auth.obj.enums.UserStatus;
 import org.solarframework.lang.Nationalities;
 import org.solarframework.db.spring.DatabaseObject;
 
-import java.security.Permission;
 import java.security.Principal;
 import java.time.*;
+import java.util.Objects;
 import java.util.Set;
 
 @Entity
 @Table(name = "account_user")
 public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_User> {
-    @ManyToOne
-    @JoinColumn(referencedColumnName = "ID", name = "RoleID")
-    private transient Account_Role role;
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Set<Account_EmailVerification> emails_verifications;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Set<Account_Notification> notifications;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "RoleID", referencedColumnName = "ID", nullable = false, insertable = false, updatable = false)
+    private Account_Role role;
 
     @Column(name = "Username", nullable = false, length = 50)
     private String username;
@@ -131,7 +138,7 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
     }
 
     public byte[] getAvatar() {
-        return avatar == null ? avatar = refetchAttribute("Avatar", byte[].class) : avatar;
+        return avatar;
     }
     public void setAvatar(byte[] avatar) {
         this.avatar = avatar;
@@ -262,21 +269,22 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
     public Account_Role getRole() {
         if (role != null) return role;
         role = retrieveEntityServiceFor(Account_Role.class).getById(getRoleId()).orElse(null);
-        return role == null ? role = new Account_Role("Guest", 0) : role;
+        return role == null ? role = new Account_Role("Guest") : role;
     }
     public Set<Account_Permission> getPermissions() {
         return getRole().getPermissions();
     }
 
     public boolean hasAccessToPath(String urlPath) {
-        Web_PathAccessLevel pathData = retrieveEntityServiceFor(Web_PathAccessLevel.class).getWhere("Path = ?", urlPath.trim()).orElse(null);
+        Web_PathPermission pathData = retrieveEntityServiceFor(Web_PathPermission.class).getWhere("Path = ?", urlPath.trim()).orElse(null);
         if (pathData == null) return false;
-        if (pathData.getMinimumAccessLevel() > getRole().getAccessLevel())
-            return pathData.getAuthorizedRoles().contains(getRole());
-        return true;
+        return pathData.getPermissionID() == null || hasPermission(pathData.getPermissionID());
     }
-    public boolean hasPermission(Account_Permission permission) {
-        return getRole().getPermissions().contains(permission);
+    public boolean hasPermission(Long permissionId) {
+        return getRole().getPermissions().stream().anyMatch(p -> Objects.equals(p.getID(), permissionId));
+    }
+    public boolean hasPermission(String name) {
+        return getRole().getPermissions().stream().anyMatch(p -> Objects.equals(p.getName(), name));
     }
 
     public static Account_User getByEmail(String email) {

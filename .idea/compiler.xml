@@ -31,6 +31,7 @@
       <module name="AstralCore-Framework" target="25" />
       <module name="DatabaseA" target="25" />
       <module name="DatabaseCommon" target="25" />
+      <module name="DatabaseImplV2" target="25" />
       <module name="DatabaseREST" target="25" />
       <module name="File" target="25" />
       <module name="ProxyServer" target="25" />
@@ -49,6 +50,7 @@
       <module name="DatabaseCommon" options="-parameters" />
       <module name="DatabaseEditor" options="-parameters" />
       <module name="DatabaseImpl" options="-parameters" />
+      <module name="DatabaseImplV2" options="-parameters" />
       <module name="DatabaseREST" options="-parameters" />
       <module name="Discord" options="-parameters" />
       <module name="Excel" options="-parameters" />

@@ -24,13 +24,13 @@ public class DatabaseObject<T> {
     private transient IDBObjectService<T> service;
 
     public IDBObjectService<T> getService() {
-        return service;
+        return service == null ? service = retrieveServiceFor(this.getClass()).makeObjectManager(this) : service;
     }
 
     public static IDatabaseService retrieveServiceFor(Class<?> clazz) {
         return serviceCache.computeIfAbsent(clazz.getName(), _ -> {
             try {
-                return SolarDBManager.getService(clazz);
+                return SolarDBManager.getServiceByEntity(clazz);
             } catch (Exception ignored) {
                 return null;
             }
@@ -50,64 +50,64 @@ public class DatabaseObject<T> {
 
     public DatabaseObject() {
         try {
-            service = retrieveServiceFor(this.getClass()).makeObjectManager(this);
+            getService();
         } catch (NullPointerException ignored) {}
     }
 
     public String getHashedIdentifier() {
-        return service.getHashedIdentifier();
+        return getService().getHashedIdentifier();
     }
 
     public String toJSON() {
-       return service.toJSON();
+       return getService().toJSON();
     }
 
     public int Write() {
         onCreate();
-        return service.Write();
+        return getService().Write();
     }
 
     public Optional<T> WriteThenReturn() {
         onCreate();
-        return service.WriteThenReturn();
+        return getService().WriteThenReturn();
     }
 
     public int Upsert() {
         onCreate();
-        return service.Upsert();
+        return getService().Upsert();
     }
 
     public Optional<T> UpsertThenReturn() {
         onCreate();
-        return service.UpsertThenReturn();
+        return getService().UpsertThenReturn();
     }
 
     public int IncrementColumn(String column, int amount) {
         onUpdate();
-        return service.IncrementColumn(column, amount);
+        return getService().IncrementColumn(column, amount);
     }
 
     public int IncrementColumns(Map<String, Double> parameters) {
         onUpdate();
-        return service.IncrementColumns(parameters);
+        return getService().IncrementColumns(parameters);
     }
 
     public int Update() {
         onUpdate();
-        return service.Update();
+        return getService().Update();
     }
 
     public int UpdateOnly(String... columns) {
         onUpdate();
-        return service.UpdateOnly(columns);
+        return getService().UpdateOnly(columns);
     }
 
     public int Delete() {
-        return service.Delete();
+        return getService().Delete();
     }
 
     public <A> A refetchAttribute(String attributeName, Class<A> attributeType) {
-        return service.refetchAttribute(attributeName, attributeType);
+        return getService().refetchAttribute(attributeName, attributeType);
     }
 
     public String getTableName() {
@@ -120,7 +120,6 @@ public class DatabaseObject<T> {
             return clazz.getSimpleName().toLowerCase();
         });
     }
-
 
     @PrePersist
     protected void onCreate() {}

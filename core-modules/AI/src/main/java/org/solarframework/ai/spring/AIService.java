@@ -24,7 +24,7 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import static org.solarframework.ai.spring.AIConst.*;
-import static org.solarframework.json.JSONItem.GSON;
+import static org.solarframework.json.JSONItem.SimpleGSON;
 import static org.solarframework.core.util.ClassUtils.getSerializableFieldsOfClassFamily;
 
 @Service
@@ -124,7 +124,7 @@ public class AIService {
         }
 
         Prompt p = Prompt.builder().chatOptions(ItemChooser)
-                .messages(getLister_Instruction(GSON.toJson(s)), UserMessage.builder().text(description).build())
+                .messages(getLister_Instruction(SimpleGSON.toJson(s)), UserMessage.builder().text(description).build())
                 .build();
         String answer = customizedPrompt(p);
         items = new ArrayList<>();

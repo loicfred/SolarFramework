@@ -20,8 +20,8 @@ import static org.solarframework.core.util.ImageUtils.getDominantColor;
 @IdClass(ActionServerID.class)
 public class Discord_GuildVariable extends DatabaseObject<Discord_GuildVariable> {
     @ManyToOne
-    @JoinColumn(referencedColumnName = "ID", name = "ServerID")
-    private transient Discord_GuildInfo DGI;
+    @JoinColumn(referencedColumnName = "ID", name = "ServerID", nullable = false, insertable = false, updatable = false)
+    private Discord_GuildInfo DGI;
 
 
     @Column(name = "ServerID", nullable = false)

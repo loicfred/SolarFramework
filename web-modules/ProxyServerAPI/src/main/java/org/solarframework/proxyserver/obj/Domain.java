@@ -1,9 +1,6 @@
 package org.solarframework.proxyserver.obj;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.OneToMany;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import org.springframework.http.HttpHeaders;
 
 import java.util.List;
@@ -12,9 +9,8 @@ import java.util.Objects;
 @Entity
 @Table(name = "web_domain")
 public class Domain extends BaseDomain<Domain> {
-    @OneToMany
-    @JoinColumn(referencedColumnName = "ID", name = "DomainID")
-    private transient List<Subdomain> subdomains = new java.util.ArrayList<>();
+    @OneToMany(mappedBy = "rootDomain", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Subdomain> subdomains = new java.util.ArrayList<>();
 
     protected Domain() {}
     public Domain(String ip, String name) {

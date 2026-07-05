@@ -10,12 +10,14 @@ import org.solarframework.db.api.*;
 import org.solarframework.db.api.dto.DatabaseStats;
 import org.solarframework.db.api.dto.TableStats;
 import org.solarframework.db.api.IEntityInfo;
+import org.solarframework.db.exception.DataMigrationException;
 import org.solarframework.json.JSONItem;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Constructor;
@@ -30,7 +32,6 @@ import static org.solarframework.db.spring.DatabaseObject.*;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.db.spring.DatabaseConfig.defaultConnectionString;
-import static org.solarframework.json.JSONItem.GSON;
 
 @Service
 public class DatabaseManager implements IDatabaseManager {
@@ -39,7 +40,7 @@ public class DatabaseManager implements IDatabaseManager {
     @JsonIgnore
     private transient final Map<String, ClassLoader> entityClassloaders = new HashMap<>(Map.of("app", Thread.currentThread().getContextClassLoader()));
     @JsonIgnore
-    private transient final Set<IStoredDataSource> storedDataSources = new HashSet<>();
+    private transient final Set<IDatabaseService> storedDataSources = new HashSet<>();
     @JsonIgnore
     private transient final CacheManager dbCacheManager;
     @JsonIgnore
@@ -47,35 +48,18 @@ public class DatabaseManager implements IDatabaseManager {
     @JsonIgnore
     private transient Instant Cooldown = Instant.now().minusSeconds(5);
 
-    protected DatabaseManager(@Qualifier("databaseCacheManager") CacheManager dbCacheManager,
-                              @Value("${spring.datasource.url:#{null}}") String connectionString,
-                              @Value("${spring.datasource.username:#{null}}") String username,
-                              @Value("${spring.datasource.password:#{null}}") String password,
-                              @Value("${spring.datasource.driver-class-name:#{null}}") String type,
-                              @Value("${spring.datasource.hikari.pool-name:#{null}}") String name,
-                              @Value("${spring.datasource.hikari.maximum-pool-size:#{null}}") Integer maxPoolSize,
-                              @Value("${spring.datasource.hikari.minimum-idle:#{null}}") Integer minimumIdle,
-                              @Value("${spring.datasource.hikari.idle-timeout:#{null}}") Long idleTimeout,
-                              @Value("${spring.datasource.hikari.max-lifetime:#{null}}") Long maxLifetime,
-                              @Value("${spring.datasource.hikari.connection-timeout:#{null}}") Long connectionTimeout,
-                              DatabaseService defaultService) {
-        defaultConnectionString = connectionString;
+    protected DatabaseManager(@Qualifier("databaseCacheManager") CacheManager dbCacheManager, DatabaseService defaultService) {
+        defaultConnectionString = defaultService.getConnectionString();
         this.dbCacheManager = dbCacheManager;
-        IStoredDataSource s = makeNewSource(new HashSet<>());
-        s.setName("Database (Default)");
-        s.setConnectionString(connectionString);
-        s.setUsername(username);
-        s.setPassword(password);
-        s.setType(DatabaseType.fromDriver(type));
-        s.setMaxPoolSize(maxPoolSize);
-        s.setMinimumIdle(minimumIdle);
-        s.setIdleTimeout(idleTimeout);
-        s.setMaxLifetime(maxLifetime);
-        s.setConnectionTimeout(connectionTimeout);
-        addSource(s);
+        defaultService.setManager(this);
+        addSource(defaultService);
         DefaultDBService = defaultService;
         SolarDBManager = this;
         reload();
+    }
+
+    public CacheManager getDbCacheManager() {
+        return dbCacheManager;
     }
 
     public void reload() {
@@ -90,10 +74,11 @@ public class DatabaseManager implements IDatabaseManager {
             if (IsSingleSource()) {
                 if (entityClassloaders.isEmpty()) entityClassloaders.put("app", Thread.currentThread().getContextClassLoader());
                 DatabaseUtils.scanEntitiesOfLoaders(new HashSet<>(entityClassloaders.values()), classes -> {
-                    getDefaultAvailableSource().setEntities(classes.stream().map((c) -> new EntityInfo(c, getEntityClassloaderKey(c.getClassLoader()))).collect(Collectors.toSet()));
+                    getDefaultService().setEntities(classes.stream().map((c) -> new EntityInfo(c, getEntityClassloaderKey(c.getClassLoader()))).collect(Collectors.toSet()));
                 });
             } else {
-                for (IStoredDataSource ds : getSources()) {
+                for (IDatabaseService ds : getSources()) {
+                    ds.reload();
                     for (IEntityInfo EI : ds.getEntities()) {
                         entityClassloaders.entrySet().stream().filter(cl -> Objects.equals(cl.getKey(), EI.getClassLoader())).findFirst().ifPresent((cl) -> {
                             try {
@@ -112,13 +97,13 @@ public class DatabaseManager implements IDatabaseManager {
     }
 
     public void verifyEntities() {
-        for (IStoredDataSource ds : storedDataSources) {
-            DatabaseStats stats = ds.getService().getDatabaseStats();
+        for (IDatabaseService ds : storedDataSources) {
+            DatabaseStats stats = ds.getDatabaseStats();
             log.info("Verifying entities for [{}] - {} Tables - {} Views - {} Rows", ds.getName(), stats.totalTables, stats.totalViews, stats.totalRows);
             for (Class<?> C : ds.getEntitiesClasses()) verifyEntity(ds, C);
         }
     }
-    public void verifyEntity(IStoredDataSource ds, Class<?> C) {
+    public void verifyEntity(IDatabaseService ds, Class<?> C) {
         try {
             Constructor<?> constructor = C.getDeclaredConstructor();
             constructor.setAccessible(true);
@@ -137,134 +122,117 @@ public class DatabaseManager implements IDatabaseManager {
             } else {
                 log.error("Entity class [{}] is NOT CHILD of DatabaseObject<>.", C.getName());
             }
-        } catch (Exception ignored) {
+        } catch (Exception e) {
+            e.printStackTrace();
             log.error("{} does not have a default constructor.", C.getName());
         }
     }
 
-    public IStoredDataSource makeNewSource(Set<IEntityInfo> entities) {
-        IStoredDataSource es = new StoredDataSource(this);
-        es.setEntities(entities);
-        return es;
+    public IDatabaseService makeNewSource(Set<IEntityInfo> entities) {
+        DatabaseService ds = new DatabaseService(dbCacheManager);
+        ds.setManager(this);
+        ds.setEntities(entities);
+        return ds;
     }
 
-    public void createAllSchemas() {
-        for (IStoredDataSource ds : storedDataSources) {
-            ds.getService().createSchema(ds.getEntitiesClasses());
-        }
-    }
-    public void updateAllSchemas() {
-        for (IStoredDataSource ds : storedDataSources) {
-            ds.getService().updateSchema(ds.getEntitiesClasses());
+    public void createAllSchemasIfMissing() {
+        for (IDatabaseService ds : storedDataSources) {
+            ds.createSchemaIfMissing(ds.getEntitiesClasses());
         }
     }
 
-    public boolean addSource(IStoredDataSource ds) {
+    public boolean addSource(IDatabaseService ds) {
         if (ds.getConnectionString().isEmpty() || ds.getName().isEmpty() || ds.getPassword().isEmpty() || ds.getUsername().isEmpty() || getSources().stream().anyMatch(d -> d.getConnectionString().equalsIgnoreCase(ds.getConnectionString()) || d.getName().equals(ds.getName()))) return false;
-        if (getDefaultAvailableSource() != null && ds.isDefault()) return false;
+        if (getDefaultService() != null && ds.isDefault()) return false;
         storedDataSources.add(ds);
         return true;
     }
-    public boolean removeSource(String connectionString) {
-        if (getSources().stream().anyMatch(ds -> ds.getConnectionString().equals(connectionString) && ds.isDefault())) return false;
-        getSources().removeIf(ds -> ds.getConnectionString().equals(connectionString));
-        return true;
+    public boolean removeNonDefaultSources() {
+        return getSources().removeIf(ds -> {
+            if (!ds.isDefault()) ds.close();
+            return !ds.isDefault();
+        });
     }
-    public Set<IStoredDataSource> getSources() {
+    public Set<IDatabaseService> getSources() {
         return storedDataSources;
     }
 
-    public IDatabaseService getService(String name) {
-        return IsSingleSource() ? getDefaultService() : getSourceByName(name).getService();
-    }
-    public IDatabaseService getService(Class<?> entity) {
-        return IsSingleSource() ? getDefaultService() : getSourceByEntity(entity).getService();
-    }
 
     public <T> IDatabaseService.ENTITY<T> getEntityService(Class<T> entity) {
-        return new DatabaseService.ENTITY<>(entity, IsSingleSource() ? getDefaultService() : getSourceByEntity(entity).getService());
+        return new DatabaseService.ENTITY<>(entity, IsSingleSource() ? getDefaultService() : getServiceByEntity(entity));
     }
 
-    public IStoredDataSource getSourceByName(String name) {
-        if (IsSingleSource()) return getDefaultAvailableSource();
+    public IDatabaseService getService(String name) {
+        if (IsSingleSource()) return getDefaultService();
         return getSources().stream().filter(ds -> ds.getName().equalsIgnoreCase(name)).findFirst().orElse(null);
     }
-    public IStoredDataSource getSourceByEntity(String className) {
-        if (IsSingleSource()) return getDefaultAvailableSource();
+    public IDatabaseService getServiceByEntity(String className) {
+        if (IsSingleSource()) return getDefaultService();
         return getSources().stream().filter(ds -> ds.getEntities().stream().anyMatch(e -> e.getClassName().equals(className))).findFirst().orElse(null);
     }
-    public IStoredDataSource getSourceByEntity(Class<?> entity) {
-        return getSourceByEntity(entity.getName());
+    public IDatabaseService getServiceByEntity(Class<?> entity) {
+        return getServiceByEntity(entity.getName());
     }
 
-    public IStoredDataSource getDefaultAvailableSource() {
-        return getSources().stream().filter(IStoredDataSource::isDefault).findFirst().orElse(null);
-    }
     public IDatabaseService getDefaultService() {
-        return getDefaultAvailableSource().getService();
+        return getSources().stream().filter(IDatabaseService::isDefault).findFirst().orElse(null);
     }
 
 
 
     // ====== SHORT CUTS ======
 
-    public <T> Optional<T> getByIdWithJoins(Class<T> clazz, Object... id) {
-        return getService(clazz).getByIdWithJoins(clazz, id);
-    }
     public <T> Optional<T> getById(String select, Class<T> clazz, Object... id) {
-        return getService(clazz).getById(select, clazz, id);
+        return getServiceByEntity(clazz).getById(select, clazz, id);
     }
     public <T> Optional<T> getById(Class<T> clazz, Object... id) {
-        return getService(clazz).getById(clazz, id);
+        return getServiceByEntity(clazz).getById(clazz, id);
     }
 
-    public <T> Optional<T> getWhereWithJoins(Class<T> clazz, String whereClause, Object... args) {
-        return getService(clazz).getWhereWithJoins(clazz, whereClause, args);
-    }
     public <T> Optional<T> getWhere(String select, Class<T> clazz, String whereClause, Object... args) {
-        return getService(clazz).getWhere(select, clazz, whereClause, args);
+        return getServiceByEntity(clazz).getWhere(select, clazz, whereClause, args);
     }
     public <T> Optional<T> getWhere(Class<T> clazz, String whereClause, Object... args) {
-        return getService(clazz).getWhere(clazz, whereClause, args);
+        return getServiceByEntity(clazz).getWhere(clazz, whereClause, args);
     }
 
     public <T> List<T> getAll(String select, Class<T> clazz) {
-        return getService(clazz).getAll(select, clazz);
+        return getServiceByEntity(clazz).getAll(select, clazz);
     }
     public <T> List<T> getAll(Class<T> clazz) {
-        return getService(clazz).getAll(clazz);
+        return getServiceByEntity(clazz).getAll(clazz);
     }
     public <T> List<T> getAllWhere(String select, Class<T> clazz, String whereClause, Object... args) {
-        return getService(clazz).getAllWhere(select, clazz, whereClause, args);
+        return getServiceByEntity(clazz).getAllWhere(select, clazz, whereClause, args);
     }
     public <T> List<T> getAllWhere(Class<T> clazz, String whereClause, Object... args) {
-        return getService(clazz).getAllWhere(clazz, whereClause, args);
+        return getServiceByEntity(clazz).getAllWhere(clazz, whereClause, args);
     }
     public <T> Set<T> getAllWhereDistinct(String select, Class<T> clazz, String whereClause, Object... args) {
-        return getService(clazz).getAllWhereDistinct(select, clazz, whereClause, args);
+        return getServiceByEntity(clazz).getAllWhereDistinct(select, clazz, whereClause, args);
     }
     public <T> Set<T> getAllWhereDistinct(Class<T> clazz, String whereClause, Object... args) {
-        return getService(clazz).getAllWhereDistinct(clazz, whereClause, args);
+        return getServiceByEntity(clazz).getAllWhereDistinct(clazz, whereClause, args);
     }
 
     public <T> int Count(Class<T> clazz) {
-        return getService(clazz).Count(clazz);
+        return getServiceByEntity(clazz).Count(clazz);
     }
     public <T> int Count(Class<T> clazz, String whereClause, Object... args) {
-        return getService(clazz).Count(clazz, whereClause, args);
+        return getServiceByEntity(clazz).Count(clazz, whereClause, args);
     }
 
     public <T> T getRandom(String select, Class<T> clazz) {
-        return getService(clazz).getRandom(select, clazz);
+        return getServiceByEntity(clazz).getRandom(select, clazz);
     }
     public <T> T getRandom(Class<T> clazz) {
-        return getService(clazz).getRandom(clazz);
+        return getServiceByEntity(clazz).getRandom(clazz);
     }
     public <T> T getRandom(String select, Class<T> clazz, String whereClause, Object... args) {
-        return getService(clazz).getRandom(select, clazz, whereClause, args);
+        return getServiceByEntity(clazz).getRandom(select, clazz, whereClause, args);
     }
     public <T> T getRandom(Class<T> clazz, String whereClause, Object... args) {
-        return getService(clazz).getRandom(clazz, whereClause, args);
+        return getServiceByEntity(clazz).getRandom(clazz, whereClause, args);
     }
 
     public void resetAllCaches() {
@@ -283,18 +251,18 @@ public class DatabaseManager implements IDatabaseManager {
         if (cache == null) return;
         com.github.benmanes.caffeine.cache.Cache<Object, Object> nativeCache = (com.github.benmanes.caffeine.cache.Cache<Object, Object>) cache.getNativeCache();
         nativeCache.asMap().forEach((key, cacheItem) -> {
-            if (cacheItem instanceof DatabaseObject<?> V) {
-                if (V.getService().getCacheHashes().contains(dbobject.getHashedIdentifier())) {
-                    copyObject(V, dbobject);
+            if (cacheItem instanceof Optional<?> optV && optV.isPresent() && optV.get() instanceof DatabaseObject<?> inCache) {
+                if (inCache.getHashedIdentifier().contains(dbobject.getHashedIdentifier())) {
+                    copyObject(inCache, dbobject);
                 }
-            } else if (cacheItem instanceof List<?> V2) { // If the item cached is a list
-                if (V2.isEmpty()) cache.evict(key);
-                else if (V2.getFirst() instanceof DatabaseObject<?>) { // Check if the datatype of the cache list is the same as the current item
-                    Object found = V2.stream().filter(dbo -> ((DatabaseObject<?>)dbo).getService().getCacheHashes().contains(dbobject.getHashedIdentifier())).findFirst().orElseGet(() -> {
-                        cache.evict(key);
-                        return null;
-                    });
-                    if (found != null) copyObject(found, dbobject);
+            } else if (cacheItem instanceof Collection<?> itemList) {
+                if (itemList.isEmpty()) cache.evict(key);
+                for (Object element : itemList) {
+                    if (element instanceof DatabaseObject<?> inCache) {
+                        if (inCache.getHashedIdentifier().contains(dbobject.getHashedIdentifier())) {
+                            copyObject(inCache, dbobject);
+                        }
+                    }
                 }
             }
         });
@@ -317,9 +285,9 @@ public class DatabaseManager implements IDatabaseManager {
     @Cacheable(value = "DBData", key = "'ALLDBSTATISTICS'", unless = "#result == null", cacheManager = "databaseCacheManager")
     public DatabaseStats getAllDatabaseStats() {
         DatabaseStats full = new DatabaseStats();
-        for (IStoredDataSource ds : getSources()) {
+        for (IDatabaseService ds : getSources()) {
             try {
-                DatabaseStats stats = ds.getService().getDatabaseStats();
+                DatabaseStats stats = ds.getDatabaseStats();
                 full.totalRows += stats.totalRows;
                 full.totalTables += stats.totalTables;
                 full.totalViews += stats.totalViews;
@@ -333,7 +301,7 @@ public class DatabaseManager implements IDatabaseManager {
         return full;
     }
     public <T> TableStats getTableStats(Class<T> clazz) {
-        return getService(clazz).getTableStats(getTableName(clazz));
+        return getServiceByEntity(clazz).getTableStats(getTableName(clazz));
     }
 
     public void setEntityClassLoaders(Map<String, ClassLoader> entityClassloaders) {
@@ -371,23 +339,24 @@ public class DatabaseManager implements IDatabaseManager {
 
     public void LoadFromFile(String path) {
         DataSourceFile db = DataSourceFile.ReadFrom(path);
-        List<StoredDataSource> readSources = db.getSources();
+        List<DatabaseService> readSources = db.getSources();
         if (readSources.isEmpty()) {
             readSources = new DataSourceFile(this).WriteTo(path).getSources();
             log.warn("No database sources found, re-creating source file using default sources.");
         }
-        if (readSources.stream().filter(IStoredDataSource::isDefault).count() != 1) {
+        if (readSources.stream().filter(IDatabaseService::isDefault).count() != 1) {
             readSources = new DataSourceFile(this).WriteTo(path).getSources();
             log.warn("None or multiple default database sources found, re-creating source file using default sources.");
         }
 
-        StoredDataSource defaultSource = readSources.stream().filter(IStoredDataSource::isDefault).findFirst().orElseThrow();
-        List<StoredDataSource> otherSources = readSources.stream().filter((IStoredDataSource s) -> !s.isDefault()).toList();
+        DatabaseService defaultSource = readSources.stream().filter(IDatabaseService::isDefault).findFirst().orElseThrow();
+        List<DatabaseService> otherSources = readSources.stream().filter((IDatabaseService s) -> !s.isDefault()).toList();
 
-        getDefaultAvailableSource().setEntities(defaultSource.getEntities());
-        getSources().removeIf(ds -> !ds.isDefault());
-        for (StoredDataSource ds : otherSources) {
+        getDefaultService().setEntities(defaultSource.getEntities());
+        removeNonDefaultSources();
+        for (DatabaseService ds : otherSources) {
             ds.setManager(this);
+            ds.setDbCacheManager(dbCacheManager);
             addSource(ds);
         }
 
@@ -397,7 +366,7 @@ public class DatabaseManager implements IDatabaseManager {
     public void SaveAsFile(String path) {
         if (getSources().isEmpty()) {
             log.error("Failed to write data source file, no database sources found.");
-        } else if (getSources().stream().filter(IStoredDataSource::isDefault).count() != 1) {
+        } else if (getSources().stream().filter(IDatabaseService::isDefault).count() != 1) {
             log.warn("Failed to write data source file, none or multiple default database sources found.");
         } else {
             new DataSourceFile(this).WriteTo(path);
@@ -406,14 +375,14 @@ public class DatabaseManager implements IDatabaseManager {
 
 
     protected static class DataSourceFile extends JSONItem<DataSourceFile> {
-        private final List<StoredDataSource> sources = new ArrayList<>();
+        private final List<DatabaseService> sources = new ArrayList<>();
         public DataSourceFile(IDatabaseManager manager) {
-            for (IStoredDataSource ds : manager.getSources()) {
-                sources.add((StoredDataSource) ds);
+            for (IDatabaseService ds : manager.getSources()) {
+                sources.add((DatabaseService) ds);
             }
         }
 
-        public List<StoredDataSource> getSources() {
+        public List<DatabaseService> getSources() {
             return sources;
         }
         public DataSourceFile WriteTo(String path) {
@@ -434,5 +403,125 @@ public class DatabaseManager implements IDatabaseManager {
             }
             return db;
         }
+    }
+
+
+
+
+    private static final int BATCH = 500;
+
+    /**
+     * Migrates a single entity's table from the old source to the new one.
+     *
+     * @return number of rows copied
+     * @throws DataMigrationException if the copy fails; target changes for this table are rolled back
+     */
+    public long migrate(IDatabaseService ioldSource, IDatabaseService inewSource, IEntityInfo entity) throws DataMigrationException {
+        DatabaseService oldSource = (DatabaseService) ioldSource;
+        DatabaseService newSource = (DatabaseService) inewSource;
+        var stats = entity.getTableStats();
+        String table = stats.getTableName();
+        try {
+            List<String> cols = stats.getColumnNames();
+            List<String> pks = stats.getColumnDetails().stream().filter(TableStats.ColumnDetail::isPrimaryKey).map(TableStats.ColumnDetail::getName).toList();
+            String orderBy = String.join(", ", pks.isEmpty() ? cols : pks);
+            String colList = String.join(", ", cols);
+            String select = "SELECT " + colList + " FROM " + table + " ORDER BY " + orderBy + " LIMIT ? OFFSET ?";
+            String insert = "INSERT INTO " + table + " (" + colList + ") VALUES ("
+                    + cols.stream().map(c -> "?").collect(Collectors.joining(", ")) + ")";
+
+            JdbcTemplate from = oldSource.getJdbcTemplate();
+            JdbcTemplate to = newSource.getJdbcTemplate();
+
+            log.info("Migrating table '{}' ({} -> {})", table, oldSource.getName(), newSource.getName());
+            Long copied = newSource.getTransactionTemplate().execute(status -> {
+                long offset = 0;
+                List<Map<String, Object>> rows;
+                do {
+                    rows = from.queryForList(select, BATCH, offset);
+                    if (!rows.isEmpty()) {
+                        Set<String> temporal = entity.getTableStats().getTimeColumns();
+                        to.batchUpdate(insert, rows, BATCH, (ps, row) -> {
+                            int i = 1;
+                            for (String c : cols) {
+                                Object v = row.get(c);
+                                ps.setObject(i++, temporal.contains(c.toLowerCase()) ? normalize(v) : v);
+                            }
+                        });
+                    }
+
+                    offset += rows.size();
+                } while (rows.size() == BATCH);
+                return offset;
+            });
+            log.info("Migrated {} rows of '{}'", copied, table);
+            return copied != null ? copied : 0;
+        } catch (Exception ex) {
+            log.error("Migration failed for table '{}', target rolled back", table, ex);
+            throw new DataMigrationException(table, ex);
+        } finally {
+            oldSource.close();
+            newSource.close();
+        }
+    }
+
+    /**
+     * Migrates several entities, parents first so foreign key constraints hold.
+     * Stops at the first failure; already-migrated tables remain on the target.
+     *
+     * @return classNames of successfully migrated entities
+     */
+    public List<String> migrate(IDatabaseService oldSource, IDatabaseService newSource, Collection<IEntityInfo> entities) throws DataMigrationException {
+        List<String> migrated = new ArrayList<>();
+        for (IEntityInfo entity : insertOrder(entities)) {
+            migrate(oldSource, newSource, entity);
+            migrated.add(entity.getClassName());
+        }
+        return migrated;
+    }
+
+    /** Orders entities so ManyToOne/OneToOne targets are inserted before their dependents. */
+    private List<IEntityInfo> insertOrder(Collection<IEntityInfo> entities) {
+        Map<String, IEntityInfo> byName = new HashMap<>();
+        for (IEntityInfo e : entities) byName.put(e.getClassName(), e);
+        List<IEntityInfo> ordered = new ArrayList<>();
+        Set<String> done = new HashSet<>();
+        for (IEntityInfo e : entities) visit(e, byName, done, ordered, new HashSet<>());
+        return ordered;
+    }
+
+    private void visit(IEntityInfo e, Map<String, IEntityInfo> byName, Set<String> done, List<IEntityInfo> out, Set<String> path) {
+        if (done.contains(e.getClassName()) || !path.add(e.getClassName())) return; // path guard breaks cycles
+        for (IEntityInfo.Relation r : e.getRelations()) {
+            IEntityInfo dep = byName.get(r.getForeignClassName());
+            if (dep != null && ("ManyToOne".equals(r.getRelationType()) || "OneToOne".equals(r.getRelationType())))
+                visit(dep, byName, done, out, path);
+        }
+        done.add(e.getClassName());
+        out.add(e);
+    }
+
+
+    private static Object normalize(Object v) {
+        return switch (v) {
+            case null -> null;
+            case java.time.Instant i -> java.sql.Timestamp.from(i);
+            case java.time.OffsetDateTime o -> java.sql.Timestamp.from(o.toInstant());
+            case java.time.ZonedDateTime z -> java.sql.Timestamp.from(z.toInstant());
+            case java.time.LocalDateTime l -> java.sql.Timestamp.valueOf(l);
+            case java.time.LocalDate d -> java.sql.Date.valueOf(d);          // DATE columns
+            case java.time.LocalTime t -> java.sql.Time.valueOf(t);          // TIME columns
+            case Long epoch -> new java.sql.Timestamp(epoch);                // SQLite INTEGER storage
+            case String s -> parseTemporal(s);
+            default -> v;
+        };
+    }
+    private static Object parseTemporal(String s) {
+        try { return java.sql.Timestamp.from(java.time.Instant.parse(s)); }                    // ...Z
+        catch (Exception e1) { /* fall through */ }
+        try { return java.sql.Timestamp.valueOf(java.time.LocalDateTime.parse(s)); }           // ISO, no zone
+        catch (Exception e2) { /* fall through */ }
+        try { return java.sql.Timestamp.valueOf(s); }                                          // "2026-07-04 00:22:08"
+        catch (Exception e3) { return s; }                                                     // let the driver decide
     }
 }

@@ -1,32 +1,38 @@
 package org.solarframework.json;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.gson.*;
+import jakarta.persistence.*;
 
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Serializable;
-import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
-    public static final Gson GSON = new GsonBuilder()
+    public static final Gson SimpleGSON = new GsonBuilder()
             .registerTypeAdapter(LocalDate.class, new LocalDateAdapter())
             .registerTypeAdapter(LocalTime.class, new LocalTimeAdapter())
             .registerTypeAdapter(LocalDateTime.class, new LocalDateTimeAdapter())
             .registerTypeAdapter(OffsetDateTime.class, new OffsetDateTimeAdapter())
             .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeAdapter())
             .registerTypeAdapter(Instant.class, new InstantAdapter())
+            .setExclusionStrategies(new ExclusionStrategy() {
+                @Override public boolean shouldSkipField(FieldAttributes f) {
+                    return f.getAnnotation(Transient.class) != null || f.getAnnotation(JsonIgnore.class) != null;
+                }
+                @Override public boolean shouldSkipClass(Class<?> c) {
+                    return c.getName().contains("HibernateProxy");
+                }
+            })
             .setPrettyPrinting()
             .create();
 
-    private static class LocalDateAdapter implements JsonSerializer<LocalDate>, JsonDeserializer<LocalDate> {
+    public static class LocalDateAdapter implements JsonSerializer<LocalDate>, JsonDeserializer<LocalDate> {
         private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE;
 
         @Override
@@ -44,7 +50,7 @@ public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
         }
     }
 
-    private static class LocalTimeAdapter implements JsonSerializer<LocalTime>, JsonDeserializer<LocalTime> {
+    public static class LocalTimeAdapter implements JsonSerializer<LocalTime>, JsonDeserializer<LocalTime> {
         private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_LOCAL_TIME;
 
         @Override
@@ -62,7 +68,7 @@ public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
         }
     }
 
-    private static class LocalDateTimeAdapter implements JsonSerializer<LocalDateTime>, JsonDeserializer<LocalDateTime> {
+    public static class LocalDateTimeAdapter implements JsonSerializer<LocalDateTime>, JsonDeserializer<LocalDateTime> {
         private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
         @Override
@@ -84,7 +90,7 @@ public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
         }
     }
 
-    private static class OffsetDateTimeAdapter implements JsonSerializer<OffsetDateTime>, JsonDeserializer<OffsetDateTime> {
+    public static class OffsetDateTimeAdapter implements JsonSerializer<OffsetDateTime>, JsonDeserializer<OffsetDateTime> {
         private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
         @Override
@@ -103,7 +109,7 @@ public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
         }
     }
 
-    private static class ZonedDateTimeAdapter implements JsonSerializer<ZonedDateTime>, JsonDeserializer<ZonedDateTime> {
+    public static class ZonedDateTimeAdapter implements JsonSerializer<ZonedDateTime>, JsonDeserializer<ZonedDateTime> {
         private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_ZONED_DATE_TIME;
 
         @Override
@@ -121,7 +127,7 @@ public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
         }
     }
 
-    private static class InstantAdapter implements JsonSerializer<Instant>, JsonDeserializer<Instant> {
+    public static class InstantAdapter implements JsonSerializer<Instant>, JsonDeserializer<Instant> {
         @Override
         public JsonElement serialize(Instant src, Type typeOfSrc, JsonSerializationContext context) {
             return src == null ? JsonNull.INSTANCE : new JsonPrimitive(src.toString());
@@ -140,7 +146,7 @@ public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
 
     public T WriteJSON(String filePath) {
         try (FileWriter writer = new FileWriter(filePath, StandardCharsets.UTF_8)) {
-            GSON.toJson(this, writer);
+            SimpleGSON.toJson(this, writer);
             return (T) this;
         } catch (Exception e) {
             return null;
@@ -149,7 +155,7 @@ public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
 
     public static <A> A ReadJSON(String filePath, Class<A> clazz) {
         try (FileReader reader = new FileReader(filePath, StandardCharsets.UTF_8)) {
-            return GSON.fromJson(reader, clazz);
+            return SimpleGSON.fromJson(reader, clazz);
         } catch (IOException e) {
             return null;
         }

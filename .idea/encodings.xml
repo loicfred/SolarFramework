@@ -12,6 +12,7 @@
     <file url="file://$PROJECT_DIR$/core-modules/DatabaseAPI/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/DatabaseCommon/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/DatabaseImpl/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/core-modules/DatabaseImplV2/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/Excel/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/Excels/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/JSON/src/main/java" charset="UTF-8" />

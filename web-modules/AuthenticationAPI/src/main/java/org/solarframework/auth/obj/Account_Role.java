@@ -4,26 +4,25 @@ import jakarta.persistence.*;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.Set;
-import java.util.function.Supplier;
 
 @Entity
 @Table(name = "account_role")
 public class Account_Role extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Role> {
 
-    @ManyToMany
+    @OneToMany(mappedBy = "role", fetch = FetchType.LAZY)
+    private Set<Account_User> users;
+
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(name = "account_role_to_permission",
             joinColumns = @JoinColumn(name = "RoleID"),
             inverseJoinColumns = @JoinColumn(name = "PermissionID")
     )
-    private transient Set<Account_Permission> permissions;
+    private Set<Account_Permission> permissions;
 
 
     @Column(name = "Name", nullable = false, length = 50)
     private String name;
-    @Column(name = "AccessLevel", nullable = false)
-    private Integer accessLevel = 0;
 
     public String getName() {
         return name;
@@ -32,23 +31,13 @@ public class Account_Role extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Rol
         this.name = name;
     }
 
-    public Integer getAccessLevel() {
-        return accessLevel;
-    }
-    public void setAccessLevel(Integer access_level) {
-        this.accessLevel = access_level;
-    }
-
     protected Account_Role() {}
-    public Account_Role(Long ID, String name, Integer accessLevel) {
+    public Account_Role(Long ID, String name) {
         this.ID = ID;
         this.name = name;
-        this.accessLevel = accessLevel;
     }
-    public Account_Role(String name, Integer accessLevel) {
-        this.ID = Instant.now().toEpochMilli();
-        this.name = name;
-        this.accessLevel = accessLevel;
+    public Account_Role(String name) {
+        this(Instant.now().toEpochMilli(), name);
     }
 
     public Set<Account_Permission> getPermissions() {

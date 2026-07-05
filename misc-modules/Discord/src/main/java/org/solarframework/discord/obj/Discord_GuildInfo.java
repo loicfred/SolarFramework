@@ -26,15 +26,14 @@ import static org.solarframework.discord.lang.L10N.SYSLG;
 public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_GuildInfo> {
     private transient Guild Guild;
 
-    @OneToMany
-    @JoinColumn(referencedColumnName = "ID", name = "ServerID")
-    private transient List<Discord_RoleInfo> Roles;
-    @OneToMany
-    @JoinColumn(referencedColumnName = "ID", name = "ServerID")
-    private transient List<Discord_ChannelInfo> Channels;
-    @OneToMany
-    @JoinColumn(referencedColumnName = "ID", name = "ServerID")
-    private transient List<Discord_GuildVariable> Variables;
+    @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Discord_RoleInfo> Roles;
+    @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Discord_ChannelInfo> Channels;
+    @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Discord_MessageInfo> Messages;
+    @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Discord_GuildVariable> Variables;
 
     private transient Object extender;
 

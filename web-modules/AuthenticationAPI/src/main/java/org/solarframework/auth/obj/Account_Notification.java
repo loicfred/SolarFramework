@@ -1,8 +1,7 @@
 package org.solarframework.auth.obj;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Table;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
@@ -11,6 +10,10 @@ import java.util.List;
 @Entity
 @Table(name = "account_notification")
 public class Account_Notification extends DatabaseObject.ID_OBJ<Long, Account_Notification> {
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "UserID", referencedColumnName = "ID", nullable = false, insertable = false, updatable = false)
+    private Account_User user;
 
     @Column(name = "UserID", nullable = false)
     public Long userID;

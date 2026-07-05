@@ -21,6 +21,14 @@ import static org.solarframework.discord.utils.WebhookUtils.getWebhookOfChannel;
 @Table(name = "discord_messageinfo")
 @IdClass(ActionServerID.class)
 public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
+    @ManyToOne
+    @JoinColumn(referencedColumnName = "Action", name = "ChannelAction", nullable = false, insertable = false, updatable = false)
+    private Discord_ChannelInfo DCI;
+
+    @ManyToOne
+    @JoinColumn(referencedColumnName = "ID", name = "ServerID", nullable = false, insertable = false, updatable = false)
+    private Discord_GuildInfo DGI;
+
     private transient Guild Guild;
     private transient StandardGuildMessageChannel C = null;
     private transient Message M = null;

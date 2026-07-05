@@ -4,8 +4,8 @@ import jakarta.persistence.*;
 import org.solarframework.db.api.dto.TableStats;
 
 import java.lang.reflect.Field;
-import java.util.HashSet;
-import java.util.Set;
+import java.lang.reflect.ParameterizedType;
+import java.util.*;
 
 public class IEntityInfo {
     protected String className;
@@ -87,8 +87,12 @@ public class IEntityInfo {
 
         public Relation(Field f) {
             variableName = f.getName();
-            foreignClassName = f.getAnnotation(ManyToOne.class) != null ? "ManyToOne" : f.getAnnotation(OneToMany.class) != null ? "OneToMany" : f.getAnnotation(OneToOne.class) != null ? "OneToOne" : f.getAnnotation(ManyToMany.class) != null ? "ManyToMany" : f.getType().getName();
             relationType = f.getAnnotation(ManyToOne.class) != null ? "ManyToOne" : f.getAnnotation(OneToMany.class) != null ? "OneToMany" : f.getAnnotation(OneToOne.class) != null ? "OneToOne" : "ManyToMany";
+            if (Collection.class.isAssignableFrom(f.getType()) && f.getGenericType() instanceof ParameterizedType pt) {
+                this.foreignClassName = pt.getActualTypeArguments()[0].getTypeName();
+            } else {
+                this.foreignClassName = f.getType().getName();
+            }
         }
 
         public String getVariableName() {
@@ -100,5 +104,42 @@ public class IEntityInfo {
         public String getRelationType() {
             return relationType;
         }
+    }
+
+
+    public static List<IEntityInfo> sortByDependency(Collection<IEntityInfo> entities) {
+        Map<String, IEntityInfo> byName = new HashMap<>();
+        entities.forEach(e -> byName.put(e.getClassName(), e));
+
+        Map<String, Set<String>> deps = new HashMap<>();
+        Map<String, Set<String>> dependents = new HashMap<>();
+        for (IEntityInfo e : entities) {
+            Set<String> d = new HashSet<>();
+            for (IEntityInfo.Relation r : e.getRelations())
+                if (("ManyToOne".equals(r.getRelationType()) || "OneToOne".equals(r.getRelationType()))
+                        && byName.containsKey(r.getForeignClassName())
+                        && !r.getForeignClassName().equals(e.getClassName())) // ignore self-reference
+                    d.add(r.getForeignClassName());
+            deps.put(e.getClassName(), d);
+            d.forEach(t -> dependents.computeIfAbsent(t, k -> new HashSet<>()).add(e.getClassName()));
+        }
+
+        PriorityQueue<String> ready = new PriorityQueue<>();
+        deps.forEach((name, d) -> { if (d.isEmpty()) ready.add(name); });
+
+        List<IEntityInfo> sorted = new ArrayList<>(entities.size());
+        while (!ready.isEmpty()) {
+            String name = ready.poll();
+            sorted.add(byName.get(name));
+            for (String dep : dependents.getOrDefault(name, Set.of())) {
+                Set<String> remaining = deps.get(dep);
+                remaining.remove(name);
+                if (remaining.isEmpty()) ready.add(dep);
+            }
+        }
+
+        if (sorted.size() < entities.size()) entities.stream().filter(e -> !sorted.contains(e)).forEach(sorted::add);
+
+        return sorted;
     }
 }

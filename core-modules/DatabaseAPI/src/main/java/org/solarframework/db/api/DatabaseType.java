@@ -1,7 +1,9 @@
 package org.solarframework.db.api;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public enum DatabaseType {
 
@@ -262,6 +264,13 @@ public enum DatabaseType {
     public String Upsert(String table, String columns, String questionMarks, String duplicateKeyUpdateClause, String conflictColumn) {
         return switch (this) {
             case MYSQL, MARIADB -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON DUPLICATE KEY UPDATE " + duplicateKeyUpdateClause : "");
+            case POSTGRESQL, SQLITE, H2, COCKROACHDB  -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON CONFLICT" + (conflictColumn != null ? "(" + conflictColumn + ")" : "") + " DO UPDATE SET " + duplicateKeyUpdateClause : "");
+            default -> throw new UnsupportedOperationException(name() + " does not support UPSERT");
+        };
+    }
+    public String UpsertBatch(String table, String columns, List<String> questionMarks, String duplicateKeyUpdateClause, String conflictColumn) {
+        return switch (this) {
+            case MYSQL, MARIADB -> "INSERT INTO " + table + " (" + columns + ") VALUES " + questionMarks.stream().map(s -> "(" + s + ")").collect(Collectors.joining(",")) + (duplicateKeyUpdateClause != null ? " ON DUPLICATE KEY UPDATE " + duplicateKeyUpdateClause : "");
             case POSTGRESQL, SQLITE, H2, COCKROACHDB  -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON CONFLICT" + (conflictColumn != null ? "(" + conflictColumn + ")" : "") + " DO UPDATE SET " + duplicateKeyUpdateClause : "");
             default -> throw new UnsupportedOperationException(name() + " does not support UPSERT");
         };

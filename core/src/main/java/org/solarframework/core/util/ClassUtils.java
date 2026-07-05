@@ -1,5 +1,6 @@
 package org.solarframework.core.util;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
@@ -33,6 +34,12 @@ public class ClassUtils {
     }
     public static List<Field> getSerializableFieldsOfClassFamily(Class<?> clazz) {
         return getAllFieldsOfClassFamily(clazz).stream().filter(f -> !Modifier.isTransient(f.getModifiers()) && !Modifier.isStatic(f.getModifiers()) && !f.getType().equals(byte[].class) && !f.getType().equals(Byte[].class)).toList();
+    }
+    public static List<Field> getFieldsWithAnnotation(Class<?> clazz, Class<? extends Annotation> annotationClass) {
+        return getAllFieldsOfClassFamily(clazz).stream().filter(f -> f.getAnnotation(annotationClass) != null).toList();
+    }
+    public static Field findFieldInClassFamily(Class<?> clazz, String fieldName) {
+        return getAllFieldsOfClassFamily(clazz).stream().filter(f -> f.getName().equals(fieldName)).findFirst().orElse(null);
     }
 
     public static boolean isClassRelated(Object obj, Object obj2) {

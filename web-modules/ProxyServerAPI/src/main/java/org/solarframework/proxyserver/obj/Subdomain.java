@@ -1,14 +1,13 @@
 package org.solarframework.proxyserver.obj;
 
 import jakarta.persistence.*;
-import org.springframework.http.HttpHeaders;
 
 @Entity
 @Table(name = "web_subdomain")
 public class Subdomain extends BaseDomain<Subdomain> {
-    @ManyToOne
-    @JoinColumn(referencedColumnName = "ID", name = "DomainID")
-    private transient Domain rootDomain;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(referencedColumnName = "ID", name = "DomainID", nullable = false, insertable = false, updatable = false)
+    private Domain rootDomain;
 
     @Column(name = "DomainID", nullable = false)
     private Long domainId;
