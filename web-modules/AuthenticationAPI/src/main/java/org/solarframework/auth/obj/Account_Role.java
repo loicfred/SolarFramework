@@ -8,7 +8,7 @@ import java.util.Set;
 
 @Entity
 @Table(name = "account_role")
-public class Account_Role extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Role> {
+public class Account_Role extends DatabaseObject.ID_RECORD_OBJ<Long, Account_Role> {
 
     @OneToMany(mappedBy = "role", fetch = FetchType.LAZY)
     private Set<Account_User> users;

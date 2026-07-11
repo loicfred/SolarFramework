@@ -264,14 +264,21 @@ public enum DatabaseType {
     public String Upsert(String table, String columns, String questionMarks, String duplicateKeyUpdateClause, String conflictColumn) {
         return switch (this) {
             case MYSQL, MARIADB -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON DUPLICATE KEY UPDATE " + duplicateKeyUpdateClause : "");
-            case POSTGRESQL, SQLITE, H2, COCKROACHDB  -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON CONFLICT" + (conflictColumn != null ? "(" + conflictColumn + ")" : "") + " DO UPDATE SET " + duplicateKeyUpdateClause : "");
+            case POSTGRESQL, SQLITE, COCKROACHDB  -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON CONFLICT" + (conflictColumn != null ? "(" + conflictColumn + ")" : "") + " DO UPDATE SET " + duplicateKeyUpdateClause : "");
+            // H2 has no ON CONFLICT / ON DUPLICATE KEY in Regular mode; its upsert is MERGE (primary key implied when KEY() is omitted).
+            case H2 -> duplicateKeyUpdateClause == null
+                    ? "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")"
+                    : "MERGE INTO " + table + " (" + columns + ")" + (conflictColumn != null ? " KEY(" + conflictColumn + ")" : "") + " VALUES (" + questionMarks + ")";
             default -> throw new UnsupportedOperationException(name() + " does not support UPSERT");
         };
     }
     public String UpsertBatch(String table, String columns, List<String> questionMarks, String duplicateKeyUpdateClause, String conflictColumn) {
         return switch (this) {
             case MYSQL, MARIADB -> "INSERT INTO " + table + " (" + columns + ") VALUES " + questionMarks.stream().map(s -> "(" + s + ")").collect(Collectors.joining(",")) + (duplicateKeyUpdateClause != null ? " ON DUPLICATE KEY UPDATE " + duplicateKeyUpdateClause : "");
-            case POSTGRESQL, SQLITE, H2, COCKROACHDB  -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON CONFLICT" + (conflictColumn != null ? "(" + conflictColumn + ")" : "") + " DO UPDATE SET " + duplicateKeyUpdateClause : "");
+            case POSTGRESQL, SQLITE, COCKROACHDB  -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON CONFLICT" + (conflictColumn != null ? "(" + conflictColumn + ")" : "") + " DO UPDATE SET " + duplicateKeyUpdateClause : "");
+            case H2 -> (duplicateKeyUpdateClause == null ? "INSERT" : "MERGE") + " INTO " + table + " (" + columns + ")"
+                    + (duplicateKeyUpdateClause != null && conflictColumn != null ? " KEY(" + conflictColumn + ")" : "")
+                    + " VALUES " + questionMarks.stream().map(s -> "(" + s + ")").collect(Collectors.joining(","));
             default -> throw new UnsupportedOperationException(name() + " does not support UPSERT");
         };
     }

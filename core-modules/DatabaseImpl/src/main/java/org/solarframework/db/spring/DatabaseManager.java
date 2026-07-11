@@ -4,6 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.solarframework.db.api.*;
@@ -21,11 +25,13 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.ClassUtils.copyObject;
+import static org.solarframework.core.util.ClassUtils.getGenericOf;
 import static org.solarframework.core.util.ClassUtils.isClassRelated;
 import static org.solarframework.db.spring.DBInstanceService.*;
 import static org.solarframework.db.spring.DatabaseObject.*;
@@ -79,13 +85,6 @@ public class DatabaseManager implements IDatabaseManager {
             } else {
                 for (IDatabaseService ds : getSources()) {
                     ds.reload();
-                    for (IEntityInfo EI : ds.getEntities()) {
-                        entityClassloaders.entrySet().stream().filter(cl -> Objects.equals(cl.getKey(), EI.getClassLoader())).findFirst().ifPresent((cl) -> {
-                            try {
-                                EI.Update(cl.getValue().loadClass(EI.getClassName()));
-                            } catch (ClassNotFoundException _) {}
-                        });
-                    }
                 }
             }
             scanBundleContainers();
@@ -114,10 +113,7 @@ public class DatabaseManager implements IDatabaseManager {
                     log.warn("Entity [{}] is registered for [{}] but needs to be updated.", C.getName(), ds.getName());
                 } else {
                     log.info("Entity [{}] is registered for [{}].", C.getName(), ds.getName());
-
-                    for (Object item : bundleObjects.stream().filter(bo -> bo.getClass() == C).toList())
-                        if (item instanceof DatabaseObject<?> i)
-                            i.Upsert();
+                    RegisterBundleObjects(C);
                 }
             } else {
                 log.error("Entity class [{}] is NOT CHILD of DatabaseObject<>.", C.getName());
@@ -126,6 +122,12 @@ public class DatabaseManager implements IDatabaseManager {
             e.printStackTrace();
             log.error("{} does not have a default constructor.", C.getName());
         }
+    }
+
+    public void RegisterBundleObjects(Class<?> C) {
+        for (Object item : bundleObjects.stream().filter(bo -> bo.getClass() == C).toList())
+            if (item instanceof DatabaseObject<?> i)
+                i.Upsert();
     }
 
     public IDatabaseService makeNewSource(Set<IEntityInfo> entities) {
@@ -149,7 +151,7 @@ public class DatabaseManager implements IDatabaseManager {
     }
     public boolean removeNonDefaultSources() {
         return getSources().removeIf(ds -> {
-            if (!ds.isDefault()) ds.close();
+            if (!ds.isDefault()) ds.reload();
             return !ds.isDefault();
         });
     }
@@ -272,14 +274,43 @@ public class DatabaseManager implements IDatabaseManager {
         if (cache == null || (!items && !lists)) return;
         com.github.benmanes.caffeine.cache.Cache<Object, Object> nativeCache = (com.github.benmanes.caffeine.cache.Cache<Object, Object>) cache.getNativeCache();
         nativeCache.asMap().forEach((key, cacheItem) -> {
-            if (items && cacheItem instanceof DatabaseObject<?> V && isClassRelated(V, dbClazz)) {
+            // Single results are cached wrapped in Optional (see DatabaseService.doQuery); unwrap before matching.
+            Object value = cacheItem instanceof Optional<?> opt ? opt.orElse(null) : cacheItem;
+            if (value == null) { // cached empty result: the write may have created a row that now matches
                 cache.evict(key);
-            } else if (lists && cacheItem instanceof List<?> V2) { // If the item cached is a list
-                if (!V2.isEmpty() && V2.getFirst() instanceof DatabaseObject<?> V3 && isClassRelated(V3, dbClazz)) { // Check if the datatype of the cache list is the same as the current item
+            } else if (value instanceof Collection<?> col) {
+                if (lists && (col.isEmpty() || col.stream().anyMatch(e -> isAffectedByChangeOf(e, dbClazz)))) {
                     cache.evict(key);
                 }
+            } else if (items && isAffectedByChangeOf(value, dbClazz)) {
+                cache.evict(key);
             }
         });
+    }
+
+    /**
+     * A cached object is stale after a write to {@code changed} when it is of that class itself,
+     * or when either side declares a mapped association to the other — loaded relations
+     * (e.g. User.orders) embed the other entity's rows inside the cached object.
+     * Non-entity values (scalars like COUNT results, Rows) cannot be attributed to a table,
+     * so they are evicted on any write.
+     */
+    private boolean isAffectedByChangeOf(Object cached, Class<?> changed) {
+        if (!(cached instanceof DatabaseObject<?>)) return true;
+        Class<?> cachedClass = cached.getClass();
+        return isClassRelated(cachedClass, changed) || hasRelationTo(cachedClass, changed) || hasRelationTo(changed, cachedClass);
+    }
+
+    private boolean hasRelationTo(Class<?> from, Class<?> to) {
+        for (Class<?> c = from; c != null && c != Object.class; c = c.getSuperclass()) {
+            for (Field f : c.getDeclaredFields()) {
+                if (!(f.isAnnotationPresent(OneToMany.class) || f.isAnnotationPresent(ManyToOne.class)
+                        || f.isAnnotationPresent(OneToOne.class) || f.isAnnotationPresent(ManyToMany.class))) continue;
+                Class<?> target = Collection.class.isAssignableFrom(f.getType()) ? getGenericOf(f, 0) : f.getType();
+                if (isClassRelated(target, to)) return true;
+            }
+        }
+        return false;
     }
 
     @Cacheable(value = "DBData", key = "'ALLDBSTATISTICS'", unless = "#result == null", cacheManager = "databaseCacheManager")
@@ -311,8 +342,8 @@ public class DatabaseManager implements IDatabaseManager {
     public void addEntityClassLoader(String name, ClassLoader entityClassloaders) {
         this.entityClassloaders.put(name, entityClassloaders);
     }
-    public Set<ClassLoader> getEntityClassloaders() {
-        return new HashSet<>(entityClassloaders.values());
+    public Map<String, ClassLoader> getEntityClassloaders() {
+        return entityClassloaders;
     }
     public ClassLoader getEntityClassloader(String key) {
         return entityClassloaders.get(key);
@@ -460,8 +491,8 @@ public class DatabaseManager implements IDatabaseManager {
             log.error("Migration failed for table '{}', target rolled back", table, ex);
             throw new DataMigrationException(table, ex);
         } finally {
-            oldSource.close();
-            newSource.close();
+            oldSource.reload();
+            newSource.reload();
         }
     }
 

@@ -3,6 +3,7 @@ package org.solarframework.auth.obj;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.solarframework.auth.obj.enums.EmailVerificationType;
+import org.solarframework.auth.obj.enums.UserStatus;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
@@ -20,9 +21,22 @@ public class Account_EmailVerification extends DatabaseObject.ID_OBJ<Long, Accou
     public Long userID;
     @Column(name = "Token", length = 128, nullable = false)
     public String token;
-    @Enumerated(EnumType.STRING)
+
+    @Convert(converter = TypeConverter.class)
     @Column(name = "Type", length = 32, nullable = false)
     public EmailVerificationType type;
+    @Converter
+    public static class TypeConverter implements AttributeConverter<EmailVerificationType, String> {
+        @Override
+        public String convertToDatabaseColumn(EmailVerificationType type) {
+            return type == null ? null : type.name();
+        }
+        @Override
+        public EmailVerificationType convertToEntityAttribute(String name) {
+            return name == null ? null : EmailVerificationType.valueOf(name);
+        }
+    }
+
     @Column(name = "ExpiryDate", nullable = false)
     public Long expiryDate = Instant.now().plus(24, ChronoUnit.HOURS).toEpochMilli();
 

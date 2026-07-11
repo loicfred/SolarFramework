@@ -16,6 +16,7 @@ public interface IDatabaseManager {
     void verifyEntities();
     void verifyEntity(IDatabaseService ds, Class<?> C);
 
+    void RegisterBundleObjects(Class<?> C);
 
     void createAllSchemasIfMissing();
 
@@ -87,7 +88,7 @@ public interface IDatabaseManager {
 
     void addEntityClassLoader(String name, ClassLoader entityClassloaders);
 
-    Set<ClassLoader> getEntityClassloaders();
+    Map<String, ClassLoader> getEntityClassloaders();
 
     ClassLoader getEntityClassloader(String key);
 

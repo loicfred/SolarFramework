@@ -8,7 +8,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "user")
-public class User extends DatabaseObject.ID_OBJ_RECORD<Long, User> {
+public class User extends DatabaseObject.ID_RECORD_OBJ<Long, User> {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     public List<Order> orders;

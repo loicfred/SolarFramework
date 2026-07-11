@@ -71,11 +71,9 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         try {
             InsertArgumentManager insertArgMgr = makeInsertManager(false);
             String sql = getType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), null, null);
-            return dbService.doUpdate(sql, insertArgMgr.currentValuesList());
+            return dbService.doUpdate(entityClass, sql, insertArgMgr.currentValuesList());
         } catch (Exception e) {
             throw new RuntimeException("Failed to write object", e);
-        } finally {
-            SolarDBManager.resetCacheFor(dbObject);
         }
     }
     @Override
@@ -87,7 +85,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         } catch (Exception e) {
             throw new RuntimeException("Failed to insert object", e);
         } finally {
-            SolarDBManager.resetCacheFor(dbObject);
+            SolarDBManager.resetCacheForClass(entityClass, true, true);
         }
     }
 
@@ -104,12 +102,10 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         try {
             InsertArgumentManager insertArgMgr = makeInsertManager(true);
             String sql = getType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), insertArgMgr.duplicateKeyUpdateClause(), conflictCols == null || conflictCols.isEmpty() ? null : conflictCols.stream().collect(Collectors.joining(", ")));
-            return dbService.doUpdate(sql, insertArgMgr.currentValuesList());
+            return dbService.doUpdate(entityClass, sql, insertArgMgr.currentValuesList());
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException("Failed to upsert object", e);
-        } finally {
-            SolarDBManager.resetCacheFor(dbObject);
         }
     }
     @Override
@@ -121,7 +117,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         } catch (Exception e) {
             throw new RuntimeException("Failed to upsert object", e);
         } finally {
-            SolarDBManager.resetCacheFor(dbObject);
+            SolarDBManager.resetCacheForClass(entityClass, true, true);
         }
     }
 
@@ -147,11 +143,9 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
             finalValues.addAll(whereValues);
 
             String sql = "UPDATE " + tableName + " SET " + setClause + " WHERE " + whereClause;
-            return dbService.doUpdate(sql, finalValues.toArray());
+            return dbService.doUpdate(entityClass, sql, finalValues.toArray());
         } catch (Exception e) {
             throw new RuntimeException("No ID field found in " + tableName + ".");
-        } finally {
-            SolarDBManager.resetCacheFor(dbObject);
         }
     }
     @Override
@@ -168,11 +162,9 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
             finalValues.addAll(whereValues);
 
             String sql = "UPDATE " + tableName + " SET " + setClause + " WHERE " + whereClause;
-            return dbService.doUpdate(sql, finalValues.toArray());
+            return dbService.doUpdate(entityClass, sql, finalValues.toArray());
         } catch (Exception e) {
             throw new RuntimeException("No ID field found in " + tableName + ".");
-        } finally {
-            SolarDBManager.resetCacheFor(dbObject);
         }
     }
 
@@ -191,12 +183,10 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
             finalValues.addAll(whereValues);
 
             String sql = "UPDATE " + tableName + " SET " + setClause + " WHERE " + whereClause;
-            return dbService.doUpdate(sql, finalValues.toArray());
+            return dbService.doUpdate(entityClass, sql, finalValues.toArray());
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException("No ID field found in " + tableName + ".");
-        } finally {
-            SolarDBManager.resetCacheFor(dbObject);
         }
     }
     @Override
@@ -216,11 +206,9 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
             finalValues.addAll(whereValues);
 
             String sql = "UPDATE " + tableName + " SET " + setClause + " WHERE " + whereClause;
-            return dbService.doUpdate(sql, finalValues.toArray());
+            return dbService.doUpdate(entityClass, sql, finalValues.toArray());
         } catch (Exception e) {
             throw new RuntimeException("No ID field found in " + tableName + ".");
-        } finally {
-            SolarDBManager.resetCacheFor(dbObject);
         }
     }
 
@@ -231,11 +219,9 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
             List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));
 
             String sql = "DELETE FROM " + tableName + " WHERE " + idFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
-            return dbService.doUpdate(sql, whereValues.toArray());
+            return dbService.doUpdate(entityClass, sql, whereValues.toArray());
         } catch (Exception e) {
             throw new RuntimeException("No ID field found in " + tableName + ".");
-        } finally {
-            SolarDBManager.resetCacheFor(dbObject);
         }
     }
 

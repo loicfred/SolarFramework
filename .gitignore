@@ -39,3 +39,5 @@ application.properties
 bin
 /WAMP/
 /config/
+.claude/
+CLAUDE.md

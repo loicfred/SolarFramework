@@ -1,19 +1,14 @@
 package org.solarframework.db.spring;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
 
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Supplier;
 
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
@@ -21,6 +16,8 @@ public class DatabaseObject<T> {
     protected static final Map<String, String> TableNames = new HashMap<>();
     protected static final Map<String, IDatabaseService> serviceCache = new HashMap<>();
     protected static final Map<String, IDatabaseService.ENTITY<?>> entityServiceCache = new HashMap<>();
+
+    @JsonIgnore
     private transient IDBObjectService<T> service;
 
     public IDBObjectService<T> getService() {
@@ -127,7 +124,7 @@ public class DatabaseObject<T> {
     protected void onUpdate() {}
 
     @MappedSuperclass
-    public static class ID_RECORD<T> extends DatabaseObject<T> {
+    public static class RECORD_OBJ<T> extends DatabaseObject<T> {
         @Column(name = "CreatedAt", nullable = false)
         private Instant createdAt;
         @Column(name = "UpdatedAt", nullable = false)
@@ -167,7 +164,7 @@ public class DatabaseObject<T> {
             super.onUpdate();
         }
 
-        protected ID_RECORD() {}
+        protected RECORD_OBJ() {}
     }
     @MappedSuperclass
     public static class ID_OBJ<IDTYPE, T> extends DatabaseObject<T> {
@@ -185,7 +182,7 @@ public class DatabaseObject<T> {
         protected ID_OBJ() {}
     }
     @MappedSuperclass
-    public static class ID_OBJ_RECORD<IDTYPE, T> extends ID_RECORD<T> {
+    public static class ID_RECORD_OBJ<IDTYPE, T> extends RECORD_OBJ<T> {
         @Id
         @Column(name = "ID")
         public IDTYPE ID;
@@ -197,6 +194,6 @@ public class DatabaseObject<T> {
             this.ID = ID;
         }
 
-        protected ID_OBJ_RECORD() {}
+        protected ID_RECORD_OBJ() {}
     }
 }

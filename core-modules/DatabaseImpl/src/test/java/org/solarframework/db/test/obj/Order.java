@@ -7,7 +7,7 @@ import java.time.Instant;
 
 @Entity
 @Table(name = "orders")
-public class Order extends DatabaseObject.ID_OBJ_RECORD<Long, Order> {
+public class Order extends DatabaseObject.ID_RECORD_OBJ<Long, Order> {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(referencedColumnName = "ID", name = "UserID", nullable = false, insertable = false, updatable = false)
     public User user;

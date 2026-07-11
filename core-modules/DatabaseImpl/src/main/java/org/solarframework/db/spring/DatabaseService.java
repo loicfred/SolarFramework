@@ -271,7 +271,6 @@ public class DatabaseService implements IDatabaseService {
         if (sessionFactory == null) {
             BootstrapServiceRegistryBuilder bootstrap = new BootstrapServiceRegistryBuilder();
             getEntitiesClasses().stream().map(Class::getClassLoader).distinct().forEach(bootstrap::applyClassLoader);
-
             StandardServiceRegistry registry = new StandardServiceRegistryBuilder(bootstrap.build())
                     .applySetting("hibernate.connection.datasource", getDataSource())
                     .applySetting("hibernate.dialect", getDatabaseType().getDialectClass())
@@ -302,13 +301,20 @@ public class DatabaseService implements IDatabaseService {
         return dataSource = new HikariDataSource(config);
     }
     public synchronized void reload() {
-        if (sessionFactory != null) {
-            try { sessionFactory.close(); } catch (Exception ignored) { }
-            sessionFactory = null;
-            metadata = null;
-            Cache cache = dbCacheManager.getCache("DBObject");
-            if (cache != null) cache.clear();
-            manager.resetAllCaches();
+        try { sessionFactory.close(); } catch (Exception ignored) { }
+        sessionFactory = null;
+        metadata = null;
+        try { dataSource.unwrap(HikariDataSource.class).close(); } catch (Exception ignored) { }
+        dataSource = null;
+        jdbcTemplate = null;
+        transactionTemplate = null;
+
+        for (IEntityInfo EI : getEntities()) {
+            manager.getEntityClassloaders().entrySet().stream().filter(cl -> Objects.equals(cl.getKey(), EI.getClassLoader())).findFirst().ifPresent((cl) -> {
+                try {
+                    EI.Update(cl.getValue().loadClass(EI.getClassName()));
+                } catch (ClassNotFoundException _) {}
+            });
         }
     }
 
@@ -339,7 +345,11 @@ public class DatabaseService implements IDatabaseService {
             }
         }
         String sql = getDatabaseType().UpsertBatch(tableName, columns, questionMarks, null, null);
-        return executeNativeUpdate(sql, currentValues.stream().flatMap(Arrays::stream).toArray());
+        try {
+            return executeNativeUpdate(sql, currentValues.stream().flatMap(Arrays::stream).toArray());
+        } finally {
+            SolarDBManager.resetCacheForClass(items.getFirst().getClass(), true, true);
+        }
     }
     public <T> int UpsertBatch(List<T> items) {
         return UpsertBatch(items, null);
@@ -364,7 +374,11 @@ public class DatabaseService implements IDatabaseService {
             }
         }
         String sql = getDatabaseType().UpsertBatch(tableName, columns, questionMarks, duplicateKey, conflictCols == null || conflictCols.isEmpty() ? null : conflictCols.stream().collect(Collectors.joining(", ")));
-        return executeNativeUpdate(sql, currentValues.stream().flatMap(Arrays::stream).toArray());
+        try {
+            return executeNativeUpdate(sql, currentValues.stream().flatMap(Arrays::stream).toArray());
+        } finally {
+            SolarDBManager.resetCacheForClass(items.getFirst().getClass(), true, true);
+        }
     }
 
     public <T> Optional<T> getById(String select, Class<T> clazz, Object... id) {
@@ -434,16 +448,18 @@ public class DatabaseService implements IDatabaseService {
         return result;
     }
 
+    // Cache keys are prefixed per result shape ("one", "all", ...) because the same SQL+args
+    // can be requested as a single value, a List, or a Set — without the prefix those collide.
     public <T> Optional<T> doQuery(Class<T> clazz, String sql, Object... args) {
-        String cacheKey = String.valueOf(Objects.hash(clazz, sql, args != null ? Arrays.deepHashCode(args) : null));
+        String cacheKey = "one" + Objects.hash(clazz, sql, args != null ? Arrays.deepHashCode(args) : null);
         return getCachedOrCompute("DBObject", cacheKey, () -> doQueryNoCache(clazz, sql, args));
     }
     public <T> List<T> doQueryAll(Class<T> clazz, String sql, Object... args) {
-        String cacheKey = String.valueOf(Objects.hash(clazz, sql, Arrays.deepHashCode(args)));
+        String cacheKey = "all" + Objects.hash(clazz, sql, Arrays.deepHashCode(args));
         return getCachedOrCompute("DBObject", cacheKey, () -> doQueryAllNoCache(clazz, sql, args));
     }
     public <T> Set<T> doQueryAllDistinct(Class<T> clazz, String sql, Object... args) {
-        String cacheKey = "D" + Objects.hash(clazz, sql, Arrays.deepHashCode(args));
+        String cacheKey = "set" + Objects.hash(clazz, sql, Arrays.deepHashCode(args));
         return getCachedOrCompute("DBObject", cacheKey, () -> doQueryAllDistinctNoCache(clazz, sql, args));
     }
 
@@ -459,15 +475,15 @@ public class DatabaseService implements IDatabaseService {
     }
 
     public Optional<Row> doQuery(String sql, Object... args) {
-        String cacheKey = String.valueOf(Objects.hash(sql, args != null ? Arrays.deepHashCode(args) : null));
+        String cacheKey = "rowone" + Objects.hash(sql, args != null ? Arrays.deepHashCode(args) : null);
         return getCachedOrCompute("DBObject", cacheKey, () -> doQueryNoCache(sql, args));
     }
     public List<Row> doQueryAll(String sql, Object... args) {
-        String cacheKey = String.valueOf(Objects.hash(sql, args != null ? Arrays.deepHashCode(args) : null));
+        String cacheKey = "rowall" + Objects.hash(sql, args != null ? Arrays.deepHashCode(args) : null);
         return getCachedOrCompute("DBObject", cacheKey, () -> doQueryAllNoCache(sql, args));
     }
     public Set<Row> doQueryAllDistinct(String sql, Object... args) {
-        String cacheKey = String.valueOf(Objects.hash(sql, args != null ? Arrays.deepHashCode(args) : null));
+        String cacheKey = "rowset" + Objects.hash(sql, args != null ? Arrays.deepHashCode(args) : null);
         return getCachedOrCompute("DBObject", cacheKey, () -> doQueryAllDistinctNoCache(sql, args));
     }
 
@@ -483,7 +499,7 @@ public class DatabaseService implements IDatabaseService {
     }
 
     public <T> Optional<T> doQueryValue(Class<T> clazz, String sql, Object... args) {
-        String cacheKey = String.valueOf(Objects.hash(clazz, sql, args != null ? Arrays.deepHashCode(args) : null));
+        String cacheKey = "val" + Objects.hash(clazz, sql, args != null ? Arrays.deepHashCode(args) : null);
         return getCachedOrCompute("DBObject", cacheKey, () -> doQueryValueNoCache(clazz, sql, args));
     }
     public <T> Optional<T> doQueryValueNoCache(Class<T> clazz, String sql, Object... args) {
@@ -506,8 +522,11 @@ public class DatabaseService implements IDatabaseService {
         return executeNativeUpdate(sql, args);
     }
     public int doUpdate(Class<?> clazz, String sql, Object... args) {
-        SolarDBManager.resetCacheForClass(clazz, true, true);
-        return executeNativeUpdate(sql, args);
+        try {
+            return executeNativeUpdate(sql, args);
+        } finally {
+            SolarDBManager.resetCacheForClass(clazz, true, true);
+        }
     }
 
 
@@ -766,6 +785,7 @@ public class DatabaseService implements IDatabaseService {
             withEm(this, em -> em.createNativeQuery("SELECT 1 FROM " + getTableName(clazz)).setMaxResults(1).getResultList());
             return true;
         } catch (Exception ignored) {
+            ignored.printStackTrace();
             return false;
         }
     }
@@ -796,16 +816,6 @@ public class DatabaseService implements IDatabaseService {
     }
     public synchronized TransactionTemplate getTransactionTemplate() {
         return transactionTemplate == null ? transactionTemplate = new TransactionTemplate(new DataSourceTransactionManager(getDataSource())) : transactionTemplate;
-    }
-
-    public void close() {
-        reload();
-        try {
-            if (dataSource != null && dataSource.isWrapperFor(HikariDataSource.class)) dataSource.unwrap(HikariDataSource.class).close();
-        } catch (SQLException ignored) { }
-        dataSource = null;
-        jdbcTemplate = null;
-        transactionTemplate = null;
     }
 
     public static class ENTITY<T> implements IDatabaseService.ENTITY<T> {

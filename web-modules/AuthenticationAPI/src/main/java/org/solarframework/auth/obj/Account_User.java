@@ -1,6 +1,5 @@
 package org.solarframework.auth.obj;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.solarframework.auth.obj.enums.AccountProvider;
 import org.solarframework.auth.obj.enums.Gender;
@@ -12,10 +11,11 @@ import java.security.Principal;
 import java.time.*;
 import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "account_user")
-public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_User> {
+public class Account_User extends DatabaseObject.ID_RECORD_OBJ<Long, Account_User> {
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private Set<Account_EmailVerification> emails_verifications;
 
@@ -44,9 +44,22 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
     private String displayName;
     @Column(name = "Avatar")
     private byte[] avatar;
-    @Enumerated(EnumType.STRING)
+
+    @Convert(converter = TypeConverter.class)
     @Column(name = "Status", length = 20, nullable = false)
     private UserStatus status = UserStatus.PENDING_VERIFICATION;
+    @Converter
+    public static class TypeConverter implements AttributeConverter<UserStatus, String> {
+        @Override
+        public String convertToDatabaseColumn(UserStatus type) {
+            return type == null ? null : type.name();
+        }
+        @Override
+        public UserStatus convertToEntityAttribute(String name) {
+            return name == null ? null : UserStatus.valueOf(name);
+        }
+    }
+
     @Column(name = "EmailVerified", nullable = false, columnDefinition = "TINYINT(1)")
     private Boolean emailVerified = false;
     @Column(name = "PhoneNumber", length = 20)
@@ -281,6 +294,7 @@ public class Account_User extends DatabaseObject.ID_OBJ_RECORD<Long, Account_Use
         return pathData.getPermissionID() == null || hasPermission(pathData.getPermissionID());
     }
     public boolean hasPermission(Long permissionId) {
+        System.err.println(getRole().getPermissions().stream().map((i) -> i.getID() + "").collect(Collectors.joining(",")));;
         return getRole().getPermissions().stream().anyMatch(p -> Objects.equals(p.getID(), permissionId));
     }
     public boolean hasPermission(String name) {

@@ -176,6 +176,4 @@ public interface IDatabaseService {
 
     DataSource getDataSource();
 
-
-    void close();
 }

@@ -1,5 +1,6 @@
 package org.solarframework.proxyserver.obj;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity

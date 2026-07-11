@@ -44,8 +44,7 @@ public class Account_Role_To_Permission extends DatabaseObject<Account_Role_To_P
     }
 
     protected Account_Role_To_Permission() {}
-
-    protected Account_Role_To_Permission(Long roleId, Long permissionId) {
+    public Account_Role_To_Permission(Long roleId, Long permissionId) {
         this.roleId = roleId;
         this.permissionId = permissionId;
     }
