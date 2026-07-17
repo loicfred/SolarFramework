@@ -22,8 +22,6 @@
         <module>core-modules/Plugin</module>
         <module>core-modules/Language</module>
         <module>core-modules/JSON</module>
-        <module>web-modules/AuthenticationAPI</module>
-        <module>web-modules/AuthenticationImpl</module>
         <module>web-modules/WebUtils</module>
         <module>web-modules/DatabaseEditor</module>
         <module>web-modules/ProxyServerAPI</module>
@@ -114,6 +112,16 @@
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
                 <artifactId>AuthenticationAPI</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>StaffAuthenticationAPI</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>CustomerAuthenticationAPI</artifactId>
                 <version>1.0</version>
             </dependency>
             <dependency>

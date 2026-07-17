@@ -1,7 +1,6 @@
 package org.solarframework.discord.obj;
 
 import jakarta.persistence.*;
-import net.dv8tion.jda.api.entities.Guild;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.io.Serializable;
@@ -12,20 +11,18 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-import static org.solarframework.core.util.ImageUtils.getDominantColor;
-
 @Entity
-@Table(name = "discord_guildvariable")
-@IdClass(Discord_GuildVariable.ServerNameID.class)
-public class Discord_GuildVariable extends DatabaseObject<Discord_GuildVariable> {
+@Table(name = "discord_profilevariable")
+@IdClass(Discord_ProfileVariable.UserNameID.class)
+public class Discord_ProfileVariable extends DatabaseObject<Discord_ProfileVariable> {
     @ManyToOne
-    @JoinColumn(referencedColumnName = "ID", name = "ServerID", nullable = false, insertable = false, updatable = false)
-    private Discord_GuildInfo DGI;
+    @JoinColumn(referencedColumnName = "ID", name = "UserID", nullable = false, insertable = false, updatable = false)
+    private Discord_Profile DP;
 
 
-    @Column(name = "ServerID", nullable = false)
+    @Column(name = "UserID", nullable = false)
     @Id
-    private Long serverID;
+    private Long userID;
 
     @Column(name = "Name", nullable = false)
     @Id
@@ -34,19 +31,19 @@ public class Discord_GuildVariable extends DatabaseObject<Discord_GuildVariable>
     @Column(name = "Value", length = 2048)
     private String value;
 
-    protected Discord_GuildVariable() {}
-    protected Discord_GuildVariable(Long serverId, String name, Object value) {
-        this.serverID = serverId;
+    protected Discord_ProfileVariable() {}
+    protected Discord_ProfileVariable(Long userId, String name, Object value) {
+        this.userID = userId;
         this.name = name;
         this.value = value != null ? value.toString() : null;
         Upsert();
     }
 
-    public Long getServerID() {
-        return serverID;
+    public Long getUserID() {
+        return userID;
     }
-    public void setServerID(Long serverID) {
-        this.serverID = serverID;
+    public void setUserID(Long userID) {
+        this.userID = userID;
     }
 
     public String getName() {
@@ -143,10 +140,9 @@ public class Discord_GuildVariable extends DatabaseObject<Discord_GuildVariable>
         return getAsLocalDateTimeOptional().orElse(null);
     }
 
-    @Embeddable
-    public static class ServerNameID implements Serializable {
+    public static class UserNameID implements Serializable {
         private String name;
-        private Long serverID;
+        private Long userID;
 
         public String getName() {
             return name;
@@ -155,23 +151,23 @@ public class Discord_GuildVariable extends DatabaseObject<Discord_GuildVariable>
             this.name = name;
         }
 
-        public Long getServerID() {
-            return serverID;
+        public Long getUserID() {
+            return userID;
         }
-        public void setServerID(Long serverID) {
-            this.serverID = serverID;
+        public void setUserID(Long userID) {
+            this.userID = userID;
         }
 
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
-            if (!(o instanceof ServerNameID that)) return false;
-            return Objects.equals(this.name, that.name) && Objects.equals(this.serverID, that.serverID);
+            if (!(o instanceof UserNameID that)) return false;
+            return Objects.equals(this.name, that.name) && Objects.equals(this.userID, that.userID);
         }
 
         @Override
         public int hashCode() {
-            return Objects.hash(name, serverID);
+            return Objects.hash(name, userID);
         }
     }
 

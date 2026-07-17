@@ -99,20 +99,20 @@ class TimeUtilsTest {
 
     @Test
     void getTimeBetweenNowReturnsPeriodBetweenPastDateAndToday() {
-        Instant past = LocalDate.now().minusDays(10).atStartOfDay(ProgramZoneId).toInstant();
+        Instant past = LocalDate.now(ProgramZoneId).minusDays(10).atStartOfDay(ProgramZoneId).toInstant();
         Period p = TimeUtils.getTimeBetweenNow(past);
         assertEquals(LocalDate.now(ProgramZoneId), past.atZone(ProgramZoneId).toLocalDate().plus(p));
     }
     @Test
     void getTimeBetweenNowReturnsPeriodBetweenTodayAndFutureDate() {
-        Instant future = LocalDate.now().plusDays(10).atStartOfDay(ProgramZoneId).toInstant();
+        Instant future = LocalDate.now(ProgramZoneId).plusDays(10).atStartOfDay(ProgramZoneId).toInstant();
         Period p = TimeUtils.getTimeBetweenNow(future);
         assertEquals(future.atZone(ProgramZoneId).toLocalDate(), LocalDate.now(ProgramZoneId).plus(p));
     }
 
     @Test
     void daysUntilDayOfNextYearForFutureDateThisYear() {
-        Instant future = LocalDate.now().plusDays(30).atStartOfDay(ProgramZoneId).toInstant();
+        Instant future = LocalDate.now(ProgramZoneId).plusDays(30).atStartOfDay(ProgramZoneId).toInstant();
         assertEquals(30, TimeUtils.DaysUntilDayOfNextYear(future));
     }
 }

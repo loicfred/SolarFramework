@@ -15,18 +15,11 @@ public class Constants {
 
     public static void main(String[] args) throws IOException {
 
-        BufferedImage img = ImageUtils.reducePixelColor(
-                new File("D:/blue.png"),
-                Color.decode("#FFFFFF"), false
+        BufferedImage img2 = ImageUtils.replaceAllMatchingColor(
+                new File("D:/Letters.png"),
+                Color.decode("#000000"),
+                new Color(0,0,0, 0), 180
         );
-        ImageIO.write(img, "png", new File("D:/blue2.png"));
-
-
-//        BufferedImage img2 = ImageUtils.replaceAllMatchingColor(
-//                new File("D:/Brick.png"),
-//                Color.decode("#000000"),
-//                new Color(5,5,40), 150
-//        );
-//        ImageIO.write(img2, "png", new File("D:/Brick2.png"));
+        ImageIO.write(img2, "png", new File("D:/Letters2.png"));
     }
 }

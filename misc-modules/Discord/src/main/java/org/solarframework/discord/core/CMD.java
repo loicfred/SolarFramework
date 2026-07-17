@@ -42,13 +42,13 @@ public class CMD {
         return org.solarframework.discord.lang.L10N.SYSL(IT, key, var);
     }
     protected String SYSLG(String key, Object... var) {
-        return org.solarframework.discord.lang.L10N.SYSLG(IT.getGuild(), key, var);
+        return org.solarframework.discord.lang.L10N.SYSLG(currentGuild(), key, var);
     }
     protected String TL(String key, Object... var) {
         return org.solarframework.discord.lang.L10N.TL(IT, key, var);
     }
     protected String TLG(String key, Object... var) {
-        return org.solarframework.discord.lang.L10N.TLG(IT.getGuild(), key, var);
+        return org.solarframework.discord.lang.L10N.TLG(currentGuild(), key, var);
     }
 
     public Discord_GuildInfo currentGuild() {

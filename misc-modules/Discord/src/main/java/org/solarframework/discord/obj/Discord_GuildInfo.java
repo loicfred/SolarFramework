@@ -14,9 +14,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.ImageUtils.getDominantColor;
 import static org.solarframework.core.util.OtherUtils.getHexValue;
+import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 import static org.solarframework.discord.core.BotBuilder.DiscordDBService;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 import static org.solarframework.discord.lang.L10N.SYSLG;
@@ -386,7 +388,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         return getRoles().stream().filter(R -> R.getAction().equalsIgnoreCase(action)).findFirst();
     }
     public void setUsageRole(String action, Role role) {
-        getRoles().removeIf(V -> V.getAction().equalsIgnoreCase(name) && Objects.equals(V.getServerID(), getID()));
+        getRoles().removeIf(V -> V.getAction().equalsIgnoreCase(action) && Objects.equals(V.getServerID(), getID()));
         getRoles().add(new Discord_RoleInfo(getGuild(), role, action));
     }
     
@@ -394,7 +396,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         return getChannels().stream().filter(C -> C.getAction().equalsIgnoreCase(action)).findFirst();
     }
     public void setUsageChannel(String action, GuildChannel channel) {
-        getChannels().removeIf(V -> V.getAction().equalsIgnoreCase(name) && Objects.equals(V.getServerID(), getID()));
+        getChannels().removeIf(V -> V.getAction().equalsIgnoreCase(action) && Objects.equals(V.getServerID(), getID()));
         getChannels().add(new Discord_ChannelInfo(getGuild(), channel, action));
     }
 
@@ -527,5 +529,13 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
             }
         } catch (Exception ignored) {}
         return false;
+    }
+
+
+    public static List<Discord_GuildInfo> list() {
+        return DefaultDBService.getAll(Discord_GuildInfo.class);
+    }
+    public static List<Discord_GuildInfo> list(boolean isInGuild) {
+        return list().stream().filter(s -> !isInGuild || s.getGuild() != null).collect(Collectors.toList());
     }
 }

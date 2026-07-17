@@ -4,6 +4,8 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.interactions.DiscordLocale;
 import net.dv8tion.jda.api.interactions.Interaction;
 import net.dv8tion.jda.api.interactions.InteractionHook;
+import org.solarframework.discord.obj.Discord_GuildInfo;
+import org.solarframework.discord.obj.Discord_Profile;
 
 import java.util.Locale;
 import java.util.MissingResourceException;
@@ -71,6 +73,8 @@ public class L10N extends org.solarframework.lang.L10N {
         return TL(key, var);
     }
 
+
+
     public static String SYSLG(Guild G, String key, Object... var) {
         try {
             RB = getSystemLanguageBundle(G == null ? DiscordLocale.ENGLISH_UK : G.getLocale());
@@ -79,6 +83,10 @@ public class L10N extends org.solarframework.lang.L10N {
             return key;
         }
     }
+    public static String SYSLG(Discord_GuildInfo GI, String key, Object... var) {
+        return SYSLG(GI == null ? null : GI.getGuild(), key, var);
+    }
+
     public static String TLG(Guild G, String key, Object... var) {
         try {
             RB = getLanguageBundle(G == null ? DiscordLocale.ENGLISH_UK : G.getLocale());
@@ -86,5 +94,8 @@ public class L10N extends org.solarframework.lang.L10N {
         } catch (MissingResourceException | NullPointerException | IllegalArgumentException e) {
             return key;
         }
+    }
+    public static String TLG(Discord_GuildInfo GI, String key, Object... var) {
+        return TLG(GI == null ? null : GI.getGuild(), key, var);
     }
 }

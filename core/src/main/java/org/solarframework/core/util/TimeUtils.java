@@ -84,7 +84,7 @@ public class TimeUtils {
     }
     public static Period getTimeBetweenNow(Instant instant) {
         LocalDate time = instant.atZone(ProgramZoneId).toLocalDate();
-        LocalDate currentDate = LocalDate.now();
+        LocalDate currentDate = LocalDate.now(ProgramZoneId);
         if (time.isAfter(currentDate)) {
             return Period.between(currentDate, time);
         } else {
@@ -95,7 +95,7 @@ public class TimeUtils {
 
     public static long DaysUntilDayOfNextYear(Instant day) {
         // Get the current date
-        LocalDate currentDate = LocalDate.now();
+        LocalDate currentDate = LocalDate.now(ProgramZoneId);
 
         // Get the next birthday
         LocalDate nextBirthday = day.atZone(ProgramZoneId).toLocalDate().withYear(currentDate.getYear());

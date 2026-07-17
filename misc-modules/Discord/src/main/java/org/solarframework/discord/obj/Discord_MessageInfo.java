@@ -22,7 +22,10 @@ import static org.solarframework.discord.utils.WebhookUtils.getWebhookOfChannel;
 @IdClass(ActionServerID.class)
 public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
     @ManyToOne
-    @JoinColumn(referencedColumnName = "Action", name = "ChannelAction", nullable = false, insertable = false, updatable = false)
+    @JoinColumns({
+            @JoinColumn(referencedColumnName = "Action", name = "ChannelAction", nullable = false, insertable = false, updatable = false),
+            @JoinColumn(referencedColumnName = "ServerID", name = "ServerID", nullable = false, insertable = false, updatable = false)
+    })
     private Discord_ChannelInfo DCI;
 
     @ManyToOne

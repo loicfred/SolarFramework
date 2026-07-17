@@ -14,12 +14,12 @@ import java.util.concurrent.TimeUnit;
 import static org.solarframework.discord.core.BotBuilder.*;
 
 @Entity
-@Table(name = "discord_channelinfo")
+@Table(name = "discord_botemoji")
 public class Discord_BotEmoji extends DatabaseObject.ID_OBJ<Long, Discord_BotEmoji> {
     private static final Emoji EmptyEmoji = Emoji.fromUnicode("U+25AA");
     private transient Emoji emoji;
 
-    @Column(name = "ChannelID", nullable = false)
+    @Column(name = "Name", nullable = false)
     public String Name;
     @Column(name = "Formatted", nullable = false)
     public String Formatted;
