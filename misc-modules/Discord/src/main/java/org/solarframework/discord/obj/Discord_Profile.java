@@ -6,9 +6,10 @@ import net.dv8tion.jda.api.entities.User;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
-import static org.solarframework.discord.core.BotBuilder.DiscordDBService;
+import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.discord.utils.UserUtils.getUserByID;
 
 @Entity
@@ -16,13 +17,16 @@ import static org.solarframework.discord.utils.UserUtils.getUserByID;
 public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile> {
     private transient User User;
 
-    @OneToMany(mappedBy = "DP", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "DP", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Discord_ProfileVariable> Variables;
 
     private transient Object extender;
 
     @Column(name = "Name", nullable = false, length = 32)
     private String name;
+
+    @Column(name = "EffectiveName", length = 64)
+    private String effectiveName;
 
     @Column(name = "GlobalName", length = 32)
     private String globalName;
@@ -39,15 +43,6 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
     @Column(name = "AsTag", length = 64)
     private String asTag;
 
-    @Column(name = "IsBot", nullable = false)
-    private Boolean bot = false;
-
-    @Column(name = "IsSystem", nullable = false)
-    private Boolean system = false;
-
-    @Column(name = "FlagsRaw", nullable = false)
-    private Integer flagsRaw = 0;
-
 
     public String getName() {
         return name;
@@ -61,6 +56,13 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
     }
     public void setGlobalName(String globalName) {
         this.globalName = globalName;
+    }
+
+    public String getEffectiveName() {
+        return effectiveName;
+    }
+    public void setEffectiveName(String effectiveName) {
+        this.effectiveName = effectiveName;
     }
 
     public String getDiscriminator() {
@@ -91,31 +93,6 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
         this.asTag = asTag;
     }
 
-    public Boolean isBot() {
-        return bot;
-    }
-    public void setBot(Boolean bot) {
-        this.bot = bot;
-    }
-
-    public Boolean isSystem() {
-        return system;
-    }
-    public void setSystem(Boolean system) {
-        this.system = system;
-    }
-
-    public Integer getFlagsRaw() {
-        return flagsRaw;
-    }
-    public void setFlagsRaw(Integer flagsRaw) {
-        this.flagsRaw = flagsRaw;
-    }
-
-    public String getEffectiveName() {
-        return globalName != null ? globalName : name;
-    }
-
     public String getAsMention() {
         return "<@" + getID() + ">";
     }
@@ -131,7 +108,7 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
         return User == null ? User = getUserByID(getID()) : User;
     }
     public List<Discord_ProfileVariable> getVariables() {
-        return DiscordDBService.getAllWhere(Discord_ProfileVariable.class, "UserID = ?", getID());
+        return SolarDBManager.getAllWhere(Discord_ProfileVariable.class, "UserID = ?", getID());
     }
 
     public <T> T extender(Class<T> extenderClass) {
@@ -158,22 +135,22 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
         getVariables().add(new Discord_ProfileVariable(getID(), name, value));
     }
     public Discord_ProfileVariable getVariable(String name) {
-        return getVariables().stream().filter(V -> V.getName().equalsIgnoreCase(name)).findFirst().orElse(new Discord_ProfileVariable(getID(), name, null));
+        return getVariables().stream().filter(V -> V.getName().equalsIgnoreCase(name)).findFirst().orElseGet(() -> new Discord_ProfileVariable(getID(), name, null));
     }
-    public String getVariableAsString(String name) {
-        return getVariable(name).getValue();
+    public Optional<String> getVariableAsString(String name) {
+        return getVariable(name).getValueOptional();
     }
-    public boolean getVariableAsBool(String name) {
-        return getVariable(name).getAsBoolean();
+    public Optional<Boolean> getVariableAsBool(String name) {
+        return getVariable(name).getAsBooleanOptional();
     }
-    public int getVariableAsInt(String name) {
-        return getVariable(name).getAsInt();
+    public Optional<Integer> getVariableAsInt(String name) {
+        return getVariable(name).getAsIntOptional();
     }
-    public long getVariableAsLong(String name) {
-        return getVariable(name).getAsLong();
+    public Optional<Long> getVariableAsLong(String name) {
+        return getVariable(name).getAsLongOptional();
     }
-    public double getVariableAsDouble(String name) {
-        return getVariable(name).getAsDouble();
+    public Optional<Double> getVariableAsDouble(String name) {
+        return getVariable(name).getAsDoubleOptional();
     }
 
     public Discord_Profile() {}
@@ -181,29 +158,25 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
         this.User = user;
         if (this.User == null) throw new NullPointerException("No User with given id.");
         refreshUserData();
-        Write();
     }
     public Discord_Profile(long userId) {
         this.User = getUserByID(userId);
         if (this.User == null) throw new NullPointerException("No User with given id.");
         refreshUserData();
-        Write();
     }
 
     public void refreshUserData() {
         try {
             setID(getUser().getIdLong());
             setName(getUser().getName());
+            setEffectiveName(getUser().getEffectiveName());
             setGlobalName(getUser().getGlobalName());
             setDiscriminator(getUser().getDiscriminator());
             setAvatarUrl(getUser().getAvatarUrl());
             setEffectiveAvatarUrl(getUser().getEffectiveAvatarUrl());
             setAsTag(getUser().getAsTag());
-            setBot(getUser().isBot());
-            setSystem(getUser().isSystem());
-            setFlagsRaw(getUser().getFlagsRaw());
         } catch (Exception ignored) {}
-        Update();
+        Upsert();
     }
 
     public static List<Discord_Profile> list() {

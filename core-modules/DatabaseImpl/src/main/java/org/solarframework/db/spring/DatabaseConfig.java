@@ -1,25 +1,17 @@
 package org.solarframework.db.spring;
 
 import com.github.benmanes.caffeine.cache.Caffeine;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.cache.support.SimpleCacheManager;
-import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
-import org.springframework.context.event.EventListener;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-
-import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
-import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 @Configuration
 @EnableCaching

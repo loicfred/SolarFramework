@@ -25,4 +25,5 @@ public abstract class SlashCMD extends CMD {
         return interactionData;
     }
 
+    public List<Long> whitelistedGuilds() {return List.of();}
 }

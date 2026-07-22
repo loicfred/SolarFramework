@@ -11,10 +11,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.ClassUtils.*;
-import static org.solarframework.core.util.ClassUtils.getAllFieldsOfClassFamily;
-import static org.solarframework.core.util.ClassUtils.setFieldValue;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
-import static org.solarframework.db.spring.DatabaseUtils.*;
 import static org.solarframework.json.JSONItem.SimpleGSON;
 
 @SuppressWarnings("all")
@@ -69,7 +66,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public int Write() {
         try {
-            InsertArgumentManager insertArgMgr = makeInsertManager(false);
+            InsertArgumentManager insertArgMgr = makeInsertManager(false, false);
             String sql = getType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), null, null);
             return dbService.doUpdate(entityClass, sql, insertArgMgr.currentValuesList());
         } catch (Exception e) {
@@ -79,7 +76,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public Optional<T> WriteThenReturn() {
         try {
-            InsertArgumentManager insertArgMgr = makeInsertManager(false);
+            InsertArgumentManager insertArgMgr = makeInsertManager(false, false);
             String sql = getType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), null, null) + " RETURNING *";
             return dbService.doQueryNoCache(entityClass, sql, insertArgMgr.currentValuesList());
         } catch (Exception e) {
@@ -100,7 +97,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public int Upsert(List<String> conflictCols) {
         try {
-            InsertArgumentManager insertArgMgr = makeInsertManager(true);
+            InsertArgumentManager insertArgMgr = makeInsertManager(true, false);
             String sql = getType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), insertArgMgr.duplicateKeyUpdateClause(), conflictCols == null || conflictCols.isEmpty() ? null : conflictCols.stream().collect(Collectors.joining(", ")));
             return dbService.doUpdate(entityClass, sql, insertArgMgr.currentValuesList());
         } catch (Exception e) {
@@ -111,7 +108,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public Optional<T> UpsertThenReturn(List<String> conflictCols) {
         try {
-            InsertArgumentManager insertArgMgr = makeInsertManager(true);
+            InsertArgumentManager insertArgMgr = makeInsertManager(true, false);
             String sql = getType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), insertArgMgr.duplicateKeyUpdateClause(), conflictCols == null || conflictCols.isEmpty() ? null : conflictCols.stream().collect(Collectors.joining(", "))) + " RETURNING *";
             return dbService.doQueryNoCache(entityClass, sql, insertArgMgr.currentValuesList());
         } catch (Exception e) {
@@ -149,7 +146,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         }
     }
     @Override
-    public int IncrementColumns(Map<String, Double> parameters) {
+    public int IncrementColumns(Map<String, Number> parameters) {
         try {
             String setClause = parameters.entrySet().stream().map(f -> f.getKey() + " = " + f.getKey() + " + ?").collect(Collectors.joining(", "));
             List<Object> setValues = parameters.entrySet().stream().map(f -> f.getValue()).collect(Collectors.toList());
@@ -244,8 +241,8 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
 
 
     protected record InsertArgumentManager(String columns, String questionMarks, String duplicateKeyUpdateClause, Object[] currentValuesList) {}
-    protected InsertArgumentManager makeInsertManager(boolean update) {
-        Set<Field> nonNullFields = cachedFields.stream().filter(f -> getFieldValue(f, dbObject) != null).collect(Collectors.toSet());
+    protected InsertArgumentManager makeInsertManager(boolean update, boolean includeNullFields) {
+        Set<Field> nonNullFields = cachedFields.stream().filter(f -> includeNullFields || getFieldValue(f, dbObject) != null).collect(Collectors.toSet());
 
         String columnsSeparatedByComma = nonNullFields.stream().map(Field::getName).collect(Collectors.joining(", "));
         String questionMarksSeparatedByComma = nonNullFields.stream().map(p -> "?").collect(Collectors.joining(", "));

@@ -9,16 +9,19 @@ import net.dv8tion.jda.api.entities.channel.middleman.StandardGuildMessageChanne
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.ChunkingFilter;
 import net.dv8tion.jda.api.utils.MemberCachePolicy;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.solarframework.db.api.IDatabaseService;
 
 import java.util.List;
 import java.util.function.Supplier;
 
 public class BotBuilder {
+    private static final Logger log = LoggerFactory.getLogger(BotBuilder.class);
+
     protected static Supplier<Void> onReady = () -> null;
 
     public static JDA DiscordAccount;
-    public static IDatabaseService DiscordDBService;
     public static Guild BotGuild;
     public static StandardGuildMessageChannel TemporaryFilesChannel;
     public static StandardGuildMessageChannel LogChannel;
@@ -62,7 +65,7 @@ public class BotBuilder {
             AfterReadyAction.get();
             return null;
         };
-        System.out.println("[Discord] Starting bot...");
+        log.info("Starting bot...");
         return DiscordAccount;
     }
 
@@ -78,10 +81,8 @@ public class BotBuilder {
     public void setAfterReadyAction(Supplier<Void> AfterReadyAction) {
         this.AfterReadyAction = AfterReadyAction;
     }
-    public void setDiscordDBService(IDatabaseService discordDBService) {
-        DiscordDBService = discordDBService;
-    }
     public void setClassLoaders(List<ClassLoader> loaders) {
         classLoaders.addAll(loaders);
     }
+
 }

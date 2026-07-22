@@ -6,9 +6,10 @@ import org.solarframework.db.api.dto.TableStats;
 import org.solarframework.db.spring.DatabaseObject;
 
 import javax.sql.DataSource;
-import java.util.*;
-
-import static org.solarframework.db.spring.DatabaseObject.getTableName;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 public interface IDatabaseService {
 

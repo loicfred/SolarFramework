@@ -2,13 +2,12 @@ package org.solarframework.db.spring;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-import org.solarframework.db.api.dto.TableStats;
 import org.solarframework.db.api.IEntityInfo;
+import org.solarframework.db.api.dto.TableStats;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.HashSet;
 
 import static org.solarframework.core.util.ClassUtils.getAllFieldsOfClassFamily;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;

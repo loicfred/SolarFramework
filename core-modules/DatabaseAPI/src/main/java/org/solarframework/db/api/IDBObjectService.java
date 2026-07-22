@@ -24,7 +24,7 @@ public interface IDBObjectService<T> {
     Optional<T> UpsertThenReturn(List<String> conflictCols);
 
     int IncrementColumn(String column, int amount);
-    int IncrementColumns(Map<String, Double> parameters);
+    int IncrementColumns(Map<String, Number> parameters);
     int Update();
     int UpdateOnly(String... columns);
 

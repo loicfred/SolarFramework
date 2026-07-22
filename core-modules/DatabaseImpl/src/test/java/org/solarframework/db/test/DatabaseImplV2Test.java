@@ -16,15 +16,10 @@ public class DatabaseImplV2Test {
         SpringApplication.run(DatabaseImplV2Test.class, args);
         SolarDBManager.createAllSchemasIfMissing();
         SolarDBManager.verifyEntities();
+
         User u = new User(1L, "Loic", "loic@gmail.com");
         u.Upsert();
-        new Order(1L,u, "Steak", 1).Upsert();
-        new Order(2L, u,"Egg", 2).Upsert();
-
-        User Me = SolarDBManager.getById(User.class, 1).orElseThrow();
-        System.err.println(Me.toJSON());
-
-        System.err.println(SolarDBManager.getServiceByEntity(Order.class).doUpdate(Order.class, "DELETE FROM orders WHERE id = ?", 2L));
-        System.err.println(SolarDBManager.getById(User.class, 1).orElseThrow().toJSON());
+        new Order(1L, u, "Steak", 1).Upsert();
+        new Order(2L, u,"Egg").Upsert();
     }
 }

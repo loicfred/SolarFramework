@@ -84,7 +84,7 @@ public class DatabaseObject<T> {
         return getService().IncrementColumn(column, amount);
     }
 
-    public int IncrementColumns(Map<String, Double> parameters) {
+    public int IncrementColumns(Map<String, Number> parameters) {
         onUpdate();
         return getService().IncrementColumns(parameters);
     }

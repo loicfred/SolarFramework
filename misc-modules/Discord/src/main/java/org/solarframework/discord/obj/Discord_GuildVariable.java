@@ -23,18 +23,18 @@ public class Discord_GuildVariable extends DatabaseObject<Discord_GuildVariable>
     private Discord_GuildInfo DGI;
 
 
-    @Column(name = "ServerID", nullable = false)
     @Id
+    @Column(name = "ServerID", nullable = false)
     private Long serverID;
 
-    @Column(name = "Name", nullable = false)
     @Id
+    @Column(name = "Name", nullable = false)
     private String name;
 
-    @Column(name = "Value", length = 2048)
+    @Column(name = "Value", length = 4095)
     private String value;
 
-    protected Discord_GuildVariable() {}
+    public Discord_GuildVariable() {}
     protected Discord_GuildVariable(Long serverId, String name, Object value) {
         this.serverID = serverId;
         this.name = name;
@@ -70,7 +70,7 @@ public class Discord_GuildVariable extends DatabaseObject<Discord_GuildVariable>
         return getValueOptional().map(Integer::parseInt);
     }
     public Integer getAsInt() {
-        return getAsIntOptional().orElseThrow();
+        return getAsIntOptional().orElse(null);
     }
 
     public Optional<Long> getAsLongOptional() {

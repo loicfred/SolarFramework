@@ -9,6 +9,7 @@ import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.IMentionable;
 import net.dv8tion.jda.api.entities.User;
 import net.dv8tion.jda.api.entities.channel.Channel;
+import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
 import net.dv8tion.jda.api.events.interaction.ModalInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.MessageContextInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
@@ -42,13 +43,13 @@ import static org.solarframework.core.util.ThreadUtils.ShutdownAfterAction;
 public class DefaultListener extends ListenerAdapter {
     private final static Logger log = LoggerFactory.getLogger(DefaultListener.class);
 
-    protected List<SlashCMD> SlashCommands;
-    protected List<UserCMD> UserCommands;
-    protected List<MessageCMD> MessageCommands;
-    protected List<ButtonCMD> ButtonCommands;
-    protected List<ModalCMD> ModalCommands;
-    protected List<StringSelectCMD> StringSelectCommands;
-    protected List<EntitySelectCMD> EntitySelectCommands;
+    protected static List<SlashCMD> SlashCommands;
+    protected static List<UserCMD> UserCommands;
+    protected static List<MessageCMD> MessageCommands;
+    protected static List<ButtonCMD> ButtonCommands;
+    protected static List<ModalCMD> ModalCommands;
+    protected static List<StringSelectCMD> StringSelectCommands;
+    protected static List<EntitySelectCMD> EntitySelectCommands;
 
     @Override
     public void onReady(@NotNull ReadyEvent event) {
@@ -56,9 +57,19 @@ public class DefaultListener extends ListenerAdapter {
             SetupGlobalCommands();
             onReady.get();
             DiscordAccount.getPresence().setActivity(Activity.customStatus("✅ Bot start-up done!"));
-            System.out.println("[Discord] Finished bot start-up!");
+            log.info("Finished bot start-up!");
         } catch (Exception e) {
             log.error("Failed to start bot: {}", e.getMessage());
+            System.exit(1);
+        }
+    }
+    @Override
+    public void onGuildReady(@NotNull GuildReadyEvent event) {
+        try {
+            SetupGuildCommands(event.getGuild());
+            log.info("Done setting up commands in: {} ({})", event.getGuild().getName(), event.getGuild().getId());
+        } catch (Exception e) {
+            log.error("Failed to setup commands of guild: {} - {}", event.getGuild().getName(), e.getMessage());
             System.exit(1);
         }
     }
@@ -131,13 +142,13 @@ public class DefaultListener extends ListenerAdapter {
     }
 
     public DefaultListener(String commandPackage) {
-        System.out.println("[Discord] Loaded " + (SlashCommands = loadClasses(SlashCMD.class, commandPackage)).size() + " slash commands.");
-        System.out.println("[Discord] Loaded " + (UserCommands = loadClasses(UserCMD.class, commandPackage)).size() + " user commands.");
-        System.out.println("[Discord] Loaded " + (MessageCommands = loadClasses(MessageCMD.class, commandPackage)).size() + " message commands.");
-        System.out.println("[Discord] Loaded " + (ButtonCommands = loadClasses(ButtonCMD.class, commandPackage)).size() + " buttons.");
-        System.out.println("[Discord] Loaded " + (ModalCommands = loadClasses(ModalCMD.class, commandPackage)).size() + " modals.");
-        System.out.println("[Discord] Loaded " + (StringSelectCommands = loadClasses(StringSelectCMD.class, commandPackage)).size() + " string select menus.");
-        System.out.println("[Discord] Loaded " + (EntitySelectCommands = loadClasses(EntitySelectCMD.class, commandPackage)).size() + " entity select menus.");
+        log.info("Loaded {} slash commands.", (SlashCommands = loadClasses(SlashCMD.class, commandPackage)).size());
+        log.info("Loaded {} user commands.", (UserCommands = loadClasses(UserCMD.class, commandPackage)).size());
+        log.info("Loaded {} message commands.", (MessageCommands = loadClasses(MessageCMD.class, commandPackage)).size());
+        log.info("Loaded {} buttons.", (ButtonCommands = loadClasses(ButtonCMD.class, commandPackage)).size());
+        log.info("Loaded {} modals.", (ModalCommands = loadClasses(ModalCMD.class, commandPackage)).size());
+        log.info("Loaded {} string select menus.", (StringSelectCommands = loadClasses(StringSelectCMD.class, commandPackage)).size());
+        log.info("Loaded {} entity select menus.", (EntitySelectCommands = loadClasses(EntitySelectCMD.class, commandPackage)).size());
     }
 
     public static void LogCommand(Interaction e) {
@@ -158,7 +169,7 @@ public class DefaultListener extends ListenerAdapter {
                 default -> {}
             }
             if (LogChannel != null) LogChannel.sendMessage(LOG).queue();
-            System.out.println("[" + getNow("HH:mm:ss") + "] " + LOG.replaceAll("(\\*_)", ""));
+            log.info(LOG.replaceAll("\\*", ""));
         }));
     }
 
@@ -166,17 +177,17 @@ public class DefaultListener extends ListenerAdapter {
     private static <T> List<T> loadClasses(Class<T> clazz, String commandPackage) {
         List<T> L = new ArrayList<>();
         try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(classLoaders.toArray(new ClassLoader[]{})).acceptPackages(commandPackage).scan()) {
-            for (ClassInfo classInfo : scanResult.getSubclasses(clazz).stream().toList()) {
+            for (ClassInfo classInfo : scanResult.getSubclasses(clazz).stream().filter(c -> !c.isAbstract()).toList()) {
                 try {
                     L.add((T) classInfo.loadClass().getDeclaredConstructor().newInstance());
                 } catch (Exception ignored) {
-                    System.err.println("[Discord] Failed to load class " + classInfo.getName());
+                    log.error("Failed to load class {}", classInfo.getName());
                 }
             }
         }
         return L;
     }
-    private void SetupGlobalCommands() {
+    public static void SetupGlobalCommands() {
         List<CommandData> CMD = new ArrayList<>();
         for (SlashCMD cmd : SlashCommands) {
             if (Arrays.stream(cmd.getData().integrationType()).allMatch(i -> i == IntegrationType.GUILD_INSTALL)) continue;
@@ -200,5 +211,28 @@ public class DefaultListener extends ListenerAdapter {
                     .setContexts(cmd.getData().integrationContextType()));
         }
         DiscordAccount.updateCommands().addCommands(CMD).queue();
+    }
+    public static void SetupGuildCommands(Guild guild) {
+        List<CommandData> CMD = new ArrayList<>();
+        for (SlashCMD cmd : SlashCommands.stream().filter(cmd -> cmd.whitelistedGuilds().contains(guild.getIdLong()) && Arrays.stream(cmd.getData().integrationType()).allMatch(i -> i == IntegrationType.GUILD_INSTALL) && Arrays.stream(cmd.getData().integrationContextType()).allMatch(i -> i == InteractionContextType.GUILD)).toList()) {
+            CMD.add(Commands.slash(cmd.getData().name(), cmd.getData().description())
+                    .addOptions(cmd.commandParameters())
+                    .setNSFW(cmd.getData().nsfw())
+                    .setIntegrationTypes(cmd.getData().integrationType())
+                    .setContexts(cmd.getData().integrationContextType()));
+        }
+        for (UserCMD cmd : UserCommands.stream().filter(cmd -> cmd.whitelistedGuilds().contains(guild.getIdLong()) && Arrays.stream(cmd.getData().integrationType()).allMatch(i -> i == IntegrationType.GUILD_INSTALL) && Arrays.stream(cmd.getData().integrationContextType()).allMatch(i -> i == InteractionContextType.GUILD)).toList()) {
+            CMD.add(Commands.user(cmd.getData().name())
+                    .setNSFW(cmd.getData().nsfw())
+                    .setIntegrationTypes(cmd.getData().integrationType())
+                    .setContexts(cmd.getData().integrationContextType()));
+        }
+        for (MessageCMD cmd : MessageCommands.stream().filter(cmd -> cmd.whitelistedGuilds().contains(guild.getIdLong()) && Arrays.stream(cmd.getData().integrationType()).allMatch(i -> i == IntegrationType.GUILD_INSTALL) && Arrays.stream(cmd.getData().integrationContextType()).allMatch(i -> i == InteractionContextType.GUILD)).toList()) {
+            CMD.add(Commands.message(cmd.getData().name())
+                    .setNSFW(cmd.getData().nsfw())
+                    .setIntegrationTypes(cmd.getData().integrationType())
+                    .setContexts(cmd.getData().integrationContextType()));
+        }
+        guild.updateCommands().addCommands(CMD).queue();
     }
 }

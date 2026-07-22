@@ -3,6 +3,8 @@ package org.solarframework.discord.core;
 import org.solarframework.discord.core.annotation.UserCommand;
 import net.dv8tion.jda.api.events.interaction.command.UserContextInteractionEvent;
 
+import java.util.List;
+
 public abstract class UserCMD extends CMD {
     private final UserCommand interactionData = this.getClass().getAnnotation(UserCommand.class);
 
@@ -18,4 +20,5 @@ public abstract class UserCMD extends CMD {
         return interactionData;
     }
 
+    public List<Long> whitelistedGuilds() {return List.of();}
 }

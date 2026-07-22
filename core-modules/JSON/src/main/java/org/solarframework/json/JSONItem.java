@@ -2,7 +2,7 @@ package org.solarframework.json;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.google.gson.*;
-import jakarta.persistence.*;
+import jakarta.persistence.Transient;
 
 import java.io.FileReader;
 import java.io.FileWriter;

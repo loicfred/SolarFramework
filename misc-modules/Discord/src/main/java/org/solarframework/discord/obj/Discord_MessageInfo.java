@@ -37,7 +37,7 @@ public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
     private transient Message M = null;
 
     @Id
-    @Column(name = "Action", length = 32, nullable = false)
+    @Column(name = "Action", length = 64, nullable = false)
     private String Action;
     @Id
     @Column(name = "ServerID", nullable = false)
@@ -48,7 +48,7 @@ public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
     @Column(name = "MessageID", unique = true)
     private Long MessageID;
 
-    @Column(name = "ChannelAction", length = 32, nullable = false)
+    @Column(name = "ChannelAction", length = 64, nullable = false)
     private String ChannelAction;
 
     public Discord_MessageInfo() {}
@@ -56,14 +56,12 @@ public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
         this.ServerID = serverId;
         this.ChannelID = channelId;
         this.ChannelAction = channelAction;
-        Upsert();
     }
     public Discord_MessageInfo(String channelAction, Long serverId, Long channelId, Long messageId) {
         this.ServerID = serverId;
         this.ChannelID = channelId;
         this.MessageID = messageId;
         this.ChannelAction = channelAction;
-        Upsert();
     }
 
     public Guild getGuild() {

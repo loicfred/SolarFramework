@@ -2,6 +2,8 @@ package org.solarframework.lang;
 
 import java.util.Arrays;
 
+import static org.solarframework.core.util.StringUtils.similarity;
+
 public enum Nationalities {
 
     English_US("United States", "United States", "U+1f1ec U+1f1e7", ":flag_us:", "US", "USA", "840"),
@@ -315,7 +317,17 @@ public enum Nationalities {
         return flagEmoji.toString();
     }
 
-    public static Nationalities get(String nationality) {
-        return Arrays.stream(values()).filter(N -> N.toString().equalsIgnoreCase(nationality) || N.country.equalsIgnoreCase(nationality) || N.nativeName.equalsIgnoreCase(nationality)).findFirst().orElse(null);
+    public static Nationalities get(String query) {
+        Nationalities best = null;
+        double bestScore = 40;
+        for (Nationalities c : Nationalities.values()) {
+            if (c.name().equalsIgnoreCase(query) || c.getCountry().equalsIgnoreCase(query) || c.getNativeName().equalsIgnoreCase(query)) return c;
+            double score = Math.max(Math.max(similarity(c.name(), query, true), similarity(c.getCountry(), query, true)), similarity(c.getNativeName(), query, true));
+            if (score > bestScore) {
+                bestScore = score;
+                best = c;
+            }
+        }
+        return best;
     }
 }

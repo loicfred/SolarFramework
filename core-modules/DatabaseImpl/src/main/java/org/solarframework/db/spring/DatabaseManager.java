@@ -13,11 +13,9 @@ import org.slf4j.LoggerFactory;
 import org.solarframework.db.api.*;
 import org.solarframework.db.api.dto.DatabaseStats;
 import org.solarframework.db.api.dto.TableStats;
-import org.solarframework.db.api.IEntityInfo;
 import org.solarframework.db.exception.DataMigrationException;
 import org.solarframework.json.JSONItem;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
@@ -30,14 +28,13 @@ import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.solarframework.core.util.ClassUtils.copyObject;
-import static org.solarframework.core.util.ClassUtils.getGenericOf;
-import static org.solarframework.core.util.ClassUtils.isClassRelated;
-import static org.solarframework.db.spring.DBInstanceService.*;
+import static org.solarframework.core.util.ClassUtils.*;
+import static org.solarframework.db.spring.DBInstanceService.CachedFields;
+import static org.solarframework.db.spring.DBInstanceService.IdFields;
+import static org.solarframework.db.spring.DatabaseConfig.defaultConnectionString;
 import static org.solarframework.db.spring.DatabaseObject.*;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
-import static org.solarframework.db.spring.DatabaseConfig.defaultConnectionString;
 
 @Service
 public class DatabaseManager implements IDatabaseManager {

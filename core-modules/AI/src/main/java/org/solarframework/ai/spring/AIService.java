@@ -24,8 +24,8 @@ import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 import static org.solarframework.ai.spring.AIConst.*;
-import static org.solarframework.json.JSONItem.SimpleGSON;
 import static org.solarframework.core.util.ClassUtils.getSerializableFieldsOfClassFamily;
+import static org.solarframework.json.JSONItem.SimpleGSON;
 
 @Service
 @SuppressWarnings("all")

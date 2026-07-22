@@ -3,18 +3,10 @@ package org.solarframework.db.spring;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
-import jakarta.persistence.EntityManager;
 import jakarta.persistence.NoResultException;
 import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
 import jakarta.persistence.TupleElement;
-import jakarta.persistence.criteria.CriteriaBuilder;
-import jakarta.persistence.criteria.CriteriaQuery;
-import jakarta.persistence.criteria.JoinType;
-import jakarta.persistence.criteria.Predicate;
-import jakarta.persistence.criteria.Root;
-import jakarta.persistence.metamodel.Attribute;
-import jakarta.persistence.metamodel.EntityType;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 import org.hibernate.boot.Metadata;
@@ -41,16 +33,17 @@ import javax.sql.DataSource;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
-import static org.solarframework.core.util.ClassUtils.copyObject;
 import static org.solarframework.db.api.IEntityInfo.sortByDependency;
 import static org.solarframework.db.spring.DBInstanceService.IdFields;
 import static org.solarframework.db.spring.DatabaseConfig.defaultConnectionString;
@@ -280,6 +273,7 @@ public class DatabaseService implements IDatabaseService {
 
             MetadataSources sources = new MetadataSources(registry);
             for (Class<?> c : getEntitiesClasses()) sources.addAnnotatedClass(c);
+
             sessionFactory = sources.buildMetadata().buildSessionFactory();
         }
         return sessionFactory;
@@ -336,7 +330,7 @@ public class DatabaseService implements IDatabaseService {
         for (T item : items) {
             if (item instanceof DatabaseObject<?> obj) {
                 if (obj.getService() instanceof DBInstanceService<?> service) {
-                    DBInstanceService.InsertArgumentManager insertArgMgr = service.makeInsertManager(false);
+                    DBInstanceService.InsertArgumentManager insertArgMgr = service.makeInsertManager(false, true);
                     questionMarks.add(insertArgMgr.questionMarks());
                     currentValues.add(insertArgMgr.currentValuesList());
                     if (columns == null) columns = insertArgMgr.columns();
@@ -364,7 +358,7 @@ public class DatabaseService implements IDatabaseService {
         for (T item : items) {
             if (item instanceof DatabaseObject<?> obj) {
                 if (obj.getService() instanceof DBInstanceService<?> service) {
-                    DBInstanceService.InsertArgumentManager insertArgMgr = service.makeInsertManager(true);
+                    DBInstanceService.InsertArgumentManager insertArgMgr = service.makeInsertManager(true, true);
                     questionMarks.add(insertArgMgr.questionMarks());
                     currentValues.add(insertArgMgr.currentValuesList());
                     if (columns == null) columns = insertArgMgr.columns();

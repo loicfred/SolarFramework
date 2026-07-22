@@ -49,17 +49,20 @@ public class Discord_BotEmoji extends DatabaseObject.ID_OBJ<Long, Discord_BotEmo
         }
     }
 
+    public static Discord_BotEmoji getEmpty() {
+        return new Discord_BotEmoji();
+    }
     public static Discord_BotEmoji getById(long emojiId) {
         if (IsTestMode) return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
-        return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("ID = ?", emojiId).orElse(null);
+        return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("ID = ?", emojiId).orElseGet(Discord_BotEmoji::new);
     }
     public static Discord_BotEmoji getByName(String name) {
         if (IsTestMode) return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
-        return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Name = ?", name).orElse(null);
+        return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Name = ?", name).orElseGet(Discord_BotEmoji::new);
     }
     public static Discord_BotEmoji getByFormatted(String formatted) {
         if (IsTestMode) return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Name LIKE ?", "U+25AA").orElseGet(() -> new Discord_BotEmoji("U+25AA"));
-        return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Formatted = ?", formatted).orElse(null);
+        return retrieveEntityServiceFor(Discord_BotEmoji.class).getWhere("Formatted = ?", formatted).orElseGet(Discord_BotEmoji::new);
     }
 
     public Emoji retrieve() {
@@ -74,8 +77,25 @@ public class Discord_BotEmoji extends DatabaseObject.ID_OBJ<Long, Discord_BotEmo
         } return emoji;
     }
 
+    public String getName() {
+        return Name;
+    }
+    public void setName(String name) {
+        Name = name;
+    }
+
     public String getFormatted() {
         return Formatted;
+    }
+    public void setFormatted(String formatted) {
+        Formatted = formatted;
+    }
+
+    public Long getServerID() {
+        return ServerID;
+    }
+    public void setServerID(Long serverID) {
+        ServerID = serverID;
     }
 
     @Override

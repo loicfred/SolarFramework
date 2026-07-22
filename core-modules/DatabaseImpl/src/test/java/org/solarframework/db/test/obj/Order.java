@@ -16,8 +16,23 @@ public class Order extends DatabaseObject.ID_RECORD_OBJ<Long, Order> {
     private String item;
     @Column(name = "UserID")
     private Long userId;
-    @Column(name = "Amount")
-    private Integer amount;
+    @Column(name = "Amount", nullable = false)
+    private Integer amount = 0;
+    @Column(name = "Active", nullable = false)
+    private Boolean active = false;
+
+
+    @Convert(converter = StatusConverter.class)
+    @Column(name = "Status", nullable = false)
+    private Status status = Status.PENDING;
+    @Converter
+    public static class StatusConverter implements AttributeConverter<Status, String> {
+        public String convertToDatabaseColumn(Status type) {
+            return type == null ? null : type.name();
+        }
+        public Status convertToEntityAttribute(String name) {return name == null ? null : Status.valueOf(name);}
+    }
+
 
     public String getItem() {
         return item;
@@ -40,7 +55,26 @@ public class Order extends DatabaseObject.ID_RECORD_OBJ<Long, Order> {
         this.amount = amount;
     }
 
+    public Status getStatus() {
+        return status;
+    }
+    public void setStatus(Status status) {
+        this.status = status;
+    }
+
+    public Boolean getActive() {
+        return active;
+    }
+    public void setActive(Boolean active) {
+        this.active = active;
+    }
+
     protected Order() {}
+    public Order(Long id, User u, String item) {
+        this.ID = id;
+        this.item = item;
+        this.userId = u.getID();
+    }
     public Order(Long id, User u, String item, Integer amount) {
         this.ID = id;
         this.item = item;
@@ -49,5 +83,9 @@ public class Order extends DatabaseObject.ID_RECORD_OBJ<Long, Order> {
     }
     public Order(User u, String item, Integer amount) {
         this(Instant.now().toEpochMilli(), u, item, amount);
+    }
+
+    public User getUser() {
+        return user;
     }
 }

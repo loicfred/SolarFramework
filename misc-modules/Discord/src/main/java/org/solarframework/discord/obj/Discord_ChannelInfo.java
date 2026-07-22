@@ -11,7 +11,7 @@ import org.solarframework.discord.obj.other.ActionServerID;
 
 import java.util.List;
 
-import static org.solarframework.discord.core.BotBuilder.DiscordDBService;
+import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 
 @Entity
@@ -29,7 +29,7 @@ public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
     private transient GuildChannel C;
 
     @Id
-    @Column(name = "Action", length = 32, nullable = false)
+    @Column(name = "Action", length = 64, nullable = false)
     private String Action;
     @Id
     @Column(name = "ServerID", nullable = false)
@@ -38,7 +38,7 @@ public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
     @Column(name = "ChannelID", nullable = false)
     private Long ChannelID;
 
-    protected Discord_ChannelInfo() {}
+    public Discord_ChannelInfo() {}
     protected Discord_ChannelInfo(Guild G, GuildChannel channel, String action) {
         this.G = G;
         this.C = channel;
@@ -46,7 +46,7 @@ public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
         this.Action = action;
         this.ChannelID = channel != null ? channel.getIdLong() : null;
         if (channel != null) Upsert();
-        else if (DiscordDBService.getWhere(Discord_ChannelInfo.class, "ServerID = ? AND Action = ?", ServerID, action).orElse(null) instanceof Discord_ChannelInfo RI) RI.Delete();
+        else if (SolarDBManager.getWhere(Discord_ChannelInfo.class, "ServerID = ? AND Action = ?", ServerID, action).orElse(null) instanceof Discord_ChannelInfo RI) RI.Delete();
     }
 
     public Long getServerID() {
@@ -91,7 +91,7 @@ public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
     }
 
     public List<Discord_MessageInfo> getMessages() {
-        return Messages == null ? Messages = DiscordDBService.getAllWhere(Discord_MessageInfo.class, "ChannelID = ? AND ChannelAction = ?", getChannelID(), getAction()) : Messages;
+        return Messages == null ? Messages = SolarDBManager.getAllWhere(Discord_MessageInfo.class, "ChannelID = ? AND ChannelAction = ?", getChannelID(), getAction()) : Messages;
     }
 
     public String getAsMention() {

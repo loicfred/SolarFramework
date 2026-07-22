@@ -20,18 +20,18 @@ public class Discord_ProfileVariable extends DatabaseObject<Discord_ProfileVaria
     private Discord_Profile DP;
 
 
-    @Column(name = "UserID", nullable = false)
     @Id
+    @Column(name = "UserID", nullable = false)
     private Long userID;
 
-    @Column(name = "Name", nullable = false)
     @Id
+    @Column(name = "Name", nullable = false)
     private String name;
 
-    @Column(name = "Value", length = 2048)
+    @Column(name = "Value", length = 4095)
     private String value;
 
-    protected Discord_ProfileVariable() {}
+    public Discord_ProfileVariable() {}
     protected Discord_ProfileVariable(Long userId, String name, Object value) {
         this.userID = userId;
         this.name = name;
@@ -67,7 +67,7 @@ public class Discord_ProfileVariable extends DatabaseObject<Discord_ProfileVaria
         return getValueOptional().map(Integer::parseInt);
     }
     public Integer getAsInt() {
-        return getAsIntOptional().orElseThrow();
+        return getAsIntOptional().orElse(null);
     }
 
     public Optional<Long> getAsLongOptional() {

@@ -19,7 +19,7 @@ import java.util.stream.Collectors;
 import static org.solarframework.core.util.ImageUtils.getDominantColor;
 import static org.solarframework.core.util.OtherUtils.getHexValue;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
-import static org.solarframework.discord.core.BotBuilder.DiscordDBService;
+import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 import static org.solarframework.discord.lang.L10N.SYSLG;
 
@@ -28,13 +28,13 @@ import static org.solarframework.discord.lang.L10N.SYSLG;
 public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_GuildInfo> {
     private transient Guild Guild;
 
-    @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Discord_RoleInfo> Roles;
-    @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Discord_ChannelInfo> Channels;
     @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Discord_MessageInfo> Messages;
-    @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Discord_GuildVariable> Variables;
 
     private transient Object extender;
@@ -60,9 +60,18 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     @Column(name = "IconUrl", length = 512)
     private String iconUrl;
     
-    @Enumerated(EnumType.STRING)
-    @Column(name = "Nationality", nullable = false, length = 32)
+    @Convert(converter = Nationality.class)
+    @Column(name = "Nationality", length = 40, nullable = false)
     private Nationalities nationality = Nationalities.International;
+    @Converter
+    public static class Nationality implements AttributeConverter<Nationalities, String> {
+        @Override
+        public String convertToDatabaseColumn(Nationalities type) {
+            return type == null ? null : type.name();
+        }
+        @Override
+        public Nationalities convertToEntityAttribute(String name) {return name == null ? null : Nationalities.valueOf(name);}
+    }
 
     @Column(name = "BannerUrl", length = 512)
     private String bannerUrl;
@@ -96,12 +105,6 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
 
     @Column(name = "AfkTimeout")
     private Integer afkTimeout;
-
-    @Column(name = "MaxMembers")
-    private Integer maxMembers = 0;
-
-    @Column(name = "MaxPresences")
-    private Integer maxPresences;
 
     @Column(name = "PremiumTier")
     private Integer premiumTier;
@@ -160,7 +163,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         return nationality;
     }
     public void setNationality(Nationalities nationality) {
-        this.nationality = nationality;
+        this.nationality = nationality == null ? Nationalities.International : nationality;
     }
 
     public String getBannerUrl() {
@@ -240,20 +243,6 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         this.afkTimeout = afkTimeout;
     }
 
-    public Integer getMaxMembers() {
-        return maxMembers;
-    }
-    public void setMaxMembers(Integer maxMembers) {
-        this.maxMembers = maxMembers;
-    }
-
-    public Integer getMaxPresences() {
-        return maxPresences;
-    }
-    public void setMaxPresences(Integer maxPresences) {
-        this.maxPresences = maxPresences;
-    }
-
     public Integer getPremiumTier() {
         return premiumTier;
     }
@@ -284,13 +273,13 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         return Guild == null ? Guild = DiscordAccount.getGuildById(ID) : Guild;
     }
     public List<Discord_RoleInfo> getRoles() {
-        return Roles != null ? Roles = DiscordDBService.getAllWhere(Discord_RoleInfo.class, "ServerID = ?", getID()) : Roles;
+        return Roles != null ? Roles = SolarDBManager.getAllWhere(Discord_RoleInfo.class, "ServerID = ?", getID()) : Roles;
     }
     public List<Discord_ChannelInfo> getChannels() {
-        return Channels != null ? Channels = DiscordDBService.getAllWhere(Discord_ChannelInfo.class, "ServerID = ?", getID()) : Channels;
+        return Channels != null ? Channels = SolarDBManager.getAllWhere(Discord_ChannelInfo.class, "ServerID = ?", getID()) : Channels;
     }
     public List<Discord_GuildVariable> getVariables() {
-        return DiscordDBService.getAllWhere(Discord_GuildVariable.class, "ServerID = ?", getID());
+        return SolarDBManager.getAllWhere(Discord_GuildVariable.class, "ServerID = ?", getID());
     }
 
     public Discord_GuildInfo() {}
@@ -298,13 +287,11 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         this.Guild = guild;
         if (this.Guild == null || getGuild().isDetached()) throw new NullPointerException("No Guild with given id.");
         refreshGuildData();
-        Write();
     }
     public Discord_GuildInfo(long serverId) {
         this.Guild = DiscordAccount.getGuildById(serverId);
         if (this.Guild == null || getGuild().isDetached()) throw new NullPointerException("No Guild with given id.");
         refreshGuildData();
-        Write();
     }
 
     public void refreshGuildData() {
@@ -329,16 +316,14 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
             setRulesChannelID(getGuild().getRulesChannel() != null ? getGuild().getRulesChannel().getIdLong() : null);
             setAfkChannelID(getGuild().getAfkChannel() != null ? getGuild().getAfkChannel().getIdLong() : null);
             setAfkTimeout(getGuild().getAfkTimeout().getSeconds());
-            setMaxMembers(getGuild().getMaxMembers());
-            setMaxPresences(getGuild().getMaxPresences());
             setPremiumTier(getGuild().getBoostTier().getKey());
         } catch (Exception ignored) {}
-        Update();
+        Upsert();
     }
 
     public void LogGuild(String string) {
         if (getLogChannel().isPresent() && getLogChannel().get().canTalk()) getLogChannel().get().sendMessage(string).queue();
-        else new Discord_ChannelInfo(getGuild(), null, "LOG");
+        else setUsageChannel("LOG", null);
     }
 
     public <T> T extender(Class<T> extenderClass) {
@@ -365,39 +350,40 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         getVariables().add(new Discord_GuildVariable(getID(), name, value));
     }
     public Discord_GuildVariable getVariable(String name) {
-        return getVariables().stream().filter(V -> V.getName().equalsIgnoreCase(name)).findFirst().orElse(new Discord_GuildVariable(getID(), name, null));
+        return getVariables().stream().filter(V -> V.getName().equalsIgnoreCase(name)).findFirst().orElseGet(() -> new Discord_GuildVariable(getID(), name, null));
     }
-    public String getVariableAsString(String name) {
-        return getVariable(name).getValue();
+    public Optional<String> getVariableAsString(String name) {
+        return getVariable(name).getValueOptional();
     }
-    public boolean getVariableAsBool(String name) {
-        return getVariable(name).getAsBoolean();
+    public Optional<Boolean> getVariableAsBool(String name) {
+        return getVariable(name).getAsBooleanOptional();
     }
-    public int getVariableAsInt(String name) {
-        return getVariable(name).getAsInt();
+    public Optional<Integer> getVariableAsInt(String name) {
+        return getVariable(name).getAsIntOptional();
     }
-    public long getVariableAsLong(String name) {
-        return getVariable(name).getAsLong();
+    public Optional<Long> getVariableAsLong(String name) {
+        return getVariable(name).getAsLongOptional();
     }
-    public double getVariableAsDouble(String name) {
-        return getVariable(name).getAsDouble();
+    public Optional<Double> getVariableAsDouble(String name) {
+        return getVariable(name).getAsDoubleOptional();
     }
-
 
     public Optional<Discord_RoleInfo> getUsageRole(String action) {
         return getRoles().stream().filter(R -> R.getAction().equalsIgnoreCase(action)).findFirst();
     }
-    public void setUsageRole(String action, Role role) {
+    public Discord_RoleInfo setUsageRole(String action, Role role) {
         getRoles().removeIf(V -> V.getAction().equalsIgnoreCase(action) && Objects.equals(V.getServerID(), getID()));
         getRoles().add(new Discord_RoleInfo(getGuild(), role, action));
+        return getRoles().getLast();
     }
     
     public Optional<Discord_ChannelInfo> getUsageChannel(String action) {
         return getChannels().stream().filter(C -> C.getAction().equalsIgnoreCase(action)).findFirst();
     }
-    public void setUsageChannel(String action, GuildChannel channel) {
+    public Discord_ChannelInfo setUsageChannel(String action, GuildChannel channel) {
         getChannels().removeIf(V -> V.getAction().equalsIgnoreCase(action) && Objects.equals(V.getServerID(), getID()));
         getChannels().add(new Discord_ChannelInfo(getGuild(), channel, action));
+        return getChannels().getLast();
     }
 
     public Optional<Discord_ChannelInfo> getLogChannel() {
@@ -415,10 +401,11 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
                             .setHoisted(true)
                             .submit().orTimeout(10, TimeUnit.SECONDS).get();
                     LogGuild(SYSLG(getGuild(),"role-create", emoji + " **__" + name + "__**"));
-                    DRI = new Discord_RoleInfo(getGuild(), newrole, action);
+                    DRI = setUsageRole(action, newrole);
                 } else {
-                    DRI = new Discord_RoleInfo(getGuild(), getGuild().getRolesByName(name, false).getFirst(), action);
+                    DRI = setUsageRole(action, getGuild().getRolesByName(name, false).getFirst());
                 }
+                DRI.setEmoji(emoji);
                 setRoleIcon(DRI, icon, false);
                 return DRI;
             } else {

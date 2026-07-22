@@ -6,7 +6,7 @@ import net.dv8tion.jda.api.entities.Role;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.discord.obj.other.ActionServerID;
 
-import static org.solarframework.discord.core.BotBuilder.DiscordDBService;
+import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 
 @Entity
@@ -21,7 +21,7 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
     private transient Role R;
 
     @Id
-    @Column(name = "Action", length = 32, nullable = false)
+    @Column(name = "Action", length = 64, nullable = false)
     private String Action;
     @Id
     @Column(name = "ServerID", nullable = false)
@@ -33,7 +33,7 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
     @Column(name = "EmojiID")
     private Long EmojiID;
 
-    protected Discord_RoleInfo() {}
+    public Discord_RoleInfo() {}
     protected Discord_RoleInfo(Guild G, Role role, String action) {
         this.G = G;
         this.R = role;
@@ -41,7 +41,7 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
         this.Action = action;
         this.RoleID = role != null ? role.getIdLong() : null;
         if (role != null) Upsert();
-        else if (DiscordDBService.getWhere(Discord_RoleInfo.class, "ServerID = ? AND Action = ?", ServerID, action).orElse(null) instanceof Discord_RoleInfo RI) RI.Delete();
+        else if (SolarDBManager.getWhere(Discord_RoleInfo.class, "ServerID = ? AND Action = ?", ServerID, action).orElse(null) instanceof Discord_RoleInfo RI) RI.Delete();
     }
 
     public Long getServerID() {
@@ -88,9 +88,15 @@ public class Discord_RoleInfo extends DatabaseObject<Discord_RoleInfo> {
     }
     public void setEmoji(Discord_BotEmoji emoji) {
         EmojiID = emoji != null ? emoji.getID() : null;
+        UpdateOnly("EmojiID");
     }
 
     public String getAsMention() {
         return getRole() != null ? getRole().getAsMention() : null;
+    }
+
+    public int DeleteWithRole() {
+        if (getRole() != null) getRole().delete().queue();
+        return Delete();
     }
 }

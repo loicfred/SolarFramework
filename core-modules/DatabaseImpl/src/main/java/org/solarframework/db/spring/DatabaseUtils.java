@@ -1,32 +1,18 @@
 package org.solarframework.db.spring;
 
-import com.google.gson.*;
 import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
-import jakarta.persistence.*;
-import org.hibernate.SessionFactory;
-import org.solarframework.db.api.IDatabaseService;
-import org.solarframework.db.api.dto.Row;
-import org.solarframework.json.JSONItem;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Component;
 
-import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
-import java.math.BigDecimal;
-import java.sql.ResultSet;
-import java.sql.Timestamp;
-import java.time.*;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.stream.Collectors;
-
-import static org.solarframework.db.spring.DatabaseObject.getTableName;
-import static org.solarframework.json.JSONItem.SimpleGSON;
-import static org.solarframework.core.util.ClassUtils.*;
 
 @Component
 public class DatabaseUtils {
@@ -132,7 +118,7 @@ public class DatabaseUtils {
     public static void scanEntitiesOfLoaders(Collection<ClassLoader> entityClassloaders, Consumer<List<Class<?>>> consumer) {
         try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(entityClassloaders.toArray(new ClassLoader[]{})).scan()) {
             List<Class<?>> L = new ArrayList<>();
-            for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(Entity.class).stream().toList()) {
+            for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(Entity.class).stream().filter(c -> !c.isAbstract()).toList()) {
                 if (classInfo.extendsSuperclass(DatabaseObject.class)) {
                     L.add(classInfo.loadClass());
                 }

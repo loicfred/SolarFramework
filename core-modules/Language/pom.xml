@@ -24,6 +24,10 @@
             <artifactId>junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
+            <artifactId>core</artifactId>
+        </dependency>
     </dependencies>
 
 </project>

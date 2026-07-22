@@ -2,7 +2,8 @@ package org.solarframework.lang;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
 class NationalitiesTest {
 
@@ -20,7 +21,7 @@ class NationalitiesTest {
     }
     @Test
     void getReturnsNullForUnknownNationality() {
-        assertNull(Nationalities.get("Atlantis"));
+        assertNull(Nationalities.get("Atlantis Mars Saturn Neptune"));
     }
 
     @Test
