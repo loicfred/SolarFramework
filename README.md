@@ -1,4 +1,4 @@
-# AstralCore Framework
+# SolarFramework
 
 A framework for built on Springboot that implements additional tools and shortcuts for development.
 It contains pre-made Spring components, beans as well as plenty of utility features.
