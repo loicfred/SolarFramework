@@ -24,6 +24,4 @@ public abstract class SlashCMD extends CMD {
     public SlashCommand getData() {
         return interactionData;
     }
-
-    public List<Long> whitelistedGuilds() {return List.of();}
 }

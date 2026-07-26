@@ -19,6 +19,4 @@ public abstract class MessageCMD extends CMD {
     public MessageCommand getData() {
         return interactionData;
     }
-
-    public List<Long> whitelistedGuilds() {return List.of();}
 }

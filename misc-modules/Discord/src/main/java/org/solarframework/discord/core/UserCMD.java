@@ -19,6 +19,4 @@ public abstract class UserCMD extends CMD {
     public UserCommand getData() {
         return interactionData;
     }
-
-    public List<Long> whitelistedGuilds() {return List.of();}
 }

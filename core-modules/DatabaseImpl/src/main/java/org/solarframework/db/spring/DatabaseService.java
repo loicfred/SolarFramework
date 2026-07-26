@@ -375,45 +375,57 @@ public class DatabaseService implements IDatabaseService {
         }
     }
 
+    /** Entities extending RECORD_OBJ are hidden from ORM-level reads once soft-deleted. Raw doQuery/doUpdate calls bypass this on purpose. */
+    private static boolean isSoftDeletable(Class<?> clazz) { return DatabaseObject.RECORD_OBJ.class.isAssignableFrom(clazz); }
+
+    private static String withActiveFilter(Class<?> clazz, String whereClause) {
+        if (!isSoftDeletable(clazz)) return whereClause;
+        return whereClause == null || whereClause.isBlank() ? "DeletedAt IS NULL" : "(" + whereClause + ") AND DeletedAt IS NULL";
+    }
+
+    /** Bypasses the soft-delete filter on purpose - if the caller already has an ID, they get the row even if it was soft-deleted. */
     public <T> Optional<T> getById(String select, Class<T> clazz, Object... id) {
-        return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + IdFields.get(clazz.getName()).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")), id);
+        String where = IdFields.get(clazz.getName()).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
+        return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + where, id);
     }
     public <T> Optional<T> getById(Class<T> clazz, Object... id) {
         return getById("*", clazz, id);
     }
 
     public <T> Optional<T> getWhere(String select, Class<T> clazz, String whereClause, Object... args) {
-        return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + whereClause, args);
+        return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + withActiveFilter(clazz, whereClause), args);
     }
     public <T> Optional<T> getWhere(Class<T> clazz, String whereClause, Object... args) {
         return getWhere("*", clazz, whereClause, args);
     }
 
     public <T> List<T> getAll(String select, Class<T> clazz) {
-        return this.doQueryAll(clazz, "SELECT " + select + " FROM " + getTableName(clazz), null);
+        String where = withActiveFilter(clazz, null);
+        return this.doQueryAll(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + (where == null ? "" : " WHERE " + where), null);
     }
     public <T> List<T> getAll(Class<T> clazz) {
         return getAll("*", clazz);
     }
 
     public <T> List<T> getAllWhere(String select, Class<T> clazz, String whereClause, Object... args) {
-        return this.doQueryAll(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + whereClause, args);
+        return this.doQueryAll(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + withActiveFilter(clazz, whereClause), args);
     }
     public <T> List<T> getAllWhere(Class<T> clazz, String whereClause, Object... args) {
         return getAllWhere("*", clazz, whereClause, args);
     }
     public <T> Set<T> getAllWhereDistinct(String select, Class<T> clazz, String whereClause, Object... args) {
-        return this.doQueryAllDistinct(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + whereClause, args);
+        return this.doQueryAllDistinct(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + withActiveFilter(clazz, whereClause), args);
     }
     public <T> Set<T> getAllWhereDistinct(Class<T> clazz, String whereClause, Object... args) {
         return getAllWhereDistinct("*", clazz, whereClause, args);
     }
 
     public <T> int Count(Class<T> clazz) {
-        return this.doQueryValue(Integer.class, "SELECT COUNT(*) FROM " + getTableName(clazz)).orElse(0);
+        String where = withActiveFilter(clazz, null);
+        return this.doQueryValue(Integer.class, "SELECT COUNT(*) FROM " + getTableName(clazz) + (where == null ? "" : " WHERE " + where)).orElse(0);
     }
     public <T> int Count(Class<T> clazz, String whereClause, Object... args) {
-        return this.doQueryValue(Integer.class, "SELECT COUNT(*) FROM " + getTableName(clazz) + " WHERE " + whereClause, args).orElse(0);
+        return this.doQueryValue(Integer.class, "SELECT COUNT(*) FROM " + getTableName(clazz) + " WHERE " + withActiveFilter(clazz, whereClause), args).orElse(0);
     }
 
     public <T> T getRandom(String select, Class<T> clazz) {

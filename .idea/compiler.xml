@@ -7,6 +7,7 @@
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="CertificateGenerator" />
+        <module name="TournamentImpl" />
         <module name="SpringProxyServerImplV2" />
         <module name="DatabaseEditor" />
         <module name="WebUtils" />
@@ -15,6 +16,7 @@
         <module name="JSON" />
         <module name="DatabaseAPI" />
         <module name="ProxyServerAPI" />
+        <module name="TournamentAPI" />
         <module name="DatabaseA" />
         <module name="core" />
         <module name="Excel" />
@@ -67,6 +69,8 @@
       <module name="SpringProxyServerImplV1" options="-parameters" />
       <module name="SpringProxyServerImplV2" options="-parameters" />
       <module name="StaffAuthenticationAPI" options="-parameters" />
+      <module name="TournamentAPI" options="-parameters" />
+      <module name="TournamentImpl" options="-parameters" />
       <module name="WebUtils" options="-parameters" />
       <module name="ZIP" options="-parameters" />
       <module name="core" options="-parameters" />

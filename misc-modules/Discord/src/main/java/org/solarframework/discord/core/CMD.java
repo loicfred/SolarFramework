@@ -39,12 +39,6 @@ public class CMD {
     protected Interaction IT;
     protected Discord_GuildInfo GI;
 
-    protected String SYSL(String key, Object... var) {
-        return org.solarframework.discord.lang.L10N.SYSL(IT, key, var);
-    }
-    protected String SYSLG(String key, Object... var) {
-        return org.solarframework.discord.lang.L10N.SYSLG(currentGuild(), key, var);
-    }
     protected String TL(String key, Object... var) {
         return org.solarframework.discord.lang.L10N.TL(IT, key, var);
     }
@@ -69,13 +63,13 @@ public class CMD {
 
     public boolean isChannelOfType(InteractionHook M, GuildChannel C, ChannelType type) {
         if (C == null && M != null) {
-            M.editOriginal(SYSL("missing-channel")).queue();
+            M.editOriginal(TL("missing-channel")).queue();
         } else if (C != null) {
             if (C.getType().equals(type)) return true;
             if (M != null) {
-                M.editOriginal("**[" + C.getAsMention() + "]** " + SYSL("wrong-channel-type-text")).queue();
+                M.editOriginal("**[" + C.getAsMention() + "]** " + TL("wrong-channel-type-text")).queue();
             } else {
-                LogGuild("**[" + C.getAsMention() + "]** " + SYSLG("wrong-channel-type-text"));
+                LogGuild("**[" + C.getAsMention() + "]** " + TLG("wrong-channel-type-text"));
             }
         }
         return false;
@@ -92,35 +86,35 @@ public class CMD {
     }
     public boolean isAdmin(InteractionHook M, Member member) {
         if (isAdmin(member)) return true;
-        M.editOriginal(SYSL("reply-failed-not-enough-permission-you", "ADMINISTRATOR")).queue();
+        M.editOriginal(TL("reply-failed-not-enough-permission-you", "ADMINISTRATOR")).queue();
         return false;
     }
 
     public boolean hasPermissionOverRole(InteractionHook M, Role R) {
         if (R == null && M != null) {
-            M.editOriginal(SYSL("missing-role")).queue();
+            M.editOriginal(TL("missing-role")).queue();
         } else if (R != null) {
             Member U = R.getGuild().getSelfMember();
             if (U.canInteract(R)) return true;
             if (M != null) {
-                M.editOriginal(SYSL("role-access-interact-fail", R.getName())).queue();
+                M.editOriginal(TL("role-access-interact-fail", R.getName())).queue();
             } else {
-                LogGuild(SYSLG("role-access-interact-fail", R.getName()));
+                LogGuild(TLG("role-access-interact-fail", R.getName()));
             }
         }
         return false;
     }
     public boolean hasPermissionInChannel(InteractionHook M, GuildChannel C, Permission... Perm) {
         if (C == null && M != null) {
-            M.editOriginal(SYSL("missing-channel")).queue();
+            M.editOriginal(TL("missing-channel")).queue();
         } else if (C != null) {
             Member U = C.getGuild().getSelfMember();
             if (U.hasPermission(C, Perm)) return true;
             List<Permission> MissingPerms = Arrays.stream(Perm).filter(P -> !U.hasPermission(C, P)).toList();
             if (M != null) {
-                M.editOriginal("**[" + C.getAsMention() + "]** " + SYSL("missing-perm") + "\n" + MissingPerms.stream().map(P -> "> - " + P.getName()).collect(Collectors.joining("\n"))).queue();
+                M.editOriginal("**[" + C.getAsMention() + "]** " + TL("missing-perm") + "\n" + MissingPerms.stream().map(P -> "> - " + P.getName()).collect(Collectors.joining("\n"))).queue();
             } else {
-                LogGuild("**[" + C.getAsMention() + "]** " + SYSLG("missing-perm") + "\n" + MissingPerms.stream().map(P -> "> - " + P.getName()).collect(Collectors.joining("\n")));
+                LogGuild("**[" + C.getAsMention() + "]** " + TLG("missing-perm") + "\n" + MissingPerms.stream().map(P -> "> - " + P.getName()).collect(Collectors.joining("\n")));
             }
         }
         return false;
@@ -134,7 +128,7 @@ public class CMD {
     }
     public boolean isFromGuild(InteractionHook M) {
         if (isFromGuild()) return true;
-        M.editOriginal(SYSL("reply-failed-not-in-guild")).queue();
+        M.editOriginal(TL("reply-failed-not-in-guild")).queue();
         return false;
     }
 
@@ -143,7 +137,7 @@ public class CMD {
     }
     public boolean isUserInGuild(InteractionHook M, String userID) {
         if (isUserInGuild(userID)) return true;
-        M.editOriginal(SYSL("user-not-part-of-guild")).queue();
+        M.editOriginal(TL("user-not-part-of-guild", "<@" + userID + ">")).queue();
         return false;
     }
     public boolean isUserInGuild(Guild guild, String userID) {
@@ -151,7 +145,7 @@ public class CMD {
     }
     public boolean isUserInGuild(InteractionHook M, Guild guild, String userID) {
         if (isUserInGuild(guild, userID)) return true;
-        M.editOriginal(SYSL("user-not-part-of-guild")).queue();
+        M.editOriginal(TL("user-not-part-of-guild", "<@" + userID + ">")).queue();
         return false;
     }
 

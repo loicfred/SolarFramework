@@ -16,10 +16,10 @@ public class Constants {
     public static void main(String[] args) throws IOException {
 
         BufferedImage img2 = ImageUtils.replaceAllMatchingColor(
-                new File("D:/Letters.png"),
+                new File("D:/Texture.png"),
                 Color.decode("#000000"),
-                new Color(0,0,0, 0), 180
+                new Color(255,255,255, 255), 50
         );
-        ImageIO.write(img2, "png", new File("D:/Letters2.png"));
+        ImageIO.write(img2, "png", new File("D:/Texture2.png"));
     }
 }

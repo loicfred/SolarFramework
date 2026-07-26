@@ -22,6 +22,8 @@
         <module>core-modules/Plugin</module>
         <module>core-modules/Language</module>
         <module>core-modules/JSON</module>
+        <module>core-modules/TournamentAPI</module>
+        <module>core-modules/TournamentImpl</module>
         <module>web-modules/WebUtils</module>
         <module>web-modules/DatabaseEditor</module>
         <module>web-modules/ProxyServerAPI</module>
@@ -100,6 +102,16 @@
             <dependency>
                 <groupId>org.solarframework.mu</groupId>
                 <artifactId>Plugin</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>TournamentAPI</artifactId>
+                <version>1.0</version>
+            </dependency>
+            <dependency>
+                <groupId>org.solarframework.mu</groupId>
+                <artifactId>TournamentImpl</artifactId>
                 <version>1.0</version>
             </dependency>
 

@@ -21,7 +21,7 @@ import static org.solarframework.core.util.OtherUtils.getHexValue;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
-import static org.solarframework.discord.lang.L10N.SYSLG;
+import static org.solarframework.discord.lang.L10N.TLG;
 
 @Entity
 @Table(name = "discord_guildinfo")
@@ -400,7 +400,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
                             .setColor(color)
                             .setHoisted(true)
                             .submit().orTimeout(10, TimeUnit.SECONDS).get();
-                    LogGuild(SYSLG(getGuild(),"role-create", emoji + " **__" + name + "__**"));
+                    LogGuild(TLG(getGuild(),"role-create", emoji + " **__" + name + "__**"));
                     DRI = setUsageRole(action, newrole);
                 } else {
                     DRI = setUsageRole(action, getGuild().getRolesByName(name, false).getFirst());
@@ -409,7 +409,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
                 setRoleIcon(DRI, icon, false);
                 return DRI;
             } else {
-                LogGuild(SYSLG(getGuild(),"role-create-permission-fail",  emoji + " **__" + name + "__**"));
+                LogGuild(TLG(getGuild(),"role-create-permission-fail",  emoji + " **__" + name + "__**"));
             }
         } catch (Exception ignored) {}
         return null;
@@ -420,14 +420,14 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
                 if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
                     if (DRI.getRole().getIcon() == null || replace) { // if not exist, then true, and true if replace too
                         if (getGuild().getSelfMember().canInteract(DRI.getRole())) {
-                            DRI.getRole().getManager().setIcon(icon).queue(_ ->  LogGuild(SYSLG(getGuild(),"role-icon-success", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**")));
+                            DRI.getRole().getManager().setIcon(icon).queue(_ ->  LogGuild(TLG(getGuild(),"role-icon-success", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**")));
                             return true;
                         } else {
-                            LogGuild(SYSLG(getGuild(),"role-icon-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
+                            LogGuild(TLG(getGuild(),"role-icon-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
                         }
                     }
                 } else {
-                    LogGuild(SYSLG(getGuild(),"role-icon-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
+                    LogGuild(TLG(getGuild(),"role-icon-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
                 }
             }
         } catch (Exception ignored) {}
@@ -438,13 +438,13 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
             if (DRI.getRole().getColors().getPrimary() == null || !getHexValue(DRI.getRole().getColors().getPrimary()).equals(getHexValue(color))) {
                 if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
                     if (getGuild().getSelfMember().canInteract(DRI.getRole())) {
-                        DRI.getRole().getManager().setColor(color).queue(_ -> LogGuild(SYSLG(getGuild(),"role-recolor-success",DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + getHexValue(color) + "**")));
+                        DRI.getRole().getManager().setColor(color).queue(_ -> LogGuild(TLG(getGuild(),"role-recolor-success",DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + getHexValue(color) + "**")));
                         return true;
                     } else {
-                        LogGuild(SYSLG(getGuild(),"role-recolor-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
+                        LogGuild(TLG(getGuild(),"role-recolor-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
                     }
                 } else {
-                    LogGuild(SYSLG(getGuild(),"role-recolor-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
+                    LogGuild(TLG(getGuild(),"role-recolor-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
                 }
             }
         } catch (Exception ignored) {}
@@ -455,13 +455,13 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
             if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
                 if (getGuild().getSelfMember().canInteract(DRI.getRole())) {
                     String oldName = DRI.getRole().getName();
-                    DRI.getRole().getManager().setName(newname).queue(_ -> LogGuild(SYSLG(getGuild(),"role-rename-success","**" + oldName + "**", DRI.getEmoji() + " **__" + newname + "__**")));
+                    DRI.getRole().getManager().setName(newname).queue(_ -> LogGuild(TLG(getGuild(),"role-rename-success","**" + oldName + "**", DRI.getEmoji() + " **__" + newname + "__**")));
                     return true;
                 } else {
-                    LogGuild(SYSLG(getGuild(),"role-rename-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
+                    LogGuild(TLG(getGuild(),"role-rename-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
                 }
             } else {
-                LogGuild(SYSLG(getGuild(),"role-rename-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
+                LogGuild(TLG(getGuild(),"role-rename-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
             }
         } catch (Exception ignored) {}
         return false;
@@ -470,13 +470,13 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         try {
             if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
                 if (getGuild().getSelfMember().canInteract(DRI.getRole())) {
-                    DRI.getRole().delete().queue(_ ->  LogGuild(SYSLG(getGuild(),"role-delete-success",DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**")));
+                    DRI.getRole().delete().queue(_ ->  LogGuild(TLG(getGuild(),"role-delete-success",DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**")));
                     return true;
                 } else {
-                    LogGuild(SYSLG(getGuild(),"role-delete-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
+                    LogGuild(TLG(getGuild(),"role-delete-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
                 }
             } else {
-                LogGuild(SYSLG(getGuild(),"role-delete-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
+                LogGuild(TLG(getGuild(),"role-delete-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**"));
             }
         } catch (Exception ignored) {}
         return false;
@@ -487,13 +487,13 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
                 if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
                     if (getGuild().getSelfMember().canInteract(DRI.getRole())) {
                         getGuild().removeRoleFromMember(member, DRI.getRole()).queue();
-                        getGuild().addRoleToMember(member, DRI.getRole()).queue(_ -> LogGuild(SYSLG(getGuild(),"role-add-success", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**")));
+                        getGuild().addRoleToMember(member, DRI.getRole()).queue(_ -> LogGuild(TLG(getGuild(),"role-add-success", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**")));
                         return true;
                     } else {
-                        LogGuild(SYSLG(getGuild(),"role-add-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**"));
+                        LogGuild(TLG(getGuild(),"role-add-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**"));
                     }
                 } else {
-                    LogGuild(SYSLG(getGuild(),"role-add-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**"));
+                    LogGuild(TLG(getGuild(),"role-add-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**"));
                 }
             }
         } catch (Exception ignored) {}
@@ -505,13 +505,13 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
                 if (getGuild().getSelfMember().hasPermission(Permission.MANAGE_ROLES)) {
                     if (getGuild().getSelfMember().canInteract(DRI.getRole())) {
                         getGuild().addRoleToMember(member, DRI.getRole()).queue();
-                        getGuild().removeRoleFromMember(member, DRI.getRole()).queue(_ -> LogGuild(SYSLG(getGuild(),"role-remove-success",DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**")));
+                        getGuild().removeRoleFromMember(member, DRI.getRole()).queue(_ -> LogGuild(TLG(getGuild(),"role-remove-success",DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**")));
                         return true;
                     } else {
-                        LogGuild(SYSLG(getGuild(),"role-remove-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**"));
+                        LogGuild(TLG(getGuild(),"role-remove-interact-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**"));
                     }
                 } else {
-                    LogGuild(SYSLG(getGuild(),"role-remove-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**"));
+                    LogGuild(TLG(getGuild(),"role-remove-permission-fail", DRI.getEmoji() + " **__" + DRI.getRole().getName() + "__**", "**" + member.getEffectiveName() + "**"));
                 }
             }
         } catch (Exception ignored) {}

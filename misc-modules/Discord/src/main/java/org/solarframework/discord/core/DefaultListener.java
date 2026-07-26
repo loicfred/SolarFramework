@@ -27,6 +27,7 @@ import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.solarframework.discord.core.annotation.GMessageCommand;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,6 +45,9 @@ public class DefaultListener extends ListenerAdapter {
     private final static Logger log = LoggerFactory.getLogger(DefaultListener.class);
 
     protected static List<SlashCMD> SlashCommands;
+    protected static List<GSlashCMD> GSlashCommands;
+    protected static List<GUserCMD> GUserCommands;
+    protected static List<GMessageCMD> GMessageCommands;
     protected static List<UserCMD> UserCommands;
     protected static List<MessageCMD> MessageCommands;
     protected static List<ButtonCMD> ButtonCommands;
@@ -76,6 +80,10 @@ public class DefaultListener extends ListenerAdapter {
 
     @Override
     public void onSlashCommandInteraction(@NotNull SlashCommandInteractionEvent e) {
+        GSlashCommands.stream().filter(cmd -> e.getName().equals(cmd.getData().name())).findFirst().ifPresent(cmd -> {
+            cmd.IT = e;
+            cmd.onSlash(e);
+        });
         SlashCommands.stream().filter(cmd -> e.getName().equals(cmd.getData().name())).findFirst().ifPresent(cmd -> {
             cmd.IT = e;
             cmd.onSlash(e);
@@ -143,6 +151,7 @@ public class DefaultListener extends ListenerAdapter {
 
     public DefaultListener(String commandPackage) {
         log.info("Loaded {} slash commands.", (SlashCommands = loadClasses(SlashCMD.class, commandPackage)).size());
+        log.info("Loaded {} guild slash commands.", (GSlashCommands = loadClasses(GSlashCMD.class, commandPackage)).size());
         log.info("Loaded {} user commands.", (UserCommands = loadClasses(UserCMD.class, commandPackage)).size());
         log.info("Loaded {} message commands.", (MessageCommands = loadClasses(MessageCMD.class, commandPackage)).size());
         log.info("Loaded {} buttons.", (ButtonCommands = loadClasses(ButtonCMD.class, commandPackage)).size());
@@ -176,7 +185,7 @@ public class DefaultListener extends ListenerAdapter {
     @SuppressWarnings("unchecked")
     private static <T> List<T> loadClasses(Class<T> clazz, String commandPackage) {
         List<T> L = new ArrayList<>();
-        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(classLoaders.toArray(new ClassLoader[]{})).acceptPackages(commandPackage).scan()) {
+        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(classLoaders.toArray(new ClassLoader[]{})).acceptPackages(commandPackage, CMD.class.getPackageName()).scan()) {
             for (ClassInfo classInfo : scanResult.getSubclasses(clazz).stream().filter(c -> !c.isAbstract()).toList()) {
                 try {
                     L.add((T) classInfo.loadClass().getDeclaredConstructor().newInstance());
@@ -214,25 +223,33 @@ public class DefaultListener extends ListenerAdapter {
     }
     public static void SetupGuildCommands(Guild guild) {
         List<CommandData> CMD = new ArrayList<>();
-        for (SlashCMD cmd : SlashCommands.stream().filter(cmd -> cmd.whitelistedGuilds().contains(guild.getIdLong()) && Arrays.stream(cmd.getData().integrationType()).allMatch(i -> i == IntegrationType.GUILD_INSTALL) && Arrays.stream(cmd.getData().integrationContextType()).allMatch(i -> i == InteractionContextType.GUILD)).toList()) {
+        for (GSlashCMD cmd : GSlashCommands.stream().filter(g -> g.conditionToAdd(guild)).toList()) {
             CMD.add(Commands.slash(cmd.getData().name(), cmd.getData().description())
-                    .addOptions(cmd.commandParameters())
+                    .addOptions(cmd.commandParameters(guild))
                     .setNSFW(cmd.getData().nsfw())
-                    .setIntegrationTypes(cmd.getData().integrationType())
-                    .setContexts(cmd.getData().integrationContextType()));
+                    .setIntegrationTypes(IntegrationType.GUILD_INSTALL)
+                    .setContexts(InteractionContextType.GUILD));
         }
-        for (UserCMD cmd : UserCommands.stream().filter(cmd -> cmd.whitelistedGuilds().contains(guild.getIdLong()) && Arrays.stream(cmd.getData().integrationType()).allMatch(i -> i == IntegrationType.GUILD_INSTALL) && Arrays.stream(cmd.getData().integrationContextType()).allMatch(i -> i == InteractionContextType.GUILD)).toList()) {
+        for (GUserCMD cmd : GUserCommands.stream().filter(g -> g.conditionToAdd(guild)).toList()) {
             CMD.add(Commands.user(cmd.getData().name())
                     .setNSFW(cmd.getData().nsfw())
-                    .setIntegrationTypes(cmd.getData().integrationType())
-                    .setContexts(cmd.getData().integrationContextType()));
+                    .setIntegrationTypes(IntegrationType.GUILD_INSTALL)
+                    .setContexts(InteractionContextType.GUILD));
         }
-        for (MessageCMD cmd : MessageCommands.stream().filter(cmd -> cmd.whitelistedGuilds().contains(guild.getIdLong()) && Arrays.stream(cmd.getData().integrationType()).allMatch(i -> i == IntegrationType.GUILD_INSTALL) && Arrays.stream(cmd.getData().integrationContextType()).allMatch(i -> i == InteractionContextType.GUILD)).toList()) {
+        for (GMessageCMD cmd : GMessageCommands.stream().filter(g -> g.conditionToAdd(guild)).toList()) {
             CMD.add(Commands.message(cmd.getData().name())
                     .setNSFW(cmd.getData().nsfw())
-                    .setIntegrationTypes(cmd.getData().integrationType())
-                    .setContexts(cmd.getData().integrationContextType()));
+                    .setIntegrationTypes(IntegrationType.GUILD_INSTALL)
+                    .setContexts(InteractionContextType.GUILD));
         }
         guild.updateCommands().addCommands(CMD).queue();
+    }
+
+    public static void addGuildSlashCommand(Guild guild, SlashCMD cmd) {
+        guild.upsertCommand(Commands.slash(cmd.getData().name(), cmd.getData().description())
+                .addOptions(cmd.commandParameters())
+                .setNSFW(cmd.getData().nsfw())
+                .setIntegrationTypes(cmd.getData().integrationType())
+                .setContexts(cmd.getData().integrationContextType())).queue();
     }
 }

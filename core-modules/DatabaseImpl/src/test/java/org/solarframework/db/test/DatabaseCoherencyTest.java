@@ -152,11 +152,13 @@ class DatabaseCoherencyTest {
     }
 
     @Test
-    void deletingUserWithOrdersFailsAndUserStaysReadable() {
+    void trueDeletingUserWithOrdersFailsAndUserStaysReadable() {
+        // Delete() is now a soft delete (sets DeletedAt) so it never touches the FK-constrained
+        // column and can't violate it - only TrueDelete() issues a real DELETE that can.
         makeNewUserWith2Orders(1);
         User me = fetchUser(1);
 
-        assertThrows(RuntimeException.class, me::Delete, "FK constraint must block deleting a user that still has orders");
+        assertThrows(RuntimeException.class, me::TrueDelete, "FK constraint must block hard-deleting a user that still has orders");
 
         assertTrue(SolarDBManager.getById(User.class, 1L).isPresent(), "user must still be readable after the failed delete");
         assertEquals(2, fetchUser(1).getOrders().size());
@@ -176,9 +178,10 @@ class DatabaseCoherencyTest {
         assertEquals(1, SolarDBManager.getServiceByEntity(Order.class).doUpdate(Order.class, "DELETE FROM orders WHERE id = ?", 102L));
         assertEquals(1, fetchUser(1).Delete());
 
-        assertTrue(SolarDBManager.getById(User.class, 1L).isEmpty());
-        assertTrue(SolarDBManager.getById(Order.class, 101L).isEmpty());
-        assertTrue(SolarDBManager.getAll(Order.class).isEmpty());
+        // getById bypasses the soft-delete filter on purpose - a caller who already has the ID can still fetch the row
+        assertTrue(SolarDBManager.getById(User.class, 1L).map(User::getDeletedAt).isPresent(), "getById must still find a soft-deleted user");
+        assertTrue(SolarDBManager.getById(Order.class, 101L).map(Order::getDeletedAt).isPresent(), "getById must still find a soft-deleted order");
+        assertTrue(SolarDBManager.getAll(Order.class).isEmpty(), "listing must exclude the soft-deleted order");
         List<User> all = SolarDBManager.getAll(User.class);
         assertEquals(1, all.size());
         assertEquals(2L, all.getFirst().getID());

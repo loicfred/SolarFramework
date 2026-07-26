@@ -1,12 +1,14 @@
 package org.solarframework.db.test.obj;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.SQLRestriction;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
 
 @Entity
 @Table(name = "orders")
+@SQLRestriction("DeletedAt IS NULL")
 public class Order extends DatabaseObject.ID_RECORD_OBJ<Long, Order> {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(referencedColumnName = "ID", name = "UserID", nullable = false, insertable = false, updatable = false)

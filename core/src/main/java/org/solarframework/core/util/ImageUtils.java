@@ -104,10 +104,11 @@ public class ImageUtils {
         for (int y = 0; y < height; y++) {
             for (int x = 0; x < width; x++) {
                 int pixel = image.getRGB(x, y);
+                int a = (pixel >> 24) & 0xff;
                 int r = (pixel >> 16) & 0xff;
                 int g = (pixel >> 8) & 0xff;
                 int b = pixel & 0xff;
-
+                if (a == 0) continue;
                 if (Math.abs(r - targetR) <= tolerance && Math.abs(g - targetG) <= tolerance && Math.abs(b - targetB) <= tolerance) {
                     result.setRGB(x, y, newRGBA);
                 } else {
