@@ -274,7 +274,8 @@ public enum DatabaseType {
     public String UpsertBatch(String table, String columns, List<String> questionMarks, String duplicateKeyUpdateClause, String conflictColumn) {
         return switch (this) {
             case MYSQL, MARIADB -> "INSERT INTO " + table + " (" + columns + ") VALUES " + questionMarks.stream().map(s -> "(" + s + ")").collect(Collectors.joining(",")) + (duplicateKeyUpdateClause != null ? " ON DUPLICATE KEY UPDATE " + duplicateKeyUpdateClause : "");
-            case POSTGRESQL, SQLITE, COCKROACHDB  -> "INSERT INTO " + table + " (" + columns + ") VALUES (" + questionMarks + ")" + (duplicateKeyUpdateClause != null ? " ON CONFLICT" + (conflictColumn != null ? "(" + conflictColumn + ")" : "") + " DO UPDATE SET " + duplicateKeyUpdateClause : "");
+            // one placeholder group per row, not the List's toString - "VALUES ([a, b])" is not SQL
+            case POSTGRESQL, SQLITE, COCKROACHDB  -> "INSERT INTO " + table + " (" + columns + ") VALUES " + questionMarks.stream().map(s -> "(" + s + ")").collect(Collectors.joining(",")) + (duplicateKeyUpdateClause != null ? " ON CONFLICT" + (conflictColumn != null ? "(" + conflictColumn + ")" : "") + " DO UPDATE SET " + duplicateKeyUpdateClause : "");
             case H2 -> (duplicateKeyUpdateClause == null ? "INSERT" : "MERGE") + " INTO " + table + " (" + columns + ")"
                     + (duplicateKeyUpdateClause != null && conflictColumn != null ? " KEY(" + conflictColumn + ")" : "")
                     + " VALUES " + questionMarks.stream().map(s -> "(" + s + ")").collect(Collectors.joining(","));

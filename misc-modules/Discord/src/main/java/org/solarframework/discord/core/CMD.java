@@ -2,6 +2,7 @@ package org.solarframework.discord.core;
 
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.components.ModalTopLevelComponent;
+import net.dv8tion.jda.api.components.actionrow.ActionRow;
 import net.dv8tion.jda.api.components.attachmentupload.AttachmentUpload;
 import net.dv8tion.jda.api.components.buttons.Button;
 import net.dv8tion.jda.api.components.checkboxgroup.CheckboxGroup;
@@ -24,6 +25,7 @@ import net.dv8tion.jda.api.interactions.InteractionHook;
 import net.dv8tion.jda.api.interactions.callbacks.IReplyCallback;
 import net.dv8tion.jda.api.modals.Modal;
 import org.solarframework.discord.obj.Discord_GuildInfo;
+import org.solarframework.discord.utils.Pager;
 
 import java.lang.reflect.Constructor;
 import java.util.Arrays;
@@ -186,7 +188,7 @@ public class CMD {
             return StringSelectMenu.create(id)
                     .setPlaceholder(TL(Menu.getData().placeholder()))
                     .setRequiredRange(Menu.getData().minValues(), Menu.getData().maxValues()).addOptions(options)
-                    .setRequired(Menu.getData().required());
+                    .setRequired(Menu.getData().minValues() > 0 && Menu.getData().required());
 
         } catch (Exception ignored) {
             return null;
@@ -201,7 +203,7 @@ public class CMD {
             return EntitySelectMenu.create(id, Menu.getData().type())
                     .setPlaceholder(TL(Menu.getData().placeholder()))
                     .setRequiredRange(Menu.getData().minValues(), Menu.getData().maxValues())
-                    .setRequired(Menu.getData().required());
+                    .setRequired(Menu.getData().minValues() > 0 && Menu.getData().required());
         } catch (Exception ignored) {
             return null;
         }
@@ -229,13 +231,20 @@ public class CMD {
             Constructor<T> constructor = clazz.getDeclaredConstructor(Arrays.stream(args).map(Object::getClass).toArray(Class[]::new));
             T obj = constructor.newInstance(args);
             obj.IT = IT;
-            obj.GI = GI;
+            if (obj.GI == null) obj.GI = currentGuild();
             return obj;
         } catch (Exception ignored) {
             return null;
         }
     }
 
+    protected ActionRow makePageRow(Class<? extends ButtonCMD> pager, int page, int perPage, int total, Object... metadata) {
+        int last = Pager.lastPage(perPage, total);
+        return last == 1 ? null : Pager.row(page, TL("page") + " " + page + "/" + last, page < last, p -> makeButton(pager, Pager.withPage(metadata, p)));
+    }
+    protected ActionRow makePageRow(Class<? extends ButtonCMD> pager, int page, boolean hasNext, Object... metadata) {
+        return page == 1 && !hasNext ? null : Pager.row(page, TL("page") + " " + page, hasNext, p -> makeButton(pager, Pager.withPage(metadata, p)));
+    }
 
     public static ModalTopLevelComponent makeTextInput(String label, String id, TextInputStyle style, String placeholder, int minLength, int maxLength, boolean required) {
         return Label.of(label, TextInput.create(id, style).setPlaceholder(placeholder).setRequiredRange(minLength, maxLength).setRequired(required).build());

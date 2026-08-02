@@ -1,6 +1,7 @@
 package org.solarframework.tournament.impl.obj;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.OneToMany;
@@ -30,6 +31,7 @@ import java.util.stream.Collectors;
  * testable and the renderers usable offline.
  */
 @Entity
+@DiscriminatorValue("0")
 public class Tournament extends ITournament {
     private static final Logger log = LoggerFactory.getLogger(Tournament.class);
 
@@ -75,12 +77,26 @@ public class Tournament extends ITournament {
         return retrieveEntityServiceFor(ITournament.class).getById(tournamentID).map(t -> (Tournament) t);
     }
 
-    /** Writes the whole aggregate: tournament, entrants, rosters, phases, tables, matches, games. */
+    /**
+     * Writes the whole aggregate: tournament, entrants, rosters, phases, tables, matches, games.
+     *
+     * <p>One batched statement per entity type instead of one per row. A full save used to be
+     * {@code 1 + entrants + roster + phases * (1 + standings + matches * (1 + games))} round trips, which
+     * is several hundred for a 64-entrant run and is paid on every start, every reported score and every
+     * phase advance.
+     */
     @Override
     public void save() {
         Upsert();
-        for (IParticipant p : getParticipants()) { p.Upsert(); p.getMembers().forEach(DatabaseObject::Upsert); }
-        for (IPhase phase : getPhases()) phase.save();
+        List<IParticipant> entrants = getParticipants();
+        DatabaseObject.UpsertAll(entrants);
+        DatabaseObject.UpsertAll(entrants.stream().flatMap(p -> p.getMembers().stream()).toList());
+        List<IPhase> phases = getPhases();
+        DatabaseObject.UpsertAll(phases);
+        DatabaseObject.UpsertAll(phases.stream().flatMap(p -> p.getStandings().stream()).toList());
+        List<IMatch> matches = phases.stream().flatMap(p -> p.getMatches().stream()).toList();
+        DatabaseObject.UpsertAll(matches);
+        DatabaseObject.UpsertAll(matches.stream().flatMap(m -> m.getGames().stream()).toList());
     }
 
     @Override
@@ -149,6 +165,7 @@ public class Tournament extends ITournament {
     public void finish() {
         List<IParticipant> ranking = computeFinalRanking();
         for (int i = 0; i < ranking.size(); i++) ranking.get(i).setFinalRank(i + 1);
+        DatabaseObject.UpsertAll(ranking); // the placements are read back by callers and after a restart, so they have to be written, not just held in memory
         setWinnerID(ranking.isEmpty() ? null : ranking.getFirst().getID());
         setRunnerUpID(ranking.size() < 2 ? null : ranking.get(1).getID());
         setThirdPlaceID(ranking.size() < 3 ? null : ranking.get(2).getID());
@@ -217,12 +234,13 @@ public class Tournament extends ITournament {
         return p;
     }
 
+    /** Pre-start only, so the entrant never played: they and their roster are hard-deleted rather than kept as a soft-deleted record. */
     @Override
     public void unregister(IParticipant p) {
         if (getStatus().isLive()) { withdraw(p); return; }
         getParticipants().remove(p);
-        p.getMembers().forEach(DatabaseObject::Delete);
-        p.Delete();
+        p.getMembers().forEach(IParticipantMember::TrueDelete);
+        p.TrueDelete();
         log.info("Unregistered '{}' from '{}'", p.getName(), getName());
         promoteFromWaitlist();
     }

@@ -78,7 +78,13 @@ public class Row {
     }
 
     public Optional<Boolean> getAsBooleanOptional(String fieldName) {
-        return getAsStringOptional(fieldName).map(Boolean::parseBoolean);
+        return get(fieldName).map(v -> switch (v) {
+            case Boolean b -> b;
+            case Number n -> n.intValue() != 0;
+            default -> { String s = v.toString(); yield s.equals("1") || s.equalsIgnoreCase("true")
+                    || s.equalsIgnoreCase("y") || s.equalsIgnoreCase("yes")
+                    || s.equalsIgnoreCase("p") || s.equalsIgnoreCase("position"); }
+        });
     }
     public Boolean getAsBoolean(String fieldName) {
         return getAsBooleanOptional(fieldName).orElse(null);

@@ -16,7 +16,7 @@ public final class HelpCMD extends SlashCMD {
     public void onSlash(SlashCommandInteractionEvent e) {
         e.deferReply(true).queue();
         Guild G = e.isFromAttachedGuild() ? e.getGuild() : null;
-        List<String> guildCMD = G == null ? List.of() : DefaultListener.GSlashCommands.stream().filter(c -> c.conditionToAdd(G)).map(c -> line(c.getData().name(), c.getData().description())).sorted().toList();
+        List<String> guildCMD = G == null ? List.of() : DefaultListener.GSlashCommands.stream().filter(c -> c.serverIds().contains(G.getIdLong())).map(c -> line(c.getData().name(), c.getData().description())).sorted().toList();
         List<String> globalCMD = DefaultListener.SlashCommands.stream().map(c -> line(c.getData().name(), c.getData().description())).sorted().toList();
 
         EmbedBuilder E = new EmbedBuilder().setTitle(TL("help-title")).setColor(new Color(88, 101, 242));

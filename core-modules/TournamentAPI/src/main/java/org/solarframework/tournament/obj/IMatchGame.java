@@ -1,8 +1,10 @@
 package org.solarframework.tournament.obj;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.DiscriminatorFormula;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.tournament.util.Ids;
+import org.solarframework.db.api.Lazy;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -24,9 +26,10 @@ import java.util.stream.Collectors;
 @Entity
 @Table(name = "tournament_match_game")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorFormula("'0'")
 public abstract class IMatchGame extends DatabaseObject.ID_RECORD_OBJ<Long, IMatchGame> {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "MatchID", nullable = false, insertable = false, updatable = false)
     private IMatch match;
 
@@ -41,9 +44,9 @@ public abstract class IMatchGame extends DatabaseObject.ID_RECORD_OBJ<Long, IMat
     private int score2 = 0;
     @Column(name = "WinnerID")
     private Long winnerID;
-    @Column(name = "IsTie", nullable = false)
-    private boolean tie = false;
-    @Column(name = "Forfeited", nullable = false)
+    @Column(name = "IsTie", nullable = false, columnDefinition = "TINYINT(1)")
+    private boolean isTie = false;
+    @Column(name = "Forfeited", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean forfeited = false;
     /** Map, stage, board colour - whatever varies game to game. */
     @Column(name = "Stage", length = 160)
@@ -78,9 +81,9 @@ public abstract class IMatchGame extends DatabaseObject.ID_RECORD_OBJ<Long, IMat
     /** Derives the game winner from its score, honouring the phase's draw rule. */
     public void decide() {
         IMatch m = getMatch();
-        if (score1 > score2) { winnerID = m == null ? null : m.getParticipantID1(); tie = false; }
-        else if (score2 > score1) { winnerID = m == null ? null : m.getParticipantID2(); tie = false; }
-        else { winnerID = null; tie = true; }
+        if (score1 > score2) { winnerID = m == null ? null : m.getParticipantID1(); isTie = false; }
+        else if (score2 > score1) { winnerID = m == null ? null : m.getParticipantID2(); isTie = false; }
+        else { winnerID = null; isTie = true; }
     }
 
     public IMatch getMatch() {
@@ -152,8 +155,8 @@ public abstract class IMatchGame extends DatabaseObject.ID_RECORD_OBJ<Long, IMat
     public void setScore2(int score2) { this.score2 = score2; }
     public Long getWinnerID() { return winnerID; }
     public void setWinnerID(Long winnerID) { this.winnerID = winnerID; }
-    public boolean isTie() { return tie; }
-    public void setTie(boolean tie) { this.tie = tie; }
+    public boolean isTie() { return isTie; }
+    public void setTie(boolean tie) { this.isTie = tie; }
     public boolean isForfeited() { return forfeited; }
     public void setForfeited(boolean forfeited) { this.forfeited = forfeited; }
     public String getStage() { return stage; }

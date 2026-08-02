@@ -2,6 +2,7 @@ package org.solarframework.tournament.obj;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import org.hibernate.annotations.DiscriminatorFormula;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.tournament.api.BracketSide;
 import org.solarframework.tournament.api.MatchDecisionMode;
@@ -9,6 +10,7 @@ import org.solarframework.tournament.api.MatchState;
 import org.solarframework.tournament.obj.convert.BracketSideConverter;
 import org.solarframework.tournament.obj.convert.MatchStateConverter;
 import org.solarframework.tournament.util.Ids;
+import org.solarframework.db.api.Lazy;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -30,9 +32,10 @@ import java.util.Optional;
 @Entity
 @Table(name = "tournament_match")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorFormula("'0'")
 public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "PhaseID", nullable = false, insertable = false, updatable = false)
     private IPhase phase;
 
@@ -92,11 +95,11 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
     private Long winnerID;
     @Column(name = "LoserID")
     private Long loserID;
-    @Column(name = "IsTie", nullable = false)
-    private boolean tie = false;
-    @Column(name = "Forfeit1", nullable = false)
+    @Column(name = "IsTie", nullable = false, columnDefinition = "TINYINT(1)")
+    private boolean isTie = false;
+    @Column(name = "Forfeit1", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean forfeit1 = false;
-    @Column(name = "Forfeit2", nullable = false)
+    @Column(name = "Forfeit2", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean forfeit2 = false;
 
     // ---- progression ----------------------------------------------------------------------------
@@ -245,17 +248,17 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
         boolean drawAllowed = phase != null && phase.isDrawAllowed();
         boolean byPoints = phase != null && phase.getMatchDecisionMode() == MatchDecisionMode.TOTAL_POINTS;
         int a = byPoints ? pointsFor1 : score1, b = byPoints ? pointsFor2 : score2;
-        if (a > b) { winnerID = participantID1; loserID = participantID2; tie = false; }
-        else if (b > a) { winnerID = participantID2; loserID = participantID1; tie = false; }
-        else if (drawAllowed) { winnerID = null; loserID = null; tie = true; }
-        else { winnerID = null; loserID = null; tie = false; }
+        if (a > b) { winnerID = participantID1; loserID = participantID2; isTie = false; }
+        else if (b > a) { winnerID = participantID2; loserID = participantID1; isTie = false; }
+        else if (drawAllowed) { winnerID = null; loserID = null; isTie = true; }
+        else { winnerID = null; loserID = null; isTie = false; }
     }
 
     /** Score, winner and timestamps for a match decided without play. */
     public void awardWalkover(Long walkoverWinnerID) {
         this.winnerID = walkoverWinnerID;
         this.loserID = getOpponentID(walkoverWinnerID).orElse(null);
-        this.tie = false;
+        this.isTie = false;
         if (Objects.equals(walkoverWinnerID, participantID1)) { score1 = getGamesToWin(); score2 = 0; forfeit2 = true; }
         else { score2 = getGamesToWin(); score1 = 0; forfeit1 = true; }
         setState(MatchState.WALKOVER);
@@ -266,12 +269,12 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
     public void awardBye() {
         this.winnerID = participantID1 != null ? participantID1 : participantID2;
         this.loserID = null;
-        this.tie = false;
+        this.isTie = false;
         setState(MatchState.BYE);
         this.completedAt = Instant.now();
     }
 
-    public boolean isTie() { return tie; }
+    public boolean isTie() { return isTie; }
     public boolean isComplete() { return getState().isDecided(); }
     public boolean isBye() { return getState() == MatchState.BYE; }
     public boolean isWalkover() { return getState() == MatchState.WALKOVER; }
@@ -370,7 +373,7 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
     public void setWinnerID(Long winnerID) { this.winnerID = winnerID; }
     public Long getLoserID() { return loserID; }
     public void setLoserID(Long loserID) { this.loserID = loserID; }
-    public void setTie(boolean tie) { this.tie = tie; }
+    public void setTie(boolean tie) { this.isTie = tie; }
     public boolean isForfeit1() { return forfeit1; }
     public void setForfeit1(boolean forfeit1) { this.forfeit1 = forfeit1; }
     public boolean isForfeit2() { return forfeit2; }

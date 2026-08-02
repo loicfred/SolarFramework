@@ -12,7 +12,11 @@ import java.util.List;
 public abstract class GSlashCMD extends CMD {
     private final GSlashCommand interactionData = this.getClass().getAnnotation(GSlashCommand.class);
 
-    public abstract boolean conditionToAdd(Guild guild);
+    private List<Long> serverIds = null;
+    protected List<Long> getServerIDs() {
+        return serverIds == null ? serverIds = serverIds() : serverIds;
+    }
+    public abstract List<Long> serverIds();
 
     public List<OptionData> commandParameters(Guild guild) {
         return List.of();

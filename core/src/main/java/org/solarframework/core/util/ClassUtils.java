@@ -4,12 +4,41 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.ParameterizedType;
+import java.net.URI;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 public class ClassUtils {
+
+    /**
+     * Makes a ClassLoader scannable by ClassGraph inside a Spring Boot executable jar.
+     * <p>Boot 3.2+ hands out its classpath as {@code jar:nested:/app.jar/!BOOT-INF/lib/x.jar!/} URLs; ClassGraph has no
+     * handler for the {@code nested:} scheme, so {@code overrideClassLoaders(launchedClassLoader)} scans zero classes and
+     * every annotated class silently disappears - while the exact same code works from the IDE. Rewriting the URLs to the
+     * classic {@code jar:file:/app.jar!/BOOT-INF/lib/x.jar!/} form fixes it. The real loader stays as parent, so
+     * {@code ClassInfo.loadClass()} still returns the application's own Class objects.
+     */
+    public static ClassLoader scannable(ClassLoader cl) {
+        if (!(cl instanceof URLClassLoader u)) return cl;
+        URL[] urls = u.getURLs();
+        if (Arrays.stream(urls).noneMatch(x -> x.toString().contains("nested:"))) return cl;
+        return new URLClassLoader(Arrays.stream(urls).map(ClassUtils::unnest).toArray(URL[]::new), cl);
+    }
+    public static ClassLoader[] scannable(java.util.Collection<ClassLoader> cls) {
+        return cls.stream().map(ClassUtils::scannable).toArray(ClassLoader[]::new);
+    }
+    private static URL unnest(URL u) {
+        String s = u.toString();
+        if (!s.contains("nested:")) return u;
+        s = s.replace("nested:", "file:");
+        int i = s.indexOf("/!");
+        if (i >= 0) s = s.substring(0, i) + "!/" + s.substring(i + 2);
+        try { return URI.create(s).toURL(); } catch (Exception e) { return u; }
+    }
 
     public static Class<?> getMainClass() {
         for (StackTraceElement element : Thread.currentThread().getStackTrace()) {
@@ -85,5 +114,10 @@ public class ClassUtils {
             return null;
         }
     }
-
+    public static <A extends Annotation> A getAnnotationRecursive(Class<?> clazz, Class<A> annotationClass) {
+        if (clazz == null || clazz == Object.class) return null;
+        A annotation = clazz.getAnnotation(annotationClass);
+        if (annotation != null) return annotation;
+        return getAnnotationRecursive(clazz.getSuperclass(), annotationClass);
+    }
 }

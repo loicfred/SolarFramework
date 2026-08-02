@@ -1,9 +1,11 @@
 package org.solarframework.tournament.obj;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.DiscriminatorFormula;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.tournament.api.MatchState;
 import org.solarframework.tournament.util.Ids;
+import org.solarframework.db.api.Lazy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,9 +22,10 @@ import java.util.stream.Stream;
 @Entity
 @Table(name = "tournament_standing")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorFormula("'0'")
 public abstract class IStanding extends DatabaseObject.ID_RECORD_OBJ<Long, IStanding> {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "PhaseID", nullable = false, insertable = false, updatable = false)
     private IPhase phase;
 
@@ -41,9 +44,9 @@ public abstract class IStanding extends DatabaseObject.ID_RECORD_OBJ<Long, IStan
     /** Set by the format's engine once the phase is ranked. */
     @Column(name = "Rank", nullable = false)
     private int rank = 0;
-    @Column(name = "Qualified", nullable = false)
+    @Column(name = "Qualified", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean qualified = false;
-    @Column(name = "Eliminated", nullable = false)
+    @Column(name = "Eliminated", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean eliminated = false;
 
     protected IStanding() {}

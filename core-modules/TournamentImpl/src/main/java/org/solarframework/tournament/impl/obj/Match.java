@@ -1,5 +1,6 @@
 package org.solarframework.tournament.impl.obj;
 
+import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import org.solarframework.db.spring.DatabaseObject;
@@ -16,6 +17,7 @@ import java.util.stream.Collectors;
 
 /** Concrete {@link IMatch}. Reporting a result cascades: bracket progression, standings, phase close-out. */
 @Entity
+@DiscriminatorValue("0")
 public class Match extends IMatch {
     private static final Logger log = LoggerFactory.getLogger(Match.class);
 
@@ -27,7 +29,7 @@ public class Match extends IMatch {
     @Override
     public void save() {
         Upsert();
-        getGames().forEach(DatabaseObject::Upsert);
+        DatabaseObject.UpsertAll(getGames());
     }
 
     /** Appends a game to the series and folds it into the running series score. */
@@ -126,7 +128,7 @@ public class Match extends IMatch {
         Phase p = (Phase) phase;
         List<IMatch> changed = PhaseEngines.of(phase.getType()).onMatchDecided(phase, this);
         Upsert();
-        changed.forEach(DatabaseObject::Upsert);
+        DatabaseObject.UpsertAll(changed);
         p.recompute();
         p.save();
         p.tryComplete();
@@ -143,7 +145,10 @@ public class Match extends IMatch {
         p.recompute();
         if (phase.getStatus() == PhaseStatus.COMPLETE) phase.setStatus(PhaseStatus.RUNNING);
         ITournament t = phase.getTournament();
-        if (t != null && t.getStatus() == TournamentStatus.COMPLETE) t.setStatus(TournamentStatus.RUNNING);
+        if (t != null && t.getStatus() == TournamentStatus.COMPLETE) {
+            t.setStatus(TournamentStatus.RUNNING);
+            t.UpdateOnly("Status");
+        }
         p.save();
         log.info("Match {} reset in phase '{}'", getMatchNumber(), phase.getName());
     }

@@ -32,15 +32,8 @@
         <module>web-modules/SpringProxyServerImplV2</module>
         <module>misc-modules/Discord</module>
         <module>misc-modules/CertificateGenerator</module>
+        <module>TestApp</module>
     </modules>
-
-    <repositories>
-        <repository>
-            <id>jitpack</id>
-            <name>jitpack</name>
-            <url>https://jitpack.io/</url>
-        </repository>
-    </repositories>
 
     <properties>
         <java.version>25</java.version>
@@ -211,11 +204,6 @@
                 <version>3.1.4</version>
             </dependency>
 
-            <dependency>
-                <groupId>com.github.MinnDevelopment</groupId>
-                <artifactId>discord-webhooks</artifactId>
-                <version>345fd27</version>
-            </dependency>
             <dependency>
                 <groupId>net.dv8tion</groupId>
                 <artifactId>JDA</artifactId>

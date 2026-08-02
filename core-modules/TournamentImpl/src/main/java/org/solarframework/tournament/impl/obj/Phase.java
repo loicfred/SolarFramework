@@ -1,5 +1,6 @@
 package org.solarframework.tournament.impl.obj;
 
+import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import org.solarframework.db.spring.DatabaseObject;
 import org.slf4j.Logger;
@@ -20,6 +21,7 @@ import java.util.Optional;
 
 /** Concrete {@link IPhase}. Generation and progression delegate to the format's {@link IPhaseEngine}. */
 @Entity
+@DiscriminatorValue("0")
 public class Phase extends IPhase {
     private static final Logger log = LoggerFactory.getLogger(Phase.class);
 
@@ -27,12 +29,16 @@ public class Phase extends IPhase {
 
     public Phase(ITournament tournament, String name, PhaseType type, int orderIndex) { super(tournament, name, type, orderIndex); }
 
-    /** Writes this phase, its table and every match (with its games). */
+    /**
+     * Writes this phase, its table and every match (with its games) - four statements rather than one per
+     * row, since a 64-entrant phase is otherwise well over a hundred round trips for a single save.
+     */
     @Override
     public void save() {
         Upsert();
-        getStandings().forEach(DatabaseObject::Upsert);
-        for (IMatch m : getMatches()) m.save();
+        DatabaseObject.UpsertAll(getStandings());
+        DatabaseObject.UpsertAll(getMatches());
+        DatabaseObject.UpsertAll(getMatches().stream().flatMap(m -> m.getGames().stream()).toList());
     }
 
     /** Slots entrants into this phase and generates its matches. */
@@ -70,7 +76,7 @@ public class Phase extends IPhase {
     @Override
     public List<IStanding> recomputeStandings() {
         List<IStanding> rows = recompute();
-        rows.forEach(DatabaseObject::Upsert);
+        DatabaseObject.UpsertAll(rows);
         return rows.stream().sorted(Comparator.comparingInt(IStanding::getGroupIndex).thenComparingInt(IStanding::getRank)).toList();
     }
 
@@ -79,28 +85,45 @@ public class Phase extends IPhase {
         return recomputeStandings().stream().filter(s -> s.getGroupIndex() == groupIndex).toList();
     }
 
-    /** Advances the phase if all its matches are decided, handing qualifiers to the next one. */
+    /** Ranks and closes the phase once all its matches are decided, then advances unless the tournament opted out. */
     @Override
     public boolean tryComplete() {
         IPhaseEngine engine = PhaseEngines.of(getType());
         if (getStatus().isComplete() || !engine.isComplete(this)) return false;
         engine.rank(this);
-        List<IParticipant> qualifiers = engine.getQualifiers(this);
         setStatus(PhaseStatus.COMPLETE);
         save();
-        log.info("Phase '{}' complete - {} qualifier(s)", getName(), qualifiers.size());
+        log.info("Phase '{}' complete", getName());
 
         ITournament tour = getTournament();
-        if (tour == null) return true;
+        if (tour != null && tour.isAutoAdvancePhases()) advanceToNext();
+        return true;
+    }
+
+    /**
+     * Hands this phase's qualifiers to the next one, or finishes the tournament when it was the last.
+     * Split out of {@link #tryComplete()} so a consumer running with auto advance off can take the same
+     * step on its own terms - the organiser pressing "next phase" rather than the last score doing it.
+     *
+     * @return false when there is nothing to advance: the phase is not closed yet, or the next one is drawn already.
+     */
+    @Override
+    public boolean advanceToNext() {
+        ITournament tour = getTournament();
+        if (tour == null || !getStatus().isComplete()) return false;
         Optional<IPhase> next = tour.getPhase(getOrderIndex() + 1);
-        if (next.isPresent()) {
-            tour.setCurrentPhaseIndex(next.get().getOrderIndex());
-            List<IParticipant> field = Seeder.applySeedNumbers(new ArrayList<>(qualifiers));
-            ((Tournament) tour).markEliminated(this, qualifiers);
-            next.get().generate(field);
-            tour.Upsert();
-            log.info("Advanced '{}' into phase '{}' with {} entrants", tour.getName(), next.get().getName(), field.size());
-        } else tour.finish();
+        if (next.isEmpty()) {
+            if (!tour.getStatus().isFinished()) tour.finish();
+            return true;
+        }
+        if (next.get().isStarted()) return false;
+        List<IParticipant> qualifiers = PhaseEngines.of(getType()).getQualifiers(this);
+        List<IParticipant> field = Seeder.applySeedNumbers(new ArrayList<>(qualifiers));
+        ((Tournament) tour).markEliminated(this, qualifiers);
+        tour.setCurrentPhaseIndex(next.get().getOrderIndex());
+        next.get().generate(field);
+        tour.Upsert();
+        log.info("Advanced '{}' into phase '{}' with {} entrants", tour.getName(), next.get().getName(), field.size());
         return true;
     }
 }

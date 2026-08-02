@@ -2,11 +2,18 @@ package org.solarframework.db.spring;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Id;
+import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
+import jakarta.persistence.OneToOne;
+import jakarta.persistence.Persistence;
 import org.solarframework.db.api.DatabaseType;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
+import org.solarframework.db.api.Lazy;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -18,6 +25,8 @@ import static org.solarframework.json.JSONItem.SimpleGSON;
 public class DBInstanceService<T> implements IDBObjectService<T> {
     protected static final Map<String, Set<Field>> IdFields = new HashMap<>();
     protected static final Map<String, Set<Field>> CachedFields = new HashMap<>();
+    protected static final Map<String, List<Field>> LazyFields = new HashMap<>();
+    protected static final Map<String, List<Field>> AssocFields = new HashMap<>();
 
     protected transient DatabaseObject<T> dbObject;
     protected transient IDatabaseService dbService;
@@ -36,8 +45,54 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         this.dbObject = obj;
         this.entityClass = (Class<T>) dbObject.getClass();
         this.tableName = obj.getTableName();
-        this.cachedFields = CachedFields.computeIfAbsent(entityClass.getName(), c -> getSerializableFieldsOfClassFamily(entityClass).stream().filter(f -> dbService.getTableStats(tableName).getColumnNames().contains(f.getName().toLowerCase())).collect(Collectors.toSet()));
+        this.cachedFields = CachedFields.computeIfAbsent(entityClass.getName(), c -> getAllFieldsOfClassFamily(entityClass).stream().filter(f -> dbService.getTableStats(tableName).getColumnNames().contains(f.getName().toLowerCase())).collect(Collectors.toSet()));
         this.idFields = IdFields.computeIfAbsent(entityClass.getName(), c -> CachedFields.get(entityClass.getName()).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toSet()));
+    }
+
+    /** Makes this object the canonical instance of its row, so every later read hands it back instead of a copy. */
+    private void remember() {
+        if (dbService instanceof DatabaseService s) EntityIdentity.register(s, dbObject);
+    }
+
+    /** IdFields is only filled when an instance of a class exists; abstract @Entity roots (ITournament, IMatch...) never get an entry, so reads keyed on them must fall back to reflection. Not cached, to avoid seeding the map with an unfiltered set the constructor would then keep. */
+    static Set<Field> idFieldsOf(Class<?> clazz) {
+        Set<Field> known = IdFields.get(clazz.getName());
+        return known != null ? known : getSerializableFieldsOfClassFamily(clazz).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toSet());
+    }
+
+    /**
+     * The blob columns reads leave behind. Only {@code byte[]} qualifies: {@link Lazy#UNLOADED} is a
+     * {@code byte[]} sentinel, so no other type can tell "never fetched" from "fetched and NULL" and any
+     * other type must keep being read and written whole.
+     */
+    static List<Field> lazyFieldsOf(Class<?> clazz) {
+        return LazyFields.computeIfAbsent(clazz.getName(), _ -> getAllFieldsOfClassFamily(clazz).stream().filter(DBInstanceService::isLazy).toList());
+    }
+    static boolean isLazy(Field f) {
+        return f.getType() == byte[].class && !Modifier.isStatic(f.getModifiers()) && !Modifier.isTransient(f.getModifiers());
+    }
+    /** True when this object never loaded that blob - writing it would replace the stored bytes with NULL. */
+    static boolean unloaded(Field f, Object obj) {
+        return isLazy(f) && Lazy.unloaded((byte[]) getFieldValue(f, obj));
+    }
+    /** Drops the blobs out of an entity a read carried without them, so the getters fetch instead of reporting NULL. */
+    static void markUnloaded(Object obj) {
+        for (Field f : lazyFieldsOf(obj.getClass())) setFieldValue(f, obj, Lazy.UNLOADED);
+    }
+
+    /** The associations a hydrator fills with a placeholder rather than a value. */
+    static List<Field> assocFieldsOf(Class<?> clazz) {
+        return AssocFields.computeIfAbsent(clazz.getName(), _ -> getAllFieldsOfClassFamily(clazz).stream().filter(f -> f.isAnnotationPresent(OneToMany.class) || f.isAnnotationPresent(ManyToOne.class) || f.isAnnotationPresent(OneToOne.class) || f.isAnnotationPresent(ManyToMany.class)).toList());
+    }
+
+    /**
+     * Nulls the associations a read hydrated but never loaded. The EntityManager closes with the query, so a
+     * PersistentBag or a proxy left behind can no longer fetch itself - it only dies on whoever touches it,
+     * and {@code x == null} never catches it. Null says the same thing in a form every getter can answer, so
+     * an association is either a value or absent and nothing in between reaches a caller.
+     */
+    static void dropPlaceholders(Object obj) {
+        for (Field f : assocFieldsOf(obj.getClass())) if (!Persistence.getPersistenceUtil().isLoaded(getFieldValue(f, obj))) setFieldValue(f, obj, null);
     }
 
     private Set<Field> getIdAndUniqueFields() {
@@ -122,6 +177,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public int IncrementColumn(String column, int amount) {
         try {
+            remember();
             for (Field f : cachedFields) {
                 if (f.getName().equalsIgnoreCase(column)) {
                     f.set(dbObject, (int) getFieldValue(f, dbObject) + amount);
@@ -148,6 +204,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public int IncrementColumns(Map<String, Number> parameters) {
         try {
+            remember();
             String setClause = parameters.entrySet().stream().map(f -> f.getKey() + " = " + f.getKey() + " + ?").collect(Collectors.joining(", "));
             List<Object> setValues = parameters.entrySet().stream().map(f -> f.getValue()).collect(Collectors.toList());
 
@@ -169,8 +226,10 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public int Update() {
         try {
-            String setClause = cachedFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(", "));
-            List<Object> setValues = cleanParameterList(cachedFields.stream().map(f -> getFieldValue(f, dbObject)).collect(Collectors.toList()));
+            remember();
+            Set<Field> writable = cachedFields.stream().filter(f -> !unloaded(f, dbObject)).collect(Collectors.toSet());
+            String setClause = writable.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(", "));
+            List<Object> setValues = cleanParameterList(writable.stream().map(f -> getFieldValue(f, dbObject)).collect(Collectors.toList()));
 
             String whereClause = idFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
             List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));
@@ -189,8 +248,9 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public int UpdateOnly(String... columns) {
         try {
-            Set<Field> fieldsList = cachedFields.stream().filter(f -> Arrays.stream(columns).anyMatch(c -> f.getName().equalsIgnoreCase(c.toLowerCase()))).collect(Collectors.toSet());
+            Set<Field> fieldsList = cachedFields.stream().filter(f -> !unloaded(f, dbObject)).filter(f -> Arrays.stream(columns).anyMatch(c -> f.getName().equalsIgnoreCase(c.toLowerCase()))).collect(Collectors.toSet());
             if (fieldsList.isEmpty()) return 0;
+            remember();
 
             String setClause = fieldsList.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(", "));
             List<Object> setValues = cleanParameterList(fieldsList.stream().map(f -> getFieldValue(f, dbObject)).collect(Collectors.toList()));
@@ -213,6 +273,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public int Delete() {
         try {
+            if (dbService instanceof DatabaseService s) EntityIdentity.forget(s, dbObject); // hard delete: no instance should outlive the row
             List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));
 
             String sql = "DELETE FROM " + tableName + " WHERE " + idFields.stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
@@ -242,7 +303,10 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
 
     protected record InsertArgumentManager(String columns, String questionMarks, String duplicateKeyUpdateClause, Object[] currentValuesList) {}
     protected InsertArgumentManager makeInsertManager(boolean update, boolean includeNullFields) {
-        Set<Field> nonNullFields = cachedFields.stream().filter(f -> includeNullFields || getFieldValue(f, dbObject) != null).collect(Collectors.toSet());
+        remember(); // the one point every insert/upsert path goes through, batches included - and before the read of a RETURNING *, so it refreshes this object instead of building a second one
+        // A batch shares one column list across rows, which cannot say "leave this row's blob alone" - so it never carries one. Single writes carry the blobs this object actually loaded.
+        Set<Field> writable = cachedFields.stream().filter(f -> includeNullFields ? !isLazy(f) : !unloaded(f, dbObject)).collect(Collectors.toSet());
+        Set<Field> nonNullFields = writable.stream().filter(f -> includeNullFields || getFieldValue(f, dbObject) != null).collect(Collectors.toSet());
 
         String columnsSeparatedByComma = nonNullFields.stream().map(Field::getName).collect(Collectors.joining(", "));
         String questionMarksSeparatedByComma = nonNullFields.stream().map(p -> "?").collect(Collectors.joining(", "));
@@ -250,7 +314,8 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         List<Object> currentValuesList = cleanParameterList(nonNullFields.stream().map(f -> getFieldValue(f, dbObject)).collect(Collectors.toList()));
 
         if (!update) return new InsertArgumentManager(columnsSeparatedByComma, questionMarksSeparatedByComma, null, currentValuesList.toArray());
-        String duplicateKeyUpdateClause = cachedFields.stream().map(f -> getType().UpsertExcludedReference(f.getName())).collect(Collectors.joining(", "));
+        // Excluding the unwritten blobs here too: "col = excluded.col" on a column the insert never listed sets it to NULL.
+        String duplicateKeyUpdateClause = writable.stream().map(f -> getType().UpsertExcludedReference(f.getName())).collect(Collectors.joining(", "));
         return new InsertArgumentManager(columnsSeparatedByComma, questionMarksSeparatedByComma, duplicateKeyUpdateClause, currentValuesList.toArray());
     }
 

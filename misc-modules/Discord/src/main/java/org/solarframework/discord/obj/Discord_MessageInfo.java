@@ -1,13 +1,19 @@
 package org.solarframework.discord.obj;
 
-import club.minnced.discord.webhook.receive.ReadonlyMessage;
-import club.minnced.discord.webhook.send.WebhookMessageBuilder;
 import jakarta.persistence.*;
+import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.entities.Message;
+import net.dv8tion.jda.api.entities.Webhook;
+import net.dv8tion.jda.api.entities.WebhookClient;
+import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.entities.channel.middleman.StandardGuildMessageChannel;
 import net.dv8tion.jda.api.exceptions.ErrorHandler;
 import net.dv8tion.jda.api.requests.ErrorResponse;
+import net.dv8tion.jda.api.requests.restaction.WebhookMessageCreateAction;
+import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
+import net.dv8tion.jda.api.utils.messages.MessageCreateData;
+import net.dv8tion.jda.api.utils.messages.MessageEditData;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.discord.obj.other.ActionServerID;
 
@@ -16,6 +22,7 @@ import java.util.function.Consumer;
 
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
 import static org.solarframework.discord.utils.WebhookUtils.getWebhookOfChannel;
+import static org.solarframework.discord.utils.WebhookUtils.served;
 
 @Entity
 @Table(name = "discord_messageinfo")
@@ -84,26 +91,29 @@ public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
         return M;
     }
 
-    public void ModifyWebhookMessageElseCreate(WebhookMessageBuilder e, Consumer<ReadonlyMessage> m) {
-        try {
-            if (MessageID == null) {
-                getWebhookOfChannel(getChannel(), WC
-                        -> WC.send(e.build()).whenComplete((msg, _)
-                        -> {if (msg != null) MessageID = msg.getId();m.accept(msg);}
-                ));
-                return;
-            }
-            getChannel().retrieveMessageById(MessageID).queue(ignored
-                            -> getWebhookOfChannel(getChannel(), WC
-                            -> WC.edit(MessageID, e.build()).whenComplete((msg, _)
-                            -> {MessageID = msg.getId();m.accept(msg);})),
-                    new ErrorHandler().handle(ErrorResponse.UNKNOWN_MESSAGE, _
-                            -> getWebhookOfChannel(getChannel(), WC
-                            -> WC.send(e.build()).whenComplete((msg, _)
-                            -> {if (msg != null) MessageID = msg.getId();m.accept(msg);
-                    })))
-            );
-        } catch (Exception ignored) {}
+    public void ModifyWebhookMessageElseCreate(MessageCreateData e, Consumer<Message> m) {
+        ModifyWebhookMessageElseCreate(e, null, null, m);
+    }
+    /** Same, but the created message is posted under a custom webhook identity instead of the guild's (a webhook edit cannot change username/avatar, so those only apply on creation). */
+    public void ModifyWebhookMessageElseCreate(MessageCreateData e, String username, String avatarUrl, Consumer<Message> m) {
+        if (MessageID == null) {sendWebhookMessage(e, username, avatarUrl, m); return;}
+        getWebhookOfChannel(getChannel(), WC -> {
+            try {
+                WC.editMessageById(MessageID, MessageEditData.fromCreateData(e)).queue(msg -> {MessageID = msg.getIdLong();m.accept(msg);},
+                        new ErrorHandler().handle(ErrorResponse.UNKNOWN_MESSAGE, _ -> sendWebhookMessage(e, username, avatarUrl, m)));
+            } catch (Exception ignored) {m.accept(null);}
+        });
+    }
+    public void ModifyWebhookMessageElseCreate(EmbedBuilder e, Consumer<Message> m) {
+        ModifyWebhookMessageElseCreate(new MessageCreateBuilder().setEmbeds(e.build()).build(), m);
+    }
+    private void sendWebhookMessage(MessageCreateData e, String username, String avatarUrl, Consumer<Message> m) {
+        getWebhookOfChannel(getChannel(), WC -> {
+            try {
+                WebhookMessageCreateAction<Message> A = username == null ? served(WC.sendMessage(e), getGuild()) : WC.sendMessage(e).setUsername(username).setAvatarUrl(avatarUrl);
+                A.queue(msg -> {MessageID = msg.getIdLong();m.accept(msg);}, _ -> m.accept(null));
+            } catch (Exception ignored) {m.accept(null);}
+        });
     }
 
     public Message getMessageElseCreate() {

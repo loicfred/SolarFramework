@@ -5,8 +5,10 @@ import jakarta.persistence.*;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
 
+import java.lang.annotation.Annotation;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -117,15 +119,40 @@ public class DatabaseObject<T> {
         return getService().refetchAttribute(attributeName, attributeType);
     }
 
+    /**
+     * Writes a whole list in one multi-row statement instead of one round trip per object - the batched
+     * counterpart of {@link #Upsert()}, for the loops that would otherwise fire N queries mid-operation.
+     *
+     * <p>The lifecycle hook still runs per item, so {@code CreatedAt}/{@code UpdatedAt} stay correct. Every
+     * item must be the same entity as the first one: the statement carries a single table and column list,
+     * taken from the head of the list.
+     *
+     * @return rows affected, or 0 when there is no database configured (same contract as {@link #Upsert()})
+     */
+    public static int UpsertAll(List<? extends DatabaseObject<?>> items) {
+        if (items == null || items.isEmpty()) return 0;
+        for (DatabaseObject<?> o : items) o.onCreate();
+        if (SolarDBManager == null && DefaultDBService == null) return 0;
+        IDatabaseService S = retrieveServiceFor(items.getFirst().getClass());
+        return (S == null ? DefaultDBService : S).UpsertBatch(items);
+    }
+
     public String getTableName() {
         return getTableName(getClass());
     }
     public static String getTableName(Class<?> clazz) {
         return TableNames.computeIfAbsent(clazz.getName(), _ -> {
-            Table annotation = clazz.getAnnotation(Table.class);
+            Table annotation = getAnnotationRecursive(clazz, Table.class);
             if (annotation != null && !annotation.name().isEmpty()) return annotation.name().toLowerCase();
             return clazz.getSimpleName().toLowerCase();
         });
+    }
+
+    private static <A extends Annotation> A getAnnotationRecursive(Class<?> clazz, Class<A> annotationClass) {
+        if (clazz == null || clazz == Object.class) return null;
+        A annotation = clazz.getAnnotation(annotationClass);
+        if (annotation != null) return annotation;
+        return getAnnotationRecursive(clazz.getSuperclass(), annotationClass);
     }
 
     @PrePersist

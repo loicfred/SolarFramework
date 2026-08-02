@@ -5,10 +5,11 @@ import java.net.URI;
 
 public class OtherUtils {
 
+    /** True only for an absolute http(s) URL with a host — {@code new URI("")} and bare words are legal relative URIs, and are rejected here. */
     public static boolean isURLValid(String url) {
         try {
-            new URI(url);
-            return true;
+            URI u = new URI(url);
+            return u.isAbsolute() && u.getHost() != null && u.getScheme().matches("(?i)https?");
         } catch (Exception e) {
             return false;
         }

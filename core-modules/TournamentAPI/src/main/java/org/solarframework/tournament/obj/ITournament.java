@@ -2,12 +2,14 @@ package org.solarframework.tournament.obj;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import org.hibernate.annotations.DiscriminatorFormula;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.tournament.api.*;
 import org.solarframework.tournament.obj.convert.MatchDecisionModeConverter;
 import org.solarframework.tournament.obj.convert.SeedingMethodConverter;
 import org.solarframework.tournament.obj.convert.TournamentStatusConverter;
 import org.solarframework.tournament.util.Ids;
+import org.solarframework.db.api.Lazy;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -27,6 +29,7 @@ import java.util.Optional;
 @Entity
 @Table(name = "tournament")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorFormula("'0'")
 public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITournament> {
 
     @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
@@ -69,9 +72,14 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
     private TournamentStatus status = TournamentStatus.DRAFT;
     @Column(name = "CurrentPhaseIndex")
     private Integer currentPhaseIndex = 0;
-    @Column(name = "IsPublic", nullable = false)
+    /** Off, a finished phase is still ranked and closed but the next one is not drawn and the run is not
+     *  finished either: something outside decides when to move on. Nullable so rows written before the
+     *  column existed - and every consumer that never touches it - keep advancing on their own. */
+    @Column(name = "AutoAdvancePhases")
+    private Boolean autoAdvancePhases;
+    @Column(name = "IsPublic", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean isPublic = true;
-    @Column(name = "BracketVisible", nullable = false)
+    @Column(name = "BracketVisible", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean bracketVisible = true;
 
     // ---- format ---------------------------------------------------------------------------------
@@ -83,19 +91,19 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
     @Column(name = "MaxParticipants", nullable = false)
     private int maxParticipants = 0;
     /** With a cap set, entrants arriving into a full field queue up instead of being turned away. */
-    @Column(name = "WaitlistEnabled", nullable = false)
+    @Column(name = "WaitlistEnabled", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean waitlistEnabled = true;
     /** A team may register before its roster is filled, but with this set it may not take the floor short. */
-    @Column(name = "RequireCompleteRosters", nullable = false)
+    @Column(name = "RequireCompleteRosters", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean requireCompleteRosters = true;
     /** Default series length for matches; 1 is a single match, 3 is a BO3. */
     @Column(name = "DefaultBestOf", nullable = false)
     private int defaultBestOf = 1;
-    @Column(name = "ThirdPlaceMatch", nullable = false)
-    private boolean thirdPlaceMatch = false;
-    @Column(name = "GrandFinalReset", nullable = false)
+    @Column(name = "ThirdPlaceMatch", nullable = false, columnDefinition = "TINYINT(1)")
+    private boolean thirdPlaceMatch = true;
+    @Column(name = "GrandFinalReset", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean grandFinalReset = true;
-    @Column(name = "DrawAllowed", nullable = false)
+    @Column(name = "DrawAllowed", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean drawAllowed = false;
     @Convert(converter = SeedingMethodConverter.class)
     @Column(name = "SeedingMethod", nullable = false, length = 32)
@@ -232,9 +240,14 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
         return p.isEmpty() ? Optional.empty() : Optional.of(p.getLast());
     }
 
+    /** Drops a phase for good: its matches, games and table are hard-deleted, there is nothing to keep a record of. */
     public void removePhase(IPhase phase) {
         getPhases().remove(phase);
+        for (IMatch m : phase.getMatches()) { m.getGames().forEach(IMatchGame::TrueDelete); m.TrueDelete(); }
+        phase.getStandings().forEach(IStanding::TrueDelete);
+        phase.TrueDelete();
         for (int i = 0; i < phases.size(); i++) phases.get(i).setOrderIndex(i);
+        UpsertAll(phases);
     }
 
     public boolean isSinglePhase() { return getPhases().size() <= 1; }
@@ -333,6 +346,8 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
     public void setStatus(TournamentStatus status) { this.status = status; }
     public int getCurrentPhaseIndex() { return currentPhaseIndex == null ? 0 : currentPhaseIndex; }
     public void setCurrentPhaseIndex(int currentPhaseIndex) { this.currentPhaseIndex = currentPhaseIndex; }
+    public boolean isAutoAdvancePhases() { return autoAdvancePhases == null || autoAdvancePhases; }
+    public void setAutoAdvancePhases(boolean autoAdvancePhases) { this.autoAdvancePhases = autoAdvancePhases; }
     public boolean isPublic() { return isPublic; }
     public void setPublic(boolean isPublic) { this.isPublic = isPublic; }
     public boolean isBracketVisible() { return bracketVisible; }

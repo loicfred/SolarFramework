@@ -10,16 +10,19 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 @SpringBootApplication
 @ComponentScan({"org.solarframework"})
-public class DatabaseImplV2Test {
+public class Database_Main {
 
     static void main(String[] args) {
-        SpringApplication.run(DatabaseImplV2Test.class, args);
+        SpringApplication.run(Database_Main.class, args);
         SolarDBManager.createAllSchemasIfMissing();
         SolarDBManager.verifyEntities();
-
         User u = new User(1L, "Loic", "loic@gmail.com");
         u.Upsert();
         new Order(1L, u, "Steak", 1).Upsert();
         new Order(2L, u,"Egg").Upsert();
+
+        System.err.println(u.getOrders());
+        System.err.println("------");
+        System.err.println(SolarDBManager.getById(User.class, 1).orElseThrow().getOrders());
     }
 }

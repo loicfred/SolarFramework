@@ -211,6 +211,31 @@ class BracketRendererTest {
         }
     }
 
+    /**
+     * The grand final continues the winners bracket, so it belongs on the champion's row in its own
+     * column to the right - not centred between the two sections, which put it below the divider and
+     * made it read as the bottom of the losers bracket.
+     */
+    @Test
+    void theGrandFinalSitsOnTheWinnersFinalRowInItsOwnColumn() {
+        Tournament t = new Tournament("DE8");
+        IPhase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
+        new DoubleEliminationEngine().generate(phase, field(t, 8));
+
+        BracketTheme th = BracketTheme.dark();
+        BracketLayout layout = new BracketLayout(phase, th);
+        layout.build();
+
+        int wbRounds = phase.getMatches(BracketSide.WINNERS).stream().mapToInt(IMatch::getRound).max().orElseThrow();
+        double wbFinalY = phase.getMatches(BracketSide.WINNERS).stream().filter(m -> m.getRound() == wbRounds)
+                .mapToDouble(m -> layout.placedY(m.getID())).min().orElseThrow();
+        double lbTop = phase.getMatches(BracketSide.LOSERS).stream().mapToDouble(m -> layout.placedY(m.getID())).min().orElseThrow();
+        double gfY = layout.placedY(phase.getMatches(BracketSide.GRAND_FINAL).getFirst().getID());
+
+        assertEquals(wbFinalY, gfY, 0.01, "The grand final should share the winners final's row");
+        assertTrue(gfY + th.matchHeight() < lbTop, "The grand final should stay above the losers section");
+    }
+
     /** Regression test for a real bug: a third place match asked for after the phase existed never reached the phase, so it was silently missing from the bracket. */
     @Test
     void aThirdPlaceMatchRequestedAfterPhaseCreationStillShowsOnTheBracket() {

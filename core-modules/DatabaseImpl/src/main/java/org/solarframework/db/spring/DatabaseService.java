@@ -32,6 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import javax.sql.DataSource;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
@@ -315,7 +316,7 @@ public class DatabaseService implements IDatabaseService {
     // ====== SHORT CUTS ======
 
     public <O> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id) {
-        return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + IdFields.get(table.getName()).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")), id);
+        return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + DBInstanceService.idFieldsOf(table).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")), id);
     }
     public <O> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args) {
         return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + where, args);
@@ -378,25 +379,55 @@ public class DatabaseService implements IDatabaseService {
     /** Entities extending RECORD_OBJ are hidden from ORM-level reads once soft-deleted. Raw doQuery/doUpdate calls bypass this on purpose. */
     private static boolean isSoftDeletable(Class<?> clazz) { return DatabaseObject.RECORD_OBJ.class.isAssignableFrom(clazz); }
 
+    private static final Pattern ORDER_BY = Pattern.compile("\\sORDER\\s+BY\\s", Pattern.CASE_INSENSITIVE);
+
+    /** Callers routinely fold "ORDER BY ..." into whereClause; splitting it off keeps it outside the parenthesised predicate below. */
     private static String withActiveFilter(Class<?> clazz, String whereClause) {
         if (!isSoftDeletable(clazz)) return whereClause;
-        return whereClause == null || whereClause.isBlank() ? "DeletedAt IS NULL" : "(" + whereClause + ") AND DeletedAt IS NULL";
+        if (whereClause == null || whereClause.isBlank()) return "DeletedAt IS NULL";
+        Matcher m = ORDER_BY.matcher(whereClause);
+        if (!m.find()) return "(" + whereClause + ") AND DeletedAt IS NULL";
+        return "(" + whereClause.substring(0, m.start()) + ") AND DeletedAt IS NULL " + whereClause.substring(m.start() + 1);
     }
+
+    private static final Map<String, String> LazySelects = new HashMap<>();
+
+    /**
+     * The select list every read uses by default: every column of the table, with the blob ones replaced by a
+     * NULL literal. Leaving them out of the list is not an option - a native query mapped to an entity needs
+     * all of its columns in the result set - but a NULL literal carries no payload, and
+     * {@link DBInstanceService#markUnloaded} turns it back into "never fetched" right after hydration, so the
+     * getters fetch on demand instead of reporting NULL.
+     *
+     * <p>Plain {@code "*"} for the entities that declare no blob, which leaves every other read untouched.
+     */
+    String selectOf(Class<?> clazz) {
+        if (DBInstanceService.lazyFieldsOf(clazz).isEmpty()) return "*";
+        String known = LazySelects.get(clazz.getName());
+        if (known != null) return known;
+        List<Field> lazy = DBInstanceService.lazyFieldsOf(clazz);
+        List<String> columns = getTableStats(getTableName(clazz)).getColumnNames();
+        if (columns.isEmpty()) return "*"; // table not created yet - nothing to enumerate, and not cached either
+        String select = Stream.concat(columns.stream().filter(c -> lazy.stream().noneMatch(f -> f.getName().equalsIgnoreCase(c))), lazy.stream().map(f -> "NULL AS " + f.getName())).collect(Collectors.joining(", "));
+        LazySelects.put(clazz.getName(), select);
+        return select;
+    }
+    static void clearLazySelects() { LazySelects.clear(); }
 
     /** Bypasses the soft-delete filter on purpose - if the caller already has an ID, they get the row even if it was soft-deleted. */
     public <T> Optional<T> getById(String select, Class<T> clazz, Object... id) {
-        String where = IdFields.get(clazz.getName()).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
+        String where = DBInstanceService.idFieldsOf(clazz).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
         return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + where, id);
     }
     public <T> Optional<T> getById(Class<T> clazz, Object... id) {
-        return getById("*", clazz, id);
+        return getById(selectOf(clazz), clazz, id);
     }
 
     public <T> Optional<T> getWhere(String select, Class<T> clazz, String whereClause, Object... args) {
         return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + withActiveFilter(clazz, whereClause), args);
     }
     public <T> Optional<T> getWhere(Class<T> clazz, String whereClause, Object... args) {
-        return getWhere("*", clazz, whereClause, args);
+        return getWhere(selectOf(clazz), clazz, whereClause, args);
     }
 
     public <T> List<T> getAll(String select, Class<T> clazz) {
@@ -404,20 +435,20 @@ public class DatabaseService implements IDatabaseService {
         return this.doQueryAll(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + (where == null ? "" : " WHERE " + where), null);
     }
     public <T> List<T> getAll(Class<T> clazz) {
-        return getAll("*", clazz);
+        return getAll(selectOf(clazz), clazz);
     }
 
     public <T> List<T> getAllWhere(String select, Class<T> clazz, String whereClause, Object... args) {
         return this.doQueryAll(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + withActiveFilter(clazz, whereClause), args);
     }
     public <T> List<T> getAllWhere(Class<T> clazz, String whereClause, Object... args) {
-        return getAllWhere("*", clazz, whereClause, args);
+        return getAllWhere(selectOf(clazz), clazz, whereClause, args);
     }
     public <T> Set<T> getAllWhereDistinct(String select, Class<T> clazz, String whereClause, Object... args) {
         return this.doQueryAllDistinct(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + withActiveFilter(clazz, whereClause), args);
     }
     public <T> Set<T> getAllWhereDistinct(Class<T> clazz, String whereClause, Object... args) {
-        return getAllWhereDistinct("*", clazz, whereClause, args);
+        return getAllWhereDistinct(selectOf(clazz), clazz, whereClause, args);
     }
 
     public <T> int Count(Class<T> clazz) {
@@ -432,13 +463,13 @@ public class DatabaseService implements IDatabaseService {
         return this.getWhere(select, clazz, "ID >= FLOOR(RAND() * (SELECT MAX(ID) FROM " + getTableName(clazz) + "))").orElse(null);
     }
     public <T> T getRandom(Class<T> clazz) {
-        return this.getRandom("*", clazz);
+        return this.getRandom(selectOf(clazz), clazz);
     }
     public <T> T getRandom(String select, Class<T> clazz, String whereClause, Object... args) {
         return this.getWhere(select, clazz, whereClause + " AND ID >= FLOOR(RAND() * (SELECT MAX(ID) FROM " + getTableName(clazz) + "))", args).orElse(null);
     }
     public <T> T getRandom(Class<T> clazz, String whereClause, Object... args) {
-        return this.getRandom("*", clazz, whereClause, args);
+        return this.getRandom(selectOf(clazz), clazz, whereClause, args);
     }
 
     // ====== GETTERS ======
@@ -546,19 +577,49 @@ public class DatabaseService implements IDatabaseService {
         });
     }
 
+    private static final Map<Class<?>, Class<?>> ConcreteEntities = new HashMap<>();
+
+    /**
+     * Abstract @Entity roots (ITournament, IMatch...) cannot be the target of a native query: Hibernate skips the
+     * discriminator fetch only for leaf types, so on a root it looks for the @DiscriminatorFormula's label ('0') in
+     * a result set that a native SELECT * never carries. Mapping to the single concrete subclass sidesteps it, and
+     * the reflective Tuple path cannot instantiate an abstract class either.
+     */
+    private <T> Class<T> concreteEntity(Class<T> clazz) {
+        if (!Modifier.isAbstract(clazz.getModifiers())) return clazz;
+        Class<?> known = ConcreteEntities.get(clazz);
+        if (known == null) {
+            known = clazz;
+            for (var e : getSessionFactory().getMetamodel().getEntities()) {
+                Class<?> j = e.getJavaType();
+                if (j != clazz && clazz.isAssignableFrom(j) && !Modifier.isAbstract(j.getModifiers())) { known = j; break; }
+            }
+            ConcreteEntities.put(clazz, known);
+        }
+        return (Class<T>) known;
+    }
+
+    /** setMaxResults becomes a LIMIT clause, which no database accepts on the INSERT ... RETURNING * of a WriteThenReturn. */
+    private static boolean takesLimit(String sql) {
+        return sql.stripLeading().regionMatches(true, 0, "SELECT", 0, 6);
+    }
+
     /** Runs a native query mapped to a class. Entities map via JPA; other classes map reflectively by column name. */
     private <T> List<T> runNativeQuery(Class<T> clazz, String sql, Object[] args, int maxResults) {
         return withEm(this, em -> {
             DatabaseUtils.SQLCleaner C = new DatabaseUtils.SQLCleaner(sql, args);
-            if (isEntity(clazz) && selectsAllColumns(C.newSQL)) {
-                Query q = bindParams(em.createNativeQuery(toOrdinalParams(C.newSQL), clazz), C.newParams);
-                if (maxResults > 0) q.setMaxResults(maxResults);
-                return (List<T>) q.getResultList();
+            // A blob-less read is a full row too - it carries every column, the lazy ones as NULL literals - so it maps as an entity and stays canonical.
+            boolean lazyRow = isEntity(clazz) && !"*".equals(selectOf(clazz)) && C.newSQL.contains(selectOf(clazz));
+            if (isEntity(clazz) && (selectsAllColumns(C.newSQL) || lazyRow)) {
+                Query q = bindParams(em.createNativeQuery(toOrdinalParams(C.newSQL), concreteEntity(clazz)), C.newParams);
+                if (maxResults > 0 && takesLimit(C.newSQL)) q.setMaxResults(maxResults);
+                // Full rows only - the Tuple path below can carry a subset of the columns, which would blank out the rest of the canonical object.
+                return ((List<T>) q.getResultList()).stream().map(o -> { if (lazyRow) DBInstanceService.markUnloaded(o); DBInstanceService.dropPlaceholders(o); return EntityIdentity.canonical(this, o); }).collect(Collectors.toList());
             }
             Query q = bindParams(em.createNativeQuery(toOrdinalParams(C.newSQL), Tuple.class), C.newParams);
-            if (maxResults > 0) q.setMaxResults(maxResults);
+            if (maxResults > 0 && takesLimit(C.newSQL)) q.setMaxResults(maxResults);
             List<Tuple> tuples = q.getResultList();
-            return tuples.stream().map(t -> mapTupleToObject(t, clazz)).collect(Collectors.toList());
+            return tuples.stream().map(t -> mapTupleToObject(t, concreteEntity(clazz))).collect(Collectors.toList());
         });
     }
 
@@ -567,7 +628,7 @@ public class DatabaseService implements IDatabaseService {
         return withEm(this, em -> {
             DatabaseUtils.SQLCleaner C = new DatabaseUtils.SQLCleaner(sql, args);
             Query q = bindParams(em.createNativeQuery(toOrdinalParams(C.newSQL), Tuple.class), C.newParams);
-            if (maxResults > 0) q.setMaxResults(maxResults);
+            if (maxResults > 0 && takesLimit(C.newSQL)) q.setMaxResults(maxResults);
             List<Tuple> tuples = q.getResultList();
             return tuples.stream().map(t -> {
                 Map<String, Object> map = new LinkedHashMap<>();
@@ -611,7 +672,13 @@ public class DatabaseService implements IDatabaseService {
                 Object value = tuple.get(el);
                 if (value == null) continue;
                 f.setAccessible(true);
-                f.set(instance, convertScalar(value, (Class<Object>) f.getType()));
+                Object converted = convertScalar(value, (Class<Object>) f.getType());
+                if (converted == null && f.getType().isPrimitive()) {
+                    // Driver returned a type we couldn't coerce; leave the field at its default
+                    // rather than crashing on Field.set(primitive, null).
+                    continue;
+                }
+                f.set(instance, converted);
             }
             return instance;
         } catch (Exception e) {
@@ -622,26 +689,49 @@ public class DatabaseService implements IDatabaseService {
     /** Converts JDBC scalar results (BigInteger, BigDecimal, etc.) to the requested Java type. */
     private <T> T convertScalar(Object value, Class<T> type) {
         if (value == null) return null;
-        if (type.isInstance(value)) return type.cast(value);
-        if (value instanceof byte[] n) return (T) (byte[]) value;
-        if (value instanceof Byte[] n) return (T) (Byte[]) value;
-        if (value instanceof Number n) {
-            if (type == Integer.class || type == int.class) return (T) Integer.valueOf(n.intValue());
-            if (type == Long.class || type == long.class) return (T) Long.valueOf(n.longValue());
-            if (type == Double.class || type == double.class) return (T) Double.valueOf(n.doubleValue());
-            if (type == Float.class || type == float.class) return (T) Float.valueOf(n.floatValue());
-            if (type == Short.class || type == short.class) return (T) Short.valueOf(n.shortValue());
-            if (type == Byte.class || type == byte.class) return (T) Byte.valueOf(n.byteValue());
-            if (type == BigDecimal.class) return (T) new BigDecimal(n.toString());
-            if (type == Boolean.class || type == boolean.class) return (T) Boolean.valueOf(n.intValue() != 0);
+        Class<?> targetType = wrap(type); // normalize primitive -> wrapper before any isInstance/cast check
+        if (targetType.isInstance(value)) return (T) targetType.cast(value);
+        if (value instanceof byte[]) return (T) value;
+        if (value instanceof Byte[]) return (T) value;
+        // A BLOB column read outside the entity mapping (refetchAttribute, doQueryValue) comes back as a driver Blob handle on H2 - materialize it, the caller asked for bytes.
+        if (value instanceof java.sql.Blob b) try { return (T) b.getBinaryStream().readAllBytes(); } catch (Exception e) { return null; }
+        if (value instanceof Boolean b) {
+            if (targetType == Boolean.class) return (T) b;
+            if (Number.class.isAssignableFrom(targetType)) {
+                return convertScalar(b ? 1 : 0, type);
+            }
         }
-        if (type == String.class) return (T) value.toString();
-        if (type == Boolean.class && value instanceof String s) return (T) Boolean.valueOf(s);
+        if (value instanceof Number n) {
+            if (targetType == Integer.class) return (T) Integer.valueOf(n.intValue());
+            if (targetType == Long.class) return (T) Long.valueOf(n.longValue());
+            if (targetType == Double.class) return (T) Double.valueOf(n.doubleValue());
+            if (targetType == Float.class) return (T) Float.valueOf(n.floatValue());
+            if (targetType == Short.class) return (T) Short.valueOf(n.shortValue());
+            if (targetType == Byte.class) return (T) Byte.valueOf(n.byteValue());
+            if (targetType == BigDecimal.class) return (T) new BigDecimal(n.toString());
+            if (targetType == Boolean.class) return (T) Boolean.valueOf(n.intValue() != 0);
+        }
+        if (targetType == String.class) return (T) value.toString();
+        if (targetType == Boolean.class && value instanceof String s) return (T) Boolean.valueOf(s);
         try {
-            return type.cast(value);
+            return (T) targetType.cast(value);
         } catch (ClassCastException e) {
             return null;
         }
+    }
+
+    /** Boxes a primitive Class to its wrapper type; returns non-primitive types unchanged. */
+    private static Class<?> wrap(Class<?> type) {
+        if (!type.isPrimitive()) return type;
+        if (type == boolean.class) return Boolean.class;
+        if (type == int.class)     return Integer.class;
+        if (type == long.class)    return Long.class;
+        if (type == double.class)  return Double.class;
+        if (type == float.class)   return Float.class;
+        if (type == short.class)   return Short.class;
+        if (type == byte.class)    return Byte.class;
+        if (type == char.class)    return Character.class;
+        return type;
     }
 
     /**
@@ -674,8 +764,11 @@ public class DatabaseService implements IDatabaseService {
         return q;
     }
 
-    /** True if the select list is "*" or "alias.*", i.e. all columns are present. */
+    private static final Pattern RETURNING_ALL = Pattern.compile("(?is)\\breturning\\s+\\*\\s*;?\\s*$");
+
+    /** True if the statement yields every column: a "*" / "alias.*" select list, or the RETURNING * of a WriteThenReturn. */
     private boolean selectsAllColumns(String sql) {
+        if (RETURNING_ALL.matcher(sql).find()) return true;
         Matcher m = Pattern
                 .compile("(?is)^\\s*select\\s+(distinct\\s+)?(.*?)\\s+from\\s")
                 .matcher(sql);
@@ -816,7 +909,16 @@ public class DatabaseService implements IDatabaseService {
         }
     }
 
+    public int createOrReplaceView(String viewName, String sql) {
+        return doUpdate("CREATE OR REPLACE VIEW " + viewName + " AS " + sql);
+    }
+    public int createOrReplaceFunction(String sql) {
+        return doUpdate("CREATE OR REPLACE FUNCTION " + sql);
+    }
 
+    public int createOrReplaceProcedure(String sql) {
+        return doUpdate("CREATE OR REPLACE PROCEDURE " + sql);
+    }
     public synchronized JdbcTemplate getJdbcTemplate() {
         return jdbcTemplate == null ? jdbcTemplate = new JdbcTemplate(getDataSource()) : jdbcTemplate;
     }

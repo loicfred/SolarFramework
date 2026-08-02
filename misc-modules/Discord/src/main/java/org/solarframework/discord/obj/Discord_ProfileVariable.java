@@ -33,10 +33,15 @@ public class Discord_ProfileVariable extends DatabaseObject<Discord_ProfileVaria
 
     public Discord_ProfileVariable() {}
     protected Discord_ProfileVariable(Long userId, String name, Object value) {
+        this(userId, name, value, true);
+    }
+    /** {@code persist == false} builds the row without writing it — what a read of an unset variable needs, so
+     *  {@link Discord_Profile#getVariable} stops INSERTing a NULL row for every name nobody has ever set. */
+    protected Discord_ProfileVariable(Long userId, String name, Object value, boolean persist) {
         this.userID = userId;
         this.name = name;
         this.value = value != null ? value.toString() : null;
-        Upsert();
+        if (persist) Upsert();
     }
 
     public Long getUserID() {

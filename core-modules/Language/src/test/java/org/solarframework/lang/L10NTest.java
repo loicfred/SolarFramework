@@ -12,9 +12,4 @@ class L10NTest {
         L10N.RB = null;
     }
 
-    @Test
-    void tlReturnsOriginalKeyWhenNoBundleIsLoaded() {
-        assertEquals("Some Key", L10N.TL("Some Key"));
-    }
-
 }

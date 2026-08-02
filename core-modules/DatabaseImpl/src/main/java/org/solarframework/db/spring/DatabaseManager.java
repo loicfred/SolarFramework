@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.ClassUtils.*;
 import static org.solarframework.db.spring.DBInstanceService.CachedFields;
+import static org.solarframework.db.spring.DBInstanceService.LazyFields;
 import static org.solarframework.db.spring.DBInstanceService.IdFields;
 import static org.solarframework.db.spring.DatabaseConfig.defaultConnectionString;
 import static org.solarframework.db.spring.DatabaseObject.*;
@@ -71,6 +72,8 @@ public class DatabaseManager implements IDatabaseManager {
             IdFields.clear();
             TableNames.clear();
             CachedFields.clear();
+            LazyFields.clear();
+            DatabaseService.clearLazySelects();
             serviceCache.clear();
             resetAllCaches();
 
@@ -234,8 +237,10 @@ public class DatabaseManager implements IDatabaseManager {
         return getServiceByEntity(clazz).getRandom(clazz, whereClause, args);
     }
 
+    /** Drops instance identity too: after this, a read of a row you already hold builds a new object instead of refreshing yours. */
     public void resetAllCaches() {
         dbCacheManager.getCacheNames().forEach(c -> dbCacheManager.getCache(c).clear());
+        EntityIdentity.clear();
     }
     public void resetCache(String cacheName) {
         Cache cache = dbCacheManager.getCache(cacheName);
@@ -352,7 +357,7 @@ public class DatabaseManager implements IDatabaseManager {
     private void scanBundleContainers() {
         bundleObjects = new ArrayList<>();
         if (entityClassloaders.isEmpty()) entityClassloaders.put("app", Thread.currentThread().getContextClassLoader());
-        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(entityClassloaders.values().toArray(new ClassLoader[]{})).scan()) {
+        try (ScanResult scanResult = DatabaseUtils.scannerOf(entityClassloaders.values()).scan()) {
             for (ClassInfo classInfo : scanResult.getClassesImplementing(BundleEntities.class).stream().toList()) {
                 Constructor<?> cons = classInfo.loadClass().getDeclaredConstructor();
                 cons.setAccessible(true);

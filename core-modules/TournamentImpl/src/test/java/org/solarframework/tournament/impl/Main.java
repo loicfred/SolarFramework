@@ -25,8 +25,6 @@ public class Main {
         t.registerTeam("Yellow Hawks", List.of("Gus", "Hana"));
         t.registerTeam("Team 1", List.of("Alice", "Bob"));
         t.registerTeam("Team 2", List.of("Alice", "Bob"));
-        t.registerTeam("Team 3", List.of("Alice", "Bob"));
-        t.registerTeam("Team 4", List.of("Alice", "Bob"));
         t.closeRegistration();
 
         IPhase bracket = t.getPhases().getFirst();

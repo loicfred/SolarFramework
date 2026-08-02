@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.db.spring.DatabaseService;
 import org.solarframework.db.test.obj.Order;
 import org.solarframework.db.test.obj.User;
@@ -22,7 +23,7 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
  * Every test follows the same idea: warm the cache through one read path,
  * write through some other path, then assert that every read path sees the change.
  */
-@SpringBootTest(classes = DatabaseImplV2Test.class, properties = {
+@SpringBootTest(classes = Database_Main.class, properties = {
         "spring.datasource.url=jdbc:h2:mem:solartest;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER",
         "spring.datasource.username=sa",
         "spring.datasource.password=test",
@@ -142,13 +143,13 @@ class DatabaseCoherencyTest {
     void userUpdateRefreshesCachedOrder() {
         makeNewUserWith2Orders(1);
         Order o = fetchOrder(101); // warm the order cache
-        assertEquals("Loic", o.user.getName());
+        assertEquals("Loic", o.getUser().getName());
 
         User me = fetchUser(1);
         me.setName("Renamed");
         assertEquals(1, me.Update());
 
-        assertEquals("Renamed", fetchOrder(101).user.getName(), "user update must be visible through the order's user");
+        assertEquals("Renamed", fetchOrder(101).getUser().getName(), "user update must be visible through the order's user");
     }
 
     @Test
@@ -291,5 +292,50 @@ class DatabaseCoherencyTest {
         assertEquals(2, SolarDBManager.getAll(User.class).size(), "batch upsert must invalidate the cached list");
         assertEquals(2, SolarDBManager.Count(User.class));
         assertEquals("A", fetchUser(1).getName());
+    }
+
+    /** The point of an *upsert* batch: a second pass over rows that already exist has to update them, not fail or duplicate. */
+    @Test
+    void upsertBatchUpdatesRowsThatAlreadyExist() {
+        User u1 = new User(1L, "A", "a@example.com");
+        User u2 = new User(2L, "B", "b@example.com");
+        DatabaseObject.UpsertAll(List.of(u1, u2));
+
+        u1.setName("A2");
+        u2.setName("B2");
+        DatabaseObject.UpsertAll(List.of(u1, u2));
+
+        assertEquals(2, SolarDBManager.Count(User.class), "an upsert of existing rows must not insert duplicates");
+        assertEquals("A2", fetchUser(1).getName());
+        assertEquals("B2", fetchUser(2).getName());
+    }
+
+    /** UpsertAll fires the lifecycle hook per item, so the timestamps a RECORD_OBJ needs are filled in by the batch too. */
+    @Test
+    void upsertAllStampsRecordTimestamps() {
+        User u = new User(1L, "A", "a@example.com");
+        assertNull(u.getCreatedAt(), "sanity: nothing has stamped it yet");
+        DatabaseObject.UpsertAll(List.of(u));
+        assertNotNull(fetchUser(1).getCreatedAt(), "CreatedAt must be written by the batch path");
+        assertNotNull(fetchUser(1).getUpdatedAt(), "UpdatedAt must be written by the batch path");
+    }
+
+    @Test
+    void insertBatchWritesEveryRow() {
+        DatabaseService service = (DatabaseService) SolarDBManager.getDefaultService();
+        Instant now = Instant.now();
+        List<User> users = List.of(new User(1L, "A", "a@example.com"), new User(2L, "B", "b@example.com"), new User(3L, "C", "c@example.com"));
+        for (User u : users) { u.setCreatedAt(now); u.setUpdatedAt(now); }
+        service.InsertBatch(users);
+
+        assertEquals(3, SolarDBManager.Count(User.class), "every row of the batch must land, not just the first");
+        assertEquals("C", fetchUser(3).getName());
+    }
+
+    @Test
+    void batchOfNothingIsANoOp() {
+        assertEquals(0, DatabaseObject.UpsertAll(List.of()));
+        assertEquals(0, ((DatabaseService) SolarDBManager.getDefaultService()).InsertBatch(List.of()));
+        assertEquals(0, SolarDBManager.Count(User.class));
     }
 }

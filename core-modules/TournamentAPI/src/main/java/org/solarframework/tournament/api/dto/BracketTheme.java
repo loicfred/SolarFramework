@@ -51,6 +51,8 @@ public class BracketTheme {
     /** Horizontal gap between rounds. */
     private int roundGap = 64;
     private int padding = 44;
+    /** Vertical gap between the title block (name / type / entrants) and the round headers below it. */
+    private int titleGap = 34;
     private int cornerRadius = 8;
     private int scoreWidth = 36;
     private int seedWidth = 26;
@@ -112,6 +114,8 @@ public class BracketTheme {
     public BracketTheme setRoundGap(int v) { this.roundGap = v; return this; }
     public int getPadding() { return padding; }
     public BracketTheme setPadding(int v) { this.padding = v; return this; }
+    public int getTitleGap() { return titleGap; }
+    public BracketTheme setTitleGap(int v) { this.titleGap = v; return this; }
     public int getCornerRadius() { return cornerRadius; }
     public BracketTheme setCornerRadius(int v) { this.cornerRadius = v; return this; }
     public int getScoreWidth() { return scoreWidth; }

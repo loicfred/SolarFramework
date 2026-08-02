@@ -3,8 +3,10 @@ package org.solarframework.discord.obj;
 import jakarta.persistence.*;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.entities.User;
+import org.solarframework.db.api.Lazy;
 import org.solarframework.db.spring.DatabaseObject;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -107,8 +109,19 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
     public User getUser() {
         return User == null ? User = getUserByID(getID()) : User;
     }
+    /**
+     * Fetched once per profile instance and held in the mapped field, not once per variable: a profile card
+     * reads ~20 names, and every {@code getVariableAsX} used to be its own full SELECT of this user's whole
+     * variable set. The {@link Lazy} guard is what makes reusing the association safe — Hibernate hydrates it
+     * with a PersistentBag that {@code != null} never catches and that throws on first read once the
+     * EntityManager is closed, while an instance built with {@code new} leaves it genuinely null.
+     */
     public List<Discord_ProfileVariable> getVariables() {
-        return SolarDBManager.getAllWhere(Discord_ProfileVariable.class, "UserID = ?", getID());
+        return Variables == null ? Variables = new ArrayList<>(SolarDBManager.getAllWhere(Discord_ProfileVariable.class, "UserID = ?", getID())) : Variables;
+    }
+    /** Drops the fetched association, for the rare caller that has to see a write made through another instance. */
+    public void invalidateVariables() {
+        Variables = null;
     }
 
     public <T> T extender(Class<T> extenderClass) {
@@ -130,12 +143,17 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
         return extender(extenderClass);
     }
 
+    /** A value equal to the stored one is not rewritten — a settings form posts every field on every save. */
     public void setVariable(String name, Object value) {
-        getVariables().removeIf(V -> V.getName().equalsIgnoreCase(name));
-        getVariables().add(new Discord_ProfileVariable(getID(), name, value));
+        List<Discord_ProfileVariable> L = getVariables();
+        String v = value != null ? value.toString() : null;
+        if (L.stream().anyMatch(V -> V.getName().equalsIgnoreCase(name) && java.util.Objects.equals(V.getValue(), v))) return;
+        L.removeIf(V -> V.getName().equalsIgnoreCase(name));
+        L.add(new Discord_ProfileVariable(getID(), name, v)); // the constructor is what writes it
     }
+    /** A name nobody has set reads as an empty row, and is <em>not</em> written — see the 4-arg constructor. */
     public Discord_ProfileVariable getVariable(String name) {
-        return getVariables().stream().filter(V -> V.getName().equalsIgnoreCase(name)).findFirst().orElseGet(() -> new Discord_ProfileVariable(getID(), name, null));
+        return getVariables().stream().filter(V -> V.getName().equalsIgnoreCase(name)).findFirst().orElseGet(() -> new Discord_ProfileVariable(getID(), name, null, false));
     }
     public Optional<String> getVariableAsString(String name) {
         return getVariable(name).getValueOptional();

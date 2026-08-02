@@ -13,7 +13,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.solarframework.db.api.IDatabaseService;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Supplier;
 
 public class BotBuilder {
@@ -26,7 +30,7 @@ public class BotBuilder {
     public static StandardGuildMessageChannel TemporaryFilesChannel;
     public static StandardGuildMessageChannel LogChannel;
     public static boolean IsTestMode = false;
-    protected static List<ClassLoader> classLoaders = List.of(Thread.currentThread().getContextClassLoader());
+    protected static List<ClassLoader> classLoaders = new ArrayList<>(List.of(Thread.currentThread().getContextClassLoader(), CMD.class.getClassLoader()));
 
     private final String token;
     private final String commandPackage;
@@ -46,8 +50,25 @@ public class BotBuilder {
         IsTestMode = testMode;
     }
 
+    /** Daemon threads, named so they are identifiable in a stack trace or thread dump. */
+    private static ThreadFactory namedThreads(String name) {
+        AtomicInteger n = new AtomicInteger();
+        return r -> {
+            Thread t = new Thread(r, name + "-" + n.incrementAndGet());
+            t.setDaemon(true);
+            return t;
+        };
+    }
+
     public JDA build() {
         DiscordAccount = JDABuilder.createDefault(token).setStatus(OnlineStatus.ONLINE).
+                // Without an event pool JDA runs listeners on the gateway read thread, so a slow command stops
+                // HEARTBEAT_ACK from being read and the connection is dropped as unresponsive. One thread keeps
+                // events serialized exactly as they were before, while freeing the socket to keep reading.
+                setEventPool(Executors.newSingleThreadExecutor(namedThreads("JDA-Events")), true).
+                // Callbacks default to ForkJoinPool.commonPool, which assumes CPU-bound work; ours block on REST
+                // and JDBC, which starves work-stealing and contends with every parallel stream in the JVM.
+                setCallbackPool(Executors.newFixedThreadPool(32, namedThreads("JDA-Callbacks")), true).
                 setChunkingFilter(ChunkingFilter.ALL).
                 setMemberCachePolicy(MemberCachePolicy.ALL).
                 enableIntents(GatewayIntent.GUILD_MEMBERS).
@@ -81,7 +102,7 @@ public class BotBuilder {
     public void setAfterReadyAction(Supplier<Void> AfterReadyAction) {
         this.AfterReadyAction = AfterReadyAction;
     }
-    public void setClassLoaders(List<ClassLoader> loaders) {
+    public void addClassLoaders(List<ClassLoader> loaders) {
         classLoaders.addAll(loaders);
     }
 

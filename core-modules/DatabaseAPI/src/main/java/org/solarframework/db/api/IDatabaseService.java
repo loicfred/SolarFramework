@@ -125,6 +125,9 @@ public interface IDatabaseService {
     String getSchema();
 
     void createSchemaIfMissing(Collection<Class<?>> clz);
+    int createOrReplaceView(String viewName, String sql);
+    int createOrReplaceFunction(String sql);
+    int createOrReplaceProcedure(String sql);
 
     interface ENTITY<T> {
 

@@ -2,9 +2,12 @@ package org.solarframework.db.test.obj;
 
 import jakarta.persistence.*;
 import org.hibernate.annotations.SQLRestriction;
+import org.solarframework.db.api.Lazy;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
+
+import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 @Entity
 @Table(name = "orders")
@@ -88,6 +91,6 @@ public class Order extends DatabaseObject.ID_RECORD_OBJ<Long, Order> {
     }
 
     public User getUser() {
-        return user;
+        return user == null ? user = SolarDBManager.getById(User.class, userId).orElse(null) : user;
     }
 }

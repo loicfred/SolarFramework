@@ -1,10 +1,12 @@
 package org.solarframework.tournament.obj;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.DiscriminatorFormula;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.tournament.api.ParticipantStatus;
 import org.solarframework.tournament.obj.convert.ParticipantStatusConverter;
 import org.solarframework.tournament.util.Ids;
+import org.solarframework.db.api.Lazy;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -19,9 +21,10 @@ import java.util.Optional;
 @Entity
 @Table(name = "tournament_participant")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorFormula("'0'")
 public abstract class IParticipant extends DatabaseObject.ID_RECORD_OBJ<Long, IParticipant> {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "TournamentID", nullable = false, insertable = false, updatable = false)
     private ITournament tournament;
 
@@ -55,7 +58,7 @@ public abstract class IParticipant extends DatabaseObject.ID_RECORD_OBJ<Long, IP
     @Column(name = "Notes", length = 2000)
     private String notes;
 
-    @Column(name = "CheckedIn", nullable = false)
+    @Column(name = "CheckedIn", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean checkedIn = false;
     @Column(name = "CheckedInAt")
     private Instant checkedInAt;

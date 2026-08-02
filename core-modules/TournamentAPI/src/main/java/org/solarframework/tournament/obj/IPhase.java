@@ -2,6 +2,7 @@ package org.solarframework.tournament.obj;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import org.hibernate.annotations.DiscriminatorFormula;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.tournament.api.*;
 import org.solarframework.tournament.obj.convert.PhaseStatusConverter;
@@ -9,6 +10,7 @@ import org.solarframework.tournament.obj.convert.PhaseTypeConverter;
 import org.solarframework.tournament.obj.convert.MatchDecisionModeConverter;
 import org.solarframework.tournament.obj.convert.SeedingMethodConverter;
 import org.solarframework.tournament.util.Ids;
+import org.solarframework.db.api.Lazy;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -25,9 +27,10 @@ import java.util.Optional;
 @Entity
 @Table(name = "tournament_phase")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
+@DiscriminatorFormula("'0'")
 public abstract class IPhase extends DatabaseObject.ID_RECORD_OBJ<Long, IPhase> {
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "TournamentID", nullable = false, insertable = false, updatable = false)
     private ITournament tournament;
 
@@ -50,9 +53,9 @@ public abstract class IPhase extends DatabaseObject.ID_RECORD_OBJ<Long, IPhase> 
     @Column(name = "Status", nullable = false, length = 32)
     private PhaseStatus status = PhaseStatus.PENDING;
     /** Convenience mirror of {@code status == COMPLETE}, kept so the column is queryable. */
-    @Column(name = "Complete", nullable = false)
+    @Column(name = "Complete", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean complete = false;
-    @Column(name = "Started", nullable = false)
+    @Column(name = "Started", nullable = false, columnDefinition = "TINYINT(1)")
     private boolean started = false;
 
     // ---- format ---------------------------------------------------------------------------------
@@ -268,8 +271,12 @@ public abstract class IPhase extends DatabaseObject.ID_RECORD_OBJ<Long, IPhase> 
     /** Recomputes, persists and returns this phase's table, ranked. */
     public abstract List<IStanding> recomputeStandings();
     public abstract List<IStanding> recomputeStandings(int groupIndex);
-    /** Advances the phase if all its matches are decided, handing qualifiers to the next one. */
+    /** Ranks and closes the phase once all its matches are decided, then advances unless the tournament
+     *  turned {@link ITournament#isAutoAdvancePhases()} off. */
     public abstract boolean tryComplete();
+    /** Hands this phase's qualifiers to the next one - or finishes the tournament when it was the last.
+     *  Public so a consumer that advances by hand can trigger the same step {@link #tryComplete()} would. */
+    public abstract boolean advanceToNext();
 
     // ---- accessors ------------------------------------------------------------------------------
 

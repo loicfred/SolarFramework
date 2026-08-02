@@ -84,6 +84,7 @@ class TournamentTest {
     @Test
     void thirdPlaceMatchIsSkippedWhenDisabled() {
         Tournament t = open("Cup", PhaseType.SINGLE_ELIMINATION, 4);
+        t.getPhases().getFirst().setThirdPlaceMatch(false);
         t.start();
         playToCompletion(t);
         assertTrue(t.getPhases().getFirst().getMatches(BracketSide.THIRD_PLACE).isEmpty());

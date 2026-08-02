@@ -7,6 +7,8 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Component;
 
+import org.solarframework.core.util.ClassUtils;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -115,8 +117,13 @@ public class DatabaseUtils {
         }
     }
 
+    /** ClassGraph configured to scan exactly the given loaders. {@link ClassUtils#scannable} keeps overrideClassLoaders() working inside a Spring Boot fat jar. */
+    public static ClassGraph scannerOf(Collection<ClassLoader> entityClassloaders) {
+        return new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(ClassUtils.scannable(entityClassloaders));
+    }
+
     public static void scanEntitiesOfLoaders(Collection<ClassLoader> entityClassloaders, Consumer<List<Class<?>>> consumer) {
-        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(entityClassloaders.toArray(new ClassLoader[]{})).scan()) {
+        try (ScanResult scanResult = scannerOf(entityClassloaders).scan()) {
             List<Class<?>> L = new ArrayList<>();
             for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(Entity.class).stream().filter(c -> !c.isAbstract()).toList()) {
                 if (classInfo.extendsSuperclass(DatabaseObject.class)) {

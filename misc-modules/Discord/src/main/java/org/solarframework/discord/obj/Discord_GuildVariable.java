@@ -36,10 +36,15 @@ public class Discord_GuildVariable extends DatabaseObject<Discord_GuildVariable>
 
     public Discord_GuildVariable() {}
     protected Discord_GuildVariable(Long serverId, String name, Object value) {
+        this(serverId, name, value, true);
+    }
+    /** {@code persist == false} builds the row without writing it — what a read of an unset variable needs, so
+     *  {@link Discord_GuildInfo#getVariable} stops INSERTing a NULL row for every name nobody has ever set. */
+    protected Discord_GuildVariable(Long serverId, String name, Object value, boolean persist) {
         this.serverID = serverId;
         this.name = name;
         this.value = value != null ? value.toString() : null;
-        Upsert();
+        if (persist) Upsert();
     }
 
     public Long getServerID() {

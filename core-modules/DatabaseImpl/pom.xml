@@ -12,6 +12,21 @@
 
     <artifactId>DatabaseImpl</artifactId>
 
+    <build>
+        <plugins>
+            <!-- A fork per test class: DatabaseRegistry is static and Spring reuses a cached context without
+                 re-initializing it, so the MariaDB class of DatabaseIdentityRemoteTest would otherwise leave
+                 the H2 classes pointing at the remote server. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <reuseForks>false</reuseForks>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
     <dependencies>
         <dependency>
             <groupId>org.solarframework.mu</groupId>

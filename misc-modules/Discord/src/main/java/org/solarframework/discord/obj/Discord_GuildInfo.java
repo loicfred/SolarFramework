@@ -1,15 +1,17 @@
 package org.solarframework.discord.obj;
 
-import club.minnced.discord.webhook.send.WebhookMessageBuilder;
 import jakarta.persistence.*;
 import net.dv8tion.jda.api.EmbedBuilder;
 import net.dv8tion.jda.api.Permission;
 import net.dv8tion.jda.api.entities.*;
 import net.dv8tion.jda.api.entities.channel.middleman.GuildChannel;
+import net.dv8tion.jda.api.requests.restaction.WebhookMessageCreateAction;
 import org.solarframework.lang.Nationalities;
+import org.solarframework.db.api.Lazy;
 import org.solarframework.db.spring.DatabaseObject;
 
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,7 +23,11 @@ import static org.solarframework.core.util.OtherUtils.getHexValue;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 import static org.solarframework.discord.core.BotBuilder.DiscordAccount;
+import static org.solarframework.discord.core.BotBuilder.LogChannel;
 import static org.solarframework.discord.lang.L10N.TLG;
+import org.solarframework.discord.utils.WebhookMessage;
+
+import static org.solarframework.discord.utils.WebhookUtils.served;
 
 @Entity
 @Table(name = "discord_guildinfo")
@@ -265,21 +271,36 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         E.setColor(getColor());
         return E;
     }
-    public WebhookMessageBuilder makeServedWebhook() {
-        return new WebhookMessageBuilder().setUsername(getGuild().getName()).setAvatarUrl(getGuild().getIconUrl());
+    public <T> WebhookMessageCreateAction<T> makeServedWebhook(WebhookMessageCreateAction<T> action) {
+        return served(action, getGuild());
+    }
+    /** For callers that must compose the message before they have an action to serve. */
+    public WebhookMessage makeServedWebhook() {
+        return WebhookMessage.served(getGuild());
     }
 
     public Guild getGuild() {
         return Guild == null ? Guild = DiscordAccount.getGuildById(ID) : Guild;
     }
+    // Each association is fetched once per guild instance and then held in its own mapped field, the same shape
+    // IParticipant uses. The Lazy guard is what makes that safe: Hibernate hydrates these with a PersistentBag
+    // that `!= null` never catches and that throws on first read once the EntityManager is closed, while an
+    // instance built with `new` leaves them genuinely null — unloaded() covers both, and the fetched ArrayList
+    // that replaces the placeholder counts as loaded, so later calls reuse it instead of re-querying.
     public List<Discord_RoleInfo> getRoles() {
-        return Roles != null ? Roles = SolarDBManager.getAllWhere(Discord_RoleInfo.class, "ServerID = ?", getID()) : Roles;
+        return Roles == null ? Roles = new ArrayList<>(SolarDBManager.getAllWhere(Discord_RoleInfo.class, "ServerID = ?", getID())) : Roles;
     }
     public List<Discord_ChannelInfo> getChannels() {
-        return Channels != null ? Channels = SolarDBManager.getAllWhere(Discord_ChannelInfo.class, "ServerID = ?", getID()) : Channels;
+        return Channels == null ? Channels = new ArrayList<>(SolarDBManager.getAllWhere(Discord_ChannelInfo.class, "ServerID = ?", getID())) : Channels;
     }
     public List<Discord_GuildVariable> getVariables() {
-        return SolarDBManager.getAllWhere(Discord_GuildVariable.class, "ServerID = ?", getID());
+        return Variables == null ? Variables = new ArrayList<>(SolarDBManager.getAllWhere(Discord_GuildVariable.class, "ServerID = ?", getID())) : Variables;
+    }
+    /** Drops the fetched associations, for the rare caller that has to see a write made through another instance. */
+    public void invalidateCaches() {
+        Roles = null;
+        Channels = null;
+        Variables = null;
     }
 
     public Discord_GuildInfo() {}
@@ -323,7 +344,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
 
     public void LogGuild(String string) {
         if (getLogChannel().isPresent() && getLogChannel().get().canTalk()) getLogChannel().get().sendMessage(string).queue();
-        else setUsageChannel("LOG", null);
+        if (LogChannel != null) LogChannel.sendMessage("**[" + getName() + "/" + getID() + "]:** " + string).queue();
     }
 
     public <T> T extender(Class<T> extenderClass) {
@@ -345,12 +366,17 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         return extender(extenderClass);
     }
 
+    /** A value equal to the stored one is not rewritten — a settings form posts every field on every save. */
     public void setVariable(String name, Object value) {
-        getVariables().removeIf(V -> V.getName().equalsIgnoreCase(name));
-        getVariables().add(new Discord_GuildVariable(getID(), name, value));
+        List<Discord_GuildVariable> L = getVariables();
+        String v = value != null ? value.toString() : null;
+        if (L.stream().anyMatch(V -> V.getName().equalsIgnoreCase(name) && Objects.equals(V.getValue(), v))) return;
+        L.removeIf(V -> V.getName().equalsIgnoreCase(name));
+        L.add(new Discord_GuildVariable(getID(), name, v)); // the constructor is what writes it
     }
+    /** A name nobody has set reads as an empty row, and is <em>not</em> written — see the 4-arg constructor. */
     public Discord_GuildVariable getVariable(String name) {
-        return getVariables().stream().filter(V -> V.getName().equalsIgnoreCase(name)).findFirst().orElseGet(() -> new Discord_GuildVariable(getID(), name, null));
+        return getVariables().stream().filter(V -> V.getName().equalsIgnoreCase(name)).findFirst().orElseGet(() -> new Discord_GuildVariable(getID(), name, null, false));
     }
     public Optional<String> getVariableAsString(String name) {
         return getVariable(name).getValueOptional();
@@ -371,19 +397,25 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     public Optional<Discord_RoleInfo> getUsageRole(String action) {
         return getRoles().stream().filter(R -> R.getAction().equalsIgnoreCase(action)).findFirst();
     }
+    /** A null role clears the mapping — the constructor deletes the row, so it must not go back into the cache. */
     public Discord_RoleInfo setUsageRole(String action, Role role) {
-        getRoles().removeIf(V -> V.getAction().equalsIgnoreCase(action) && Objects.equals(V.getServerID(), getID()));
-        getRoles().add(new Discord_RoleInfo(getGuild(), role, action));
-        return getRoles().getLast();
+        List<Discord_RoleInfo> L = getRoles();
+        L.removeIf(V -> V.getAction().equalsIgnoreCase(action) && Objects.equals(V.getServerID(), getID()));
+        Discord_RoleInfo RI = new Discord_RoleInfo(getGuild(), role, action);
+        if (role != null) L.add(RI);
+        return RI;
     }
     
     public Optional<Discord_ChannelInfo> getUsageChannel(String action) {
         return getChannels().stream().filter(C -> C.getAction().equalsIgnoreCase(action)).findFirst();
     }
+    /** A null channel clears the mapping — the constructor deletes the row, so it must not go back into the cache. */
     public Discord_ChannelInfo setUsageChannel(String action, GuildChannel channel) {
-        getChannels().removeIf(V -> V.getAction().equalsIgnoreCase(action) && Objects.equals(V.getServerID(), getID()));
-        getChannels().add(new Discord_ChannelInfo(getGuild(), channel, action));
-        return getChannels().getLast();
+        List<Discord_ChannelInfo> L = getChannels();
+        L.removeIf(V -> V.getAction().equalsIgnoreCase(action) && Objects.equals(V.getServerID(), getID()));
+        Discord_ChannelInfo CI = new Discord_ChannelInfo(getGuild(), channel, action);
+        if (channel != null) L.add(CI);
+        return CI;
     }
 
     public Optional<Discord_ChannelInfo> getLogChannel() {

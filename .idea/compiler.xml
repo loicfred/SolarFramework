@@ -6,6 +6,7 @@
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
+        <module name="TestApp" />
         <module name="CertificateGenerator" />
         <module name="TournamentImpl" />
         <module name="SpringProxyServerImplV2" />
@@ -69,6 +70,7 @@
       <module name="SpringProxyServerImplV1" options="-parameters" />
       <module name="SpringProxyServerImplV2" options="-parameters" />
       <module name="StaffAuthenticationAPI" options="-parameters" />
+      <module name="TestApp" options="-parameters" />
       <module name="TournamentAPI" options="-parameters" />
       <module name="TournamentImpl" options="-parameters" />
       <module name="WebUtils" options="-parameters" />

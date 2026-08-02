@@ -1,5 +1,6 @@
 package org.solarframework.tournament.impl.obj;
 
+import jakarta.persistence.DiscriminatorValue;
 import jakarta.persistence.Entity;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -8,6 +9,7 @@ import org.solarframework.tournament.obj.ITournament;
 
 /** Concrete {@link IParticipant}. */
 @Entity
+@DiscriminatorValue("0")
 public class Participant extends IParticipant {
     private static final Logger log = LoggerFactory.getLogger(Participant.class);
 

@@ -13,14 +13,21 @@ import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
 public class L10N extends org.solarframework.lang.L10N {
+    public static ResourceBundle getSystemLanguageBundle(DiscordLocale lang) {
+        return getSystemLanguageBundle(lang.getLanguageName());
+    }
+    public static ResourceBundle getSystemLanguageBundle(Nationalities lang) {
+        return getSystemLanguageBundle(lang.name());
+    }
     public static ResourceBundle getSystemLanguageBundle(String lang) {
         try {
-            Locale locale = getLocale(lang);
-            return ResourceBundle.getBundle("lang/discord/system", locale, L10N.class.getClassLoader());
+            return ResourceBundle.getBundle("lang/discord/system", getLocale(lang), L10N.class.getClassLoader());
         } catch (Exception ignored) {
             return null;
         }
     }
+
+
     public static ResourceBundle getLanguageBundle(DiscordLocale lang) {
         return getLanguageBundle(lang.getLanguageName());
     }
@@ -29,10 +36,9 @@ public class L10N extends org.solarframework.lang.L10N {
     }
     public static ResourceBundle getLanguageBundle(String lang) {
         try {
-            Locale locale = getLocale(lang);
-            return ResourceBundle.getBundle("lang/discord/texts", locale, L10N.class.getClassLoader());
+            return ResourceBundle.getBundle("lang/discord/texts", getLocale(lang), L10N.class.getClassLoader());
         } catch (Exception ignored) {
-            return getSystemLanguageBundle(lang);
+            return null;
         }
     }
 
@@ -55,20 +61,43 @@ public class L10N extends org.solarframework.lang.L10N {
     }
 
     public static String TL(InteractionHook m, String key, Object... var) {
-        RB = getLanguageBundle(m.getInteraction().getUserLocale());
-        return TL(key, var);
+        try {
+            RB = getLanguageBundle(m.getInteraction().getUserLocale());
+            return TL(key, var);
+        } catch (Exception e) {
+            try {
+                RB = getSystemLanguageBundle(m.getInteraction().getUserLocale());
+                return TL(key, var);
+            } catch (Exception ex) {
+                return key;
+            }
+        }
     }
     public static String TL(Interaction event, String key, Object... var) {
-        RB = getLanguageBundle(event.getUserLocale());
-        return TL(key, var);
+        try {
+            RB = getLanguageBundle(event.getUserLocale());
+            return TL(key, var);
+        } catch (Exception e) {
+            try {
+                RB = getSystemLanguageBundle(event.getUserLocale());
+                return TL(key, var);
+            } catch (Exception ex) {
+                return key;
+            }
+        }
     }
 
     public static String TLG(Guild G, String key, Object... var) {
         try {
             RB = getLanguageBundle(G == null ? DiscordLocale.ENGLISH_UK : G.getLocale());
             return TL(key, var);
-        } catch (MissingResourceException | NullPointerException | IllegalArgumentException e) {
-            return key;
+        } catch (Exception e) {
+            try {
+                RB = getSystemLanguageBundle(G == null ? DiscordLocale.ENGLISH_UK : G.getLocale());
+                return TL(key, var);
+            } catch (Exception ex) {
+                return key;
+            }
         }
     }
     public static String TLG(Discord_GuildInfo GI, String key, Object... var) {
