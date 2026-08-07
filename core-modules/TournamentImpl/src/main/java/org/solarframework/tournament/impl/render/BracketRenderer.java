@@ -72,7 +72,8 @@ public class BracketRenderer implements IBracketRenderer {
     @Override
     public String renderHtml(IPhase phase, BracketTheme theme) {
         BracketTheme t = orDefault(theme);
-        return HtmlPainter.render(new BracketLayout(phase, t).build(), t, htmlTitle(phase));
+        ITournament parent = phase.getTournament();
+        return HtmlPainter.render(new BracketLayout(phase, t).build(), t, parent == null ? phase.getName() : parent.getName() + " - " + phase.getName());
     }
 
     @Override
@@ -94,11 +95,6 @@ public class BracketRenderer implements IBracketRenderer {
     public File writeHtml(ITournament tournament, BracketTheme theme, File target) throws IOException {
         Files.writeString(target.toPath(), renderHtml(tournament, theme), StandardCharsets.UTF_8);
         return target;
-    }
-
-    private String htmlTitle(IPhase phase) {
-        ITournament t = phase.getTournament();
-        return t == null ? phase.getName() : t.getName() + " - " + phase.getName();
     }
 
     private static BracketTheme orDefault(BracketTheme theme) { return theme == null ? BracketTheme.dark() : theme; }

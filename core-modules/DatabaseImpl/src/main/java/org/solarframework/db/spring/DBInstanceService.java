@@ -2,11 +2,10 @@ package org.solarframework.db.spring;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Id;
-import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
-import jakarta.persistence.Persistence;
+import org.hibernate.proxy.HibernateProxy;
+import org.hibernate.proxy.LazyInitializer;
 import org.solarframework.db.api.DatabaseType;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
@@ -26,7 +25,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     protected static final Map<String, Set<Field>> IdFields = new HashMap<>();
     protected static final Map<String, Set<Field>> CachedFields = new HashMap<>();
     protected static final Map<String, List<Field>> LazyFields = new HashMap<>();
-    protected static final Map<String, List<Field>> AssocFields = new HashMap<>();
+    protected static final Map<String, List<Field>> ToOneFields = new HashMap<>();
 
     protected transient DatabaseObject<T> dbObject;
     protected transient IDatabaseService dbService;
@@ -80,19 +79,35 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         for (Field f : lazyFieldsOf(obj.getClass())) setFieldValue(f, obj, Lazy.UNLOADED);
     }
 
-    /** The associations a hydrator fills with a placeholder rather than a value. */
-    static List<Field> assocFieldsOf(Class<?> clazz) {
-        return AssocFields.computeIfAbsent(clazz.getName(), _ -> getAllFieldsOfClassFamily(clazz).stream().filter(f -> f.isAnnotationPresent(OneToMany.class) || f.isAnnotationPresent(ManyToOne.class) || f.isAnnotationPresent(OneToOne.class) || f.isAnnotationPresent(ManyToMany.class)).toList());
+    static List<Field> toOneFieldsOf(Class<?> clazz) {
+        return ToOneFields.computeIfAbsent(clazz.getName(), _ -> getAllFieldsOfClassFamily(clazz).stream().filter(f -> f.isAnnotationPresent(ManyToOne.class) || f.isAnnotationPresent(OneToOne.class)).toList());
     }
 
     /**
-     * Nulls the associations a read hydrated but never loaded. The EntityManager closes with the query, so a
-     * PersistentBag or a proxy left behind can no longer fetch itself - it only dies on whoever touches it,
-     * and {@code x == null} never catches it. Null says the same thing in a form every getter can answer, so
-     * an association is either a value or absent and nothing in between reaches a caller.
+     * Redirects every to-one association on a freshly Hibernate-loaded entity onto the framework's own
+     * canonical instance for that row - called from a {@code PostLoadEventListener}, after Hibernate is done
+     * with the entity, so it is a plain field mutation with no Hibernate session involvement. A
+     * {@code getEntity}/{@code lock} based Interceptor hook was tried first and rejected: it asks Hibernate
+     * to adopt an object still attached to a different, already-closed EntityManager, which this framework
+     * has one of per call, and Hibernate answers that with {@code DetachedObjectException}.
+     *
+     * <p>An already-initialized association (eager, or a lazy one some earlier load already touched) is
+     * folded into the canonical instance directly. An untouched lazy proxy is swapped for the canonical
+     * instance only when one is already registered - its id is available without initializing it - so a row
+     * nothing has read yet stays a deferred proxy, exactly as {@code FetchType.LAZY} asked for; a row read
+     * anywhere else already comes back as that same object instead of a second, disconnected one.
      */
-    static void dropPlaceholders(Object obj) {
-        for (Field f : assocFieldsOf(obj.getClass())) if (!Persistence.getPersistenceUtil().isLoaded(getFieldValue(f, obj))) setFieldValue(f, obj, null);
+    static void canonicalizeToOneAssociations(DatabaseService service, Object entity) {
+        for (Field f : toOneFieldsOf(entity.getClass())) {
+            Object value = getFieldValue(f, entity);
+            if (value == null) continue;
+            LazyInitializer lazy = HibernateProxy.extractLazyInitializer(value);
+            if (lazy == null) setFieldValue(f, entity, EntityIdentity.canonical(service, value));
+            else if (lazy.isUninitialized()) {
+                Object known = EntityIdentity.known(service, lazy.getPersistentClass(), lazy.getIdentifier());
+                if (known != null) setFieldValue(f, entity, known);
+            } else setFieldValue(f, entity, EntityIdentity.canonical(service, lazy.getImplementation()));
+        }
     }
 
     private Set<Field> getIdAndUniqueFields() {
@@ -248,7 +263,10 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     @Override
     public int UpdateOnly(String... columns) {
         try {
-            Set<Field> fieldsList = cachedFields.stream().filter(f -> !unloaded(f, dbObject)).filter(f -> Arrays.stream(columns).anyMatch(c -> f.getName().equalsIgnoreCase(c.toLowerCase()))).collect(Collectors.toSet());
+            List<String> cols = new ArrayList<>(Arrays.asList(columns));
+            if (dbObject instanceof DatabaseObject.RECORD_OBJ<T> && !cols.contains("UpdatedAt")) cols.add("UpdatedAt");
+
+            Set<Field> fieldsList = cachedFields.stream().filter(f -> !unloaded(f, dbObject)).filter(f -> cols.stream().anyMatch(c -> f.getName().equalsIgnoreCase(c.toLowerCase()))).collect(Collectors.toSet());
             if (fieldsList.isEmpty()) return 0;
             remember();
 

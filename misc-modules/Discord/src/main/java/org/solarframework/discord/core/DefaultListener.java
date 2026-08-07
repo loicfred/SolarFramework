@@ -16,6 +16,7 @@ import net.dv8tion.jda.api.events.interaction.command.UserContextInteractionEven
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.EntitySelectInteractionEvent;
 import net.dv8tion.jda.api.events.interaction.component.StringSelectInteractionEvent;
+import net.dv8tion.jda.api.events.guild.GuildReadyEvent;
 import net.dv8tion.jda.api.events.session.ReadyEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.IntegrationType;
@@ -23,10 +24,12 @@ import net.dv8tion.jda.api.interactions.Interaction;
 import net.dv8tion.jda.api.interactions.InteractionContextType;
 import net.dv8tion.jda.api.interactions.commands.build.CommandData;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -65,23 +68,18 @@ public class DefaultListener extends ListenerAdapter {
             System.exit(1);
         }
     }
-//    private final ExecutorService onGuildReady = Executors.newFixedThreadPool(20);
-//    @Override
-//    public void onGuildReady(@NotNull GuildReadyEvent event) {
-//        if (event.getGuild().getMemberCount() < 10) {
-//            event.getGuild().leave().queue();
-//            return;
-//        }
-//        onGuildReady.execute(() -> {
-//            try {
-//                SetupGuildCommands(event.getGuild());
-//                log.info("Done setting up commands in: {} ({})", event.getGuild().getName(), event.getGuild().getId());
-//            } catch (Exception e) {
-//                log.error("Failed to setup commands of guild: {} - {}", event.getGuild().getName(), e.getMessage());
-//                System.exit(1);
-//            }
-//        });
-//    }
+    private final ExecutorService onGuildReady = Executors.newFixedThreadPool(20);
+    @Override
+    public void onGuildReady(@NotNull GuildReadyEvent event) {
+        onGuildReady.execute(() -> {
+            try {
+                SetupGuildCommands(event.getGuild());
+                log.info("Done setting up commands in: {} ({})", event.getGuild().getName(), event.getGuild().getId());
+            } catch (Exception e) {
+                log.error("Failed to setup commands of guild: {} - {}", event.getGuild().getName(), e.getMessage());
+            }
+        });
+    }
 
     /**
      * The registered instances are prototypes: they are matched against (cheap — {@code getData()} is a cached
@@ -93,7 +91,9 @@ public class DefaultListener extends ListenerAdapter {
     private static <T extends CMD> Optional<T> callCommand(Optional<T> prototype) {
         return prototype.flatMap(p -> {
             try {
-                return Optional.of((T) p.getClass().getDeclaredConstructor().newInstance());
+                Constructor<?> c = p.getClass().getDeclaredConstructor();
+                c.setAccessible(true); // registration accepts non-public handlers, so dispatch has to be able to build one too
+                return Optional.of((T) c.newInstance());
             } catch (Exception ex) {
                 log.error("Failed to instantiate {} for dispatch", p.getClass().getName(), ex);
                 return Optional.empty();
@@ -219,13 +219,23 @@ public class DefaultListener extends ListenerAdapter {
         });
     }
 
+    /**
+     * {@code ignoreClassVisibility()} is not optional: ClassGraph only records <b>public</b> classes by default, so a
+     * non-public class anywhere in the chain breaks it — a {@code public static} handler extending a {@code private
+     * abstract} base in its own outer class is simply never seen as a subclass of {@link CMD}, and it registers no
+     * command. Nothing fails at build or boot: the component renders, the click dispatches to no handler, and the
+     * interaction is never acknowledged. Same reason the constructor is forced accessible — a package-private or
+     * private handler has a constructor to match.
+     */
     @SuppressWarnings("unchecked")
     private static <T> List<T> loadClasses(Class<T> clazz, String commandPackage) {
         List<T> L = new ArrayList<>();
-        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().overrideClassLoaders(ClassUtils.scannable(classLoaders)).acceptPackages(commandPackage, CMD.class.getPackageName()).scan()) {
+        try (ScanResult scanResult = new ClassGraph().enableClassInfo().enableAnnotationInfo().ignoreClassVisibility().overrideClassLoaders(ClassUtils.scannable(classLoaders)).acceptPackages(commandPackage, CMD.class.getPackageName()).scan()) {
             for (ClassInfo classInfo : scanResult.getSubclasses(clazz).stream().filter(c -> !c.isAbstract()).toList()) {
                 try {
-                    L.add((T) classInfo.loadClass().getDeclaredConstructor().newInstance());
+                    Constructor<?> c = classInfo.loadClass().getDeclaredConstructor();
+                    c.setAccessible(true);
+                    L.add((T) c.newInstance());
                 } catch (Exception ignored) {
                     log.error("Failed to load class {}", classInfo.getName());
                 }
@@ -236,8 +246,11 @@ public class DefaultListener extends ListenerAdapter {
     public static void SetupGlobalCommands() {
         List<CommandData> CMD = new ArrayList<>();
         for (SlashCMD cmd : SlashCommands) {
+            // Discord rejects a command carrying both, so subcommands win when a command declares any.
+            List<SubcommandData> subs = cmd.commandSubcommands();
             CMD.add(Commands.slash(cmd.getData().name(), cmd.getData().description())
-                    .addOptions(cmd.commandParameters())
+                    .addSubcommands(subs)
+                    .addOptions(subs.isEmpty() ? cmd.commandParameters() : List.of())
                     .setNSFW(cmd.getData().nsfw())
                     .setIntegrationTypes(cmd.getData().integrationType())
                     .setContexts(cmd.getData().integrationContextType()));
@@ -259,8 +272,10 @@ public class DefaultListener extends ListenerAdapter {
     public static void SetupGuildCommands(Guild guild) {
         List<CommandData> CMD = new ArrayList<>();
         for (GSlashCMD cmd : GSlashCommands.stream().filter(g -> g.getServerIDs().contains(guild.getIdLong())).toList()) {
+            List<SubcommandData> subs = cmd.commandSubcommands(guild);
             CMD.add(Commands.slash(cmd.getData().name(), cmd.getData().description())
-                    .addOptions(cmd.commandParameters(guild))
+                    .addSubcommands(subs)
+                    .addOptions(subs.isEmpty() ? cmd.commandParameters(guild) : List.of())
                     .setNSFW(cmd.getData().nsfw())
                     .setIntegrationTypes(IntegrationType.GUILD_INSTALL)
                     .setContexts(InteractionContextType.GUILD));
@@ -277,12 +292,32 @@ public class DefaultListener extends ListenerAdapter {
                     .setIntegrationTypes(IntegrationType.GUILD_INSTALL)
                     .setContexts(InteractionContextType.GUILD));
         }
-        if (!CMD.isEmpty()) guild.updateCommands().addCommands(CMD).queue();
+        guild.updateCommands().addCommands(CMD).queue(); // pushed even when empty: a guild that lost its last eligible command has to have the stale one cleared
+    }
+
+    /**
+     * Re-reads every guild-scoped command's {@code serverIds()} and re-pushes the whole set to each guild.
+     * Guild commands are otherwise registered once at guild-ready off a memoized list, so a command whose
+     * eligibility depends on live data (an open tournament, a clan, a league) only appears after a restart.
+     */
+    public static void RefreshGuildCommands() {
+        GSlashCommands.forEach(GSlashCMD::invalidateServerIDs);
+        GUserCommands.forEach(GUserCMD::invalidateServerIDs);
+        GMessageCommands.forEach(GMessageCMD::invalidateServerIDs);
+        for (Guild g : DiscordAccount.getGuilds()) {
+            try {
+                SetupGuildCommands(g);
+            } catch (Exception e) {
+                log.error("Failed to refresh commands of guild: {} - {}", g.getName(), e.getMessage());
+            }
+        }
     }
 
     public static void addGuildSlashCommand(Guild guild, SlashCMD cmd) {
+        List<SubcommandData> subs = cmd.commandSubcommands();
         guild.upsertCommand(Commands.slash(cmd.getData().name(), cmd.getData().description())
-                .addOptions(cmd.commandParameters())
+                .addSubcommands(subs)
+                .addOptions(subs.isEmpty() ? cmd.commandParameters() : List.of())
                 .setNSFW(cmd.getData().nsfw())
                 .setIntegrationTypes(cmd.getData().integrationType())
                 .setContexts(cmd.getData().integrationContextType())).queue();

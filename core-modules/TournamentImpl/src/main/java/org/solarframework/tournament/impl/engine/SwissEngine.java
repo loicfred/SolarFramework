@@ -67,7 +67,9 @@ public class SwissEngine extends AbstractPhaseEngine {
         List<IMatch> created = new ArrayList<>();
 
         if (field.size() % 2 == 1) {
-            IStanding bye = pickBye(field);
+            // the bye goes to the lowest-placed entrant who has not had one yet
+            IStanding bye = field.getLast();
+            for (int i = field.size() - 1; i >= 0; i--) if (!field.get(i).isHadBye()) { bye = field.get(i); break; }
             field.remove(bye);
             IMatch m = newMatch(phase, BracketSide.SWISS, round, created.size());
             m.setParticipantID1(bye.getParticipantID());
@@ -101,12 +103,6 @@ public class SwissEngine extends AbstractPhaseEngine {
                 .thenComparing(Comparator.comparingDouble(IStanding::getBuchholz).reversed())
                 .thenComparingInt(s -> s.getSeed() > 0 ? s.getSeed() : Integer.MAX_VALUE)
                 .thenComparingLong(IStanding::getParticipantID);
-    }
-
-    /** The bye goes to the lowest-placed entrant who has not had one yet. */
-    private IStanding pickBye(List<IStanding> field) {
-        for (int i = field.size() - 1; i >= 0; i--) if (!field.get(i).isHadBye()) return field.get(i);
-        return field.getLast();
     }
 
     /**

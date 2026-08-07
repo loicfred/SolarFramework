@@ -91,6 +91,6 @@ public class Order extends DatabaseObject.ID_RECORD_OBJ<Long, Order> {
     }
 
     public User getUser() {
-        return user == null ? user = SolarDBManager.getById(User.class, userId).orElse(null) : user;
+        return user;
     }
 }

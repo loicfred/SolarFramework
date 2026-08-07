@@ -32,10 +32,10 @@ import java.util.Optional;
 @DiscriminatorFormula("'0'")
 public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITournament> {
 
-    @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<IPhase> phases = new ArrayList<>();
 
-    @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<IParticipant> participants = new ArrayList<>();
 
     // ---- identity -------------------------------------------------------------------------------
@@ -51,7 +51,7 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
     private String discipline;
     @Column(name = "OwnerRef", length = 120)
     private String ownerRef;
-    @Column(name = "ExternalRef", length = 200)
+    @Column(name = "ExternalRef", length = 200, unique = true)
     private String externalRef;
     @Column(name = "Region", length = 80)
     private String region;
@@ -68,73 +68,73 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
 
     // ---- state ----------------------------------------------------------------------------------
     @Convert(converter = TournamentStatusConverter.class)
-    @Column(name = "Status", nullable = false, length = 32)
+    @Column(name = "Status", nullable = false, length = 32, columnDefinition = "VARCHAR(32) NOT NULL DEFAULT 'DRAFT'")
     private TournamentStatus status = TournamentStatus.DRAFT;
-    @Column(name = "CurrentPhaseIndex")
+    @Column(name = "CurrentPhaseIndex", columnDefinition = "INT DEFAULT 0")
     private Integer currentPhaseIndex = 0;
     /** Off, a finished phase is still ranked and closed but the next one is not drawn and the run is not
      *  finished either: something outside decides when to move on. Nullable so rows written before the
      *  column existed - and every consumer that never touches it - keep advancing on their own. */
     @Column(name = "AutoAdvancePhases")
     private Boolean autoAdvancePhases;
-    @Column(name = "IsPublic", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "IsPublic", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean isPublic = true;
-    @Column(name = "BracketVisible", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "BracketVisible", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean bracketVisible = true;
 
     // ---- format ---------------------------------------------------------------------------------
     /** 1 for 1v1, 2 for 2v2, 5 for 5v5... Drives how many members a participant may roster. */
-    @Column(name = "TeamSize", nullable = false)
+    @Column(name = "TeamSize", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 1")
     private int teamSize = 1;
-    @Column(name = "MinParticipants", nullable = false)
+    @Column(name = "MinParticipants", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 2")
     private int minParticipants = 2;
-    @Column(name = "MaxParticipants", nullable = false)
+    @Column(name = "MaxParticipants", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int maxParticipants = 0;
     /** With a cap set, entrants arriving into a full field queue up instead of being turned away. */
-    @Column(name = "WaitlistEnabled", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "WaitlistEnabled", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean waitlistEnabled = true;
     /** A team may register before its roster is filled, but with this set it may not take the floor short. */
-    @Column(name = "RequireCompleteRosters", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "RequireCompleteRosters", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean requireCompleteRosters = true;
     /** Default series length for matches; 1 is a single match, 3 is a BO3. */
-    @Column(name = "DefaultBestOf", nullable = false)
+    @Column(name = "DefaultBestOf", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 1")
     private int defaultBestOf = 1;
-    @Column(name = "ThirdPlaceMatch", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "ThirdPlaceMatch", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean thirdPlaceMatch = true;
-    @Column(name = "GrandFinalReset", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "GrandFinalReset", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean grandFinalReset = true;
-    @Column(name = "DrawAllowed", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "DrawAllowed", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean drawAllowed = false;
     @Convert(converter = SeedingMethodConverter.class)
-    @Column(name = "SeedingMethod", nullable = false, length = 32)
+    @Column(name = "SeedingMethod", nullable = false, length = 32, columnDefinition = "VARCHAR(32) NOT NULL DEFAULT 'MANUAL'")
     private SeedingMethod seedingMethod = SeedingMethod.MANUAL;
-    @Column(name = "RandomSeed", nullable = false)
+    @Column(name = "RandomSeed", nullable = false, columnDefinition = "BIGINT NOT NULL DEFAULT 0")
     private long randomSeed = 0L;
     /** How a match's winner is decided; each phase inherits this as its default and may override it. */
     @Convert(converter = MatchDecisionModeConverter.class)
-    @Column(name = "MatchDecisionMode", nullable = false, length = 32)
+    @Column(name = "MatchDecisionMode", nullable = false, length = 32, columnDefinition = "VARCHAR(32) NOT NULL DEFAULT 'GAMES_WON'")
     private MatchDecisionMode matchDecisionMode = MatchDecisionMode.GAMES_WON;
 
     // ---- points ---------------------------------------------------------------------------------
-    @Column(name = "PointsPerWin", nullable = false)
+    @Column(name = "PointsPerWin", nullable = false, columnDefinition = "DOUBLE NOT NULL DEFAULT 3")
     private double pointsPerWin = 3;
-    @Column(name = "PointsPerDraw", nullable = false)
+    @Column(name = "PointsPerDraw", nullable = false, columnDefinition = "DOUBLE NOT NULL DEFAULT 1")
     private double pointsPerDraw = 1;
-    @Column(name = "PointsPerLoss", nullable = false)
+    @Column(name = "PointsPerLoss", nullable = false, columnDefinition = "DOUBLE NOT NULL DEFAULT 0")
     private double pointsPerLoss = 0;
-    @Column(name = "PointsPerBye", nullable = false)
+    @Column(name = "PointsPerBye", nullable = false, columnDefinition = "DOUBLE NOT NULL DEFAULT 3")
     private double pointsPerBye = 3;
-    @Column(name = "PointsPerForfeit", nullable = false)
+    @Column(name = "PointsPerForfeit", nullable = false, columnDefinition = "DOUBLE NOT NULL DEFAULT 0")
     private double pointsPerForfeit = 0;
     @Column(name = "Tiebreakers", length = 400)
     private String tiebreakers = TournamentEnums.join(Tiebreaker.DEFAULT_GROUP);
 
     // ---- registration ---------------------------------------------------------------------------
-    @Column(name = "CheckInRequired", nullable = false)
+    @Column(name = "CheckInRequired", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean checkInRequired = false;
-    @Column(name = "CheckInMinutes", nullable = false)
+    @Column(name = "CheckInMinutes", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 30")
     private int checkInMinutes = 30;
-    @Column(name = "AllowLateRegistration", nullable = false)
+    @Column(name = "AllowLateRegistration", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean allowLateRegistration = false;
     @Column(name = "RegistrationOpensAt")
     private Instant registrationOpensAt;
@@ -152,12 +152,10 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
     private String currency;
     @Column(name = "EntryFee")
     private Double entryFee;
-    @Column(name = "WinnerID")
-    private Long winnerID;
-    @Column(name = "RunnerUpID")
-    private Long runnerUpID;
-    @Column(name = "ThirdPlaceID")
-    private Long thirdPlaceID;
+    // No podium columns: the placings are IParticipant.finalRank, which finish() writes for every entrant and
+    // which is what the standings, the profile pages and the exports already read. Three columns holding the
+    // top of that same list could only ever disagree with it - a reset match, a re-ranked phase or an imported
+    // bracket updated one and not the other - so the podium is derived below instead of stored twice.
 
     protected ITournament() {}
 
@@ -283,12 +281,20 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
     // ---- behavior, implemented by the concrete Tournament ----------------------------------------
 
     public abstract void save();
-    public abstract void deleteCascade();
+    /** @param hard {@code true} really removes every row, {@code false} only stamps {@code DeletedAt} on them. */
+    public abstract void deleteCascade(boolean hard);
     public abstract void openRegistration();
     public abstract void closeRegistration();
     public abstract void start();
     public abstract void finish();
     public abstract void cancel(String reason);
+    /**
+     * Puts a run whose state drifted back into a consistent one, without ever discarding a result.
+     * See the implementation for what it repairs and what it only reports.
+     *
+     * @return one human-readable line per thing it fixed or refused to fix; empty when nothing was wrong
+     */
+    public abstract List<String> repair();
 
     public abstract IParticipant register(String name);
     public abstract IParticipant register(String name, int seed);
@@ -419,16 +425,16 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
     public void setCurrency(String currency) { this.currency = currency; }
     public Double getEntryFee() { return entryFee; }
     public void setEntryFee(Double entryFee) { this.entryFee = entryFee; }
-    public Long getWinnerID() { return winnerID; }
-    public void setWinnerID(Long winnerID) { this.winnerID = winnerID; }
-    public Long getRunnerUpID() { return runnerUpID; }
-    public void setRunnerUpID(Long runnerUpID) { this.runnerUpID = runnerUpID; }
-    public Long getThirdPlaceID() { return thirdPlaceID; }
-    public void setThirdPlaceID(Long thirdPlaceID) { this.thirdPlaceID = thirdPlaceID; }
-
-    public Optional<IParticipant> getWinner() { return getParticipant(winnerID); }
-    public Optional<IParticipant> getRunnerUp() { return getParticipant(runnerUpID); }
-    public Optional<IParticipant> getThirdPlace() { return getParticipant(thirdPlaceID); }
+    /** The entrant holding a placing, or empty while the run is unfinished - {@code finalRank} is 0 until {@link #finish()}. */
+    public Optional<IParticipant> getByFinalRank(int rank) {
+        return rank < 1 ? Optional.empty() : getParticipants().stream().filter(p -> p.getFinalRank() == rank).findFirst();
+    }
+    public Optional<IParticipant> getWinner() { return getByFinalRank(1); }
+    public Optional<IParticipant> getRunnerUp() { return getByFinalRank(2); }
+    public Optional<IParticipant> getThirdPlace() { return getByFinalRank(3); }
+    public Long getWinnerID() { return getWinner().map(IParticipant::getID).orElse(null); }
+    public Long getRunnerUpID() { return getRunnerUp().map(IParticipant::getID).orElse(null); }
+    public Long getThirdPlaceID() { return getThirdPlace().map(IParticipant::getID).orElse(null); }
 
     /** Podium in finishing order, empty entries dropped. */
     public List<IParticipant> getPodium() {

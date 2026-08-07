@@ -59,15 +59,17 @@ public class Discord_MessageInfo extends DatabaseObject<Discord_MessageInfo> {
     private String ChannelAction;
 
     public Discord_MessageInfo() {}
-    public Discord_MessageInfo(String channelAction, Long serverId, Long channelId) {
+    public Discord_MessageInfo(String action, String channelAction, Long serverId, Long channelId) {
         this.ServerID = serverId;
         this.ChannelID = channelId;
+        this.Action = action;
         this.ChannelAction = channelAction;
     }
-    public Discord_MessageInfo(String channelAction, Long serverId, Long channelId, Long messageId) {
+    public Discord_MessageInfo(String action, String channelAction, Long serverId, Long channelId, Long messageId) {
         this.ServerID = serverId;
         this.ChannelID = channelId;
         this.MessageID = messageId;
+        this.Action = action;
         this.ChannelAction = channelAction;
     }
 

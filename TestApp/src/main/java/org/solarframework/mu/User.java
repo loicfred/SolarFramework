@@ -56,7 +56,7 @@ public class User extends DatabaseObject.ID_RECORD_OBJ<Long, User> {
     }
 
     public List<Order> getOrders() {
-        return orders == null ? orders = new ArrayList<>(SolarDBManager.getAllWhere(Order.class, "UserID = ?", getID())) : orders;
+        return orders == null ? orders = new ArrayList<>() : orders;
     }
 
     public Order addOrder(String item, int amount) {

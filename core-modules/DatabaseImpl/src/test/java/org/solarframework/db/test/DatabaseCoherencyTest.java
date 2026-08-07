@@ -63,6 +63,10 @@ class DatabaseCoherencyTest {
         return SolarDBManager.getById(Order.class, id).orElseThrow();
     }
 
+    private List<Order> fetchOrdersOf(long userId) {
+        return SolarDBManager.getAllWhere(Order.class, "UserID = ?", userId);
+    }
+
     // ====== BASIC READS ======
 
     @Test
@@ -71,7 +75,7 @@ class DatabaseCoherencyTest {
         User me = fetchUser(1);
         assertEquals("Loic", me.getName());
         assertEquals("loic@gmail.com", me.getEmail());
-        assertEquals(2, me.getOrders().size());
+        assertEquals(2, fetchOrdersOf(1).size());
     }
 
     @Test
@@ -102,24 +106,24 @@ class DatabaseCoherencyTest {
     @Test
     void rawSqlOrderDeleteRefreshesCachedUser() {
         makeNewUserWith2Orders(1);
-        assertEquals(2, fetchUser(1).getOrders().size(), "user cached with both orders");
+        assertEquals(2, fetchOrdersOf(1).size(), "user cached with both orders");
 
         int deleted = SolarDBManager.getServiceByEntity(Order.class).doUpdate(Order.class, "DELETE FROM orders WHERE id = ?", 102L);
         assertEquals(1, deleted);
 
-        assertEquals(1, fetchUser(1).getOrders().size(), "cached user must be refreshed after raw SQL order delete");
+        assertEquals(1, fetchOrdersOf(1).size(), "cached user must be refreshed after raw SQL order delete");
     }
 
     @Test
     void objectOrderDeleteRefreshesCachedUser() {
         makeNewUserWith2Orders(1);
         User me = fetchUser(1);
-        assertEquals(2, me.getOrders().size());
+        assertEquals(2, fetchOrdersOf(1).size());
 
-        Order first = me.getOrders().getFirst();
+        Order first = fetchOrdersOf(1).getFirst();
         assertEquals(1, first.Delete());
 
-        List<Order> remaining = fetchUser(1).getOrders();
+        List<Order> remaining = fetchOrdersOf(1);
         assertEquals(1, remaining.size(), "cached user must be refreshed after Order.Delete()");
         assertNotEquals(first.getID(), remaining.getFirst().getID());
     }
@@ -133,7 +137,7 @@ class DatabaseCoherencyTest {
         o.setAmount(99);
         assertEquals(1, o.Update());
 
-        Order fromUser = fetchUser(1).getOrders().stream().filter(x -> x.getID() == 101L).findFirst().orElseThrow();
+        Order fromUser = fetchOrdersOf(1).stream().filter(x -> x.getID() == 101L).findFirst().orElseThrow();
         assertEquals(99, fromUser.getAmount(), "order update must be visible through the user's orders");
     }
 
@@ -162,7 +166,7 @@ class DatabaseCoherencyTest {
         assertThrows(RuntimeException.class, me::TrueDelete, "FK constraint must block hard-deleting a user that still has orders");
 
         assertTrue(SolarDBManager.getById(User.class, 1L).isPresent(), "user must still be readable after the failed delete");
-        assertEquals(2, fetchUser(1).getOrders().size());
+        assertEquals(2, fetchOrdersOf(1).size());
     }
 
     @Test
@@ -271,7 +275,7 @@ class DatabaseCoherencyTest {
 
         assertEquals(6, o.getAmount(), "in-memory object must be incremented");
         assertEquals(6, fetchOrder(101).getAmount(), "fresh read must see the increment");
-        assertEquals(6, fetchUser(1).getOrders().stream().filter(x -> x.getID() == 101L).findFirst().orElseThrow().getAmount(),
+        assertEquals(6, fetchOrdersOf(1).stream().filter(x -> x.getID() == 101L).findFirst().orElseThrow().getAmount(),
                 "the user's cached orders must see the increment");
     }
 

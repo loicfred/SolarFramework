@@ -5,6 +5,7 @@ import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EntityManager;
+import org.hibernate.annotations.View;
 import org.springframework.stereotype.Component;
 
 import org.solarframework.core.util.ClassUtils;
@@ -126,6 +127,20 @@ public class DatabaseUtils {
         try (ScanResult scanResult = scannerOf(entityClassloaders).scan()) {
             List<Class<?>> L = new ArrayList<>();
             for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(Entity.class).stream().filter(c -> !c.isAbstract()).toList()) {
+                if (classInfo.extendsSuperclass(DatabaseObject.class)) {
+                    L.add(classInfo.loadClass());
+                }
+            }
+            consumer.accept(L);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static void scanViewsOfLoaders(Collection<ClassLoader> entityClassloaders, Consumer<List<Class<?>>> consumer) {
+        try (ScanResult scanResult = scannerOf(entityClassloaders).scan()) {
+            List<Class<?>> L = new ArrayList<>();
+            for (ClassInfo classInfo : scanResult.getClassesWithAnnotation(View.class).stream().filter(c -> !c.isAbstract()).toList()) {
                 if (classInfo.extendsSuperclass(DatabaseObject.class)) {
                     L.add(classInfo.loadClass());
                 }

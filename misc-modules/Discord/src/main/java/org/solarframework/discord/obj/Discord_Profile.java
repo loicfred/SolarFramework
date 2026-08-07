@@ -20,7 +20,7 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
     private transient User User;
 
     @OneToMany(mappedBy = "DP", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Discord_ProfileVariable> Variables;
+    private List<Discord_ProfileVariable> Variables = new ArrayList<>();
 
     private transient Object extender;
 
@@ -60,7 +60,17 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
         this.globalName = globalName;
     }
 
+    /**
+     * The member's display name, falling back to {@link #getName()} — the only NOT NULL name column. The other
+     * two are written from a live JDA user by RefreshProfileInformation, so a row for somebody who has left, or
+     * who was never resolved, has none of them; returning null there printed a literal "null" wherever a name
+     * was concatenated and broke any write feeding it to a NOT NULL column.
+     */
     public String getEffectiveName() {
+        return effectiveName != null && !effectiveName.isBlank() ? effectiveName : globalName != null && !globalName.isBlank() ? globalName : name;
+    }
+    /** The stored column as-is, for the callers that must tell "no display name" from "falls back to the username". */
+    public String getRawEffectiveName() {
         return effectiveName;
     }
     public void setEffectiveName(String effectiveName) {
@@ -109,19 +119,9 @@ public class Discord_Profile extends DatabaseObject.ID_OBJ<Long, Discord_Profile
     public User getUser() {
         return User == null ? User = getUserByID(getID()) : User;
     }
-    /**
-     * Fetched once per profile instance and held in the mapped field, not once per variable: a profile card
-     * reads ~20 names, and every {@code getVariableAsX} used to be its own full SELECT of this user's whole
-     * variable set. The {@link Lazy} guard is what makes reusing the association safe — Hibernate hydrates it
-     * with a PersistentBag that {@code != null} never catches and that throws on first read once the
-     * EntityManager is closed, while an instance built with {@code new} leaves it genuinely null.
-     */
+
     public List<Discord_ProfileVariable> getVariables() {
-        return Variables == null ? Variables = new ArrayList<>(SolarDBManager.getAllWhere(Discord_ProfileVariable.class, "UserID = ?", getID())) : Variables;
-    }
-    /** Drops the fetched association, for the rare caller that has to see a write made through another instance. */
-    public void invalidateVariables() {
-        Variables = null;
+        return Variables;
     }
 
     public <T> T extender(Class<T> extenderClass) {

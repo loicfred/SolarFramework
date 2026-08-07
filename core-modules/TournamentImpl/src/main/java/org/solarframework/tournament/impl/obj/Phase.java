@@ -55,27 +55,20 @@ public class Phase extends IPhase {
     public void regenerate() {
         List<IParticipant> entrants = getParticipants();
         if (entrants.isEmpty()) throw TournamentException.of("Phase '%s' has no entrants to regenerate from", getName());
-        clearForRegeneration();
-        generate(entrants);
-        log.info("Regenerated phase '{}'", getName());
-    }
-
-    private void clearForRegeneration() {
         for (IMatch m : getMatches()) { m.getGames().forEach(DatabaseObject::Delete); m.Delete(); }
         getStandings().forEach(DatabaseObject::Delete);
         getMatches().clear();
         getStandings().clear();
         setStatus(PhaseStatus.PENDING);
         setCurrentRound(0);
+        generate(entrants);
+        log.info("Regenerated phase '{}'", getName());
     }
-
-    /** Recomputes this phase's table from its matches, in memory only - persisted by the next {@link #save()}. */
-    List<IStanding> recompute() { return StandingsCalculator.recompute(this); }
 
     /** Recomputes, persists and returns this phase's table, ranked. */
     @Override
     public List<IStanding> recomputeStandings() {
-        List<IStanding> rows = recompute();
+        List<IStanding> rows = StandingsCalculator.recompute(this);
         DatabaseObject.UpsertAll(rows);
         return rows.stream().sorted(Comparator.comparingInt(IStanding::getGroupIndex).thenComparingInt(IStanding::getRank)).toList();
     }

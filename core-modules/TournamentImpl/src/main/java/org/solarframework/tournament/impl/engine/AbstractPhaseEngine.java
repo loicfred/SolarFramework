@@ -59,18 +59,14 @@ public abstract class AbstractPhaseEngine implements IPhaseEngine {
     /** Sequential, stable match numbers used in labels and on the rendered bracket. */
     protected void numberMatches(IPhase phase) {
         List<IMatch> ms = new ArrayList<>(phase.getMatches());
-        ms.sort(Comparator.comparingInt((IMatch m) -> sideOrder(m.getBracketSide())).thenComparingInt(IMatch::getRound).thenComparingInt(IMatch::getPosition));
-        for (int i = 0; i < ms.size(); i++) ms.get(i).setMatchNumber(i + 1);
-    }
-
-    private int sideOrder(BracketSide s) {
-        return switch (s) {
+        ms.sort(Comparator.comparingInt((IMatch m) -> switch (m.getBracketSide()) {
             case GROUP, SWISS, WINNERS -> 0;
             case LOSERS -> 1;
             case THIRD_PLACE -> 2;
             case GRAND_FINAL -> 3;
             case GRAND_FINAL_RESET -> 4;
-        };
+        }).thenComparingInt(IMatch::getRound).thenComparingInt(IMatch::getPosition));
+        for (int i = 0; i < ms.size(); i++) ms.get(i).setMatchNumber(i + 1);
     }
 
     // ---- progression ----------------------------------------------------------------------------
@@ -121,6 +117,33 @@ public abstract class AbstractPhaseEngine implements IPhaseEngine {
             }
         }
         return touched;
+    }
+
+    /**
+     * Replays every decided match's feed in bracket order, then settles the byes that follow from it.
+     *
+     * <p>Unlike {@link #propagate}, this <b>only fills an empty slot</b>. A slot that already holds
+     * somebody is left exactly as it is, decided downstream or not: a match reported before the one
+     * feeding it is the very case this exists for, and overwriting its entrant would leave a result
+     * pointing at somebody who was not in it.
+     */
+    @Override
+    public List<IMatch> repair(IPhase phase) {
+        List<IMatch> changed = new ArrayList<>();
+        List<IMatch> ordered = new ArrayList<>(phase.getMatches());
+        ordered.sort(Comparator.comparingInt(IMatch::getRound).thenComparingInt(IMatch::getPosition));
+        for (IMatch m : ordered) {
+            if (!m.getState().isDecided()) continue;
+            if (m.getWinnerID() != null && m.getNextMatchID() != null && m.getNextMatchSlot() != null)
+                phase.getMatch(m.getNextMatchID()).filter(n -> n.getParticipantID(m.getNextMatchSlot()) == null)
+                        .ifPresent(n -> { n.setParticipant(m.getNextMatchSlot(), m.getWinnerID()); changed.add(n); });
+            if (m.getLoserID() != null && m.getNextLoserMatchID() != null && m.getNextLoserMatchSlot() != null)
+                phase.getMatch(m.getNextLoserMatchID()).filter(n -> n.getParticipantID(m.getNextLoserMatchSlot()) == null)
+                        .ifPresent(n -> { n.setParticipant(m.getNextLoserMatchSlot(), m.getLoserID()); changed.add(n); });
+        }
+        for (IMatch m : resolveByes(phase)) if (!changed.contains(m)) changed.add(m);
+        if (!changed.isEmpty()) log.info("Repaired phase {}: {} match(es) relinked", phase.getID(), changed.size());
+        return changed;
     }
 
     /** Whether any upstream match could still deliver an entrant into this slot. */

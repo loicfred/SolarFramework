@@ -22,7 +22,6 @@ public class Discord_GuildVariable extends DatabaseObject<Discord_GuildVariable>
     @JoinColumn(referencedColumnName = "ID", name = "ServerID", nullable = false, insertable = false, updatable = false)
     private Discord_GuildInfo DGI;
 
-
     @Id
     @Column(name = "ServerID", nullable = false)
     private Long serverID;

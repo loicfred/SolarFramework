@@ -42,30 +42,26 @@ public final class StandingsCalculator {
         long randomSeed = phase.getTournament() == null ? phase.getID() : phase.getTournament().getRandomSeed();
         Comparator<IStanding> cmp = null;
         for (Tiebreaker t : chain) {
-            Comparator<IStanding> c = single(t, phase, randomSeed);
+            Comparator<IStanding> c = switch (t) {
+                case POINTS -> Comparator.comparingDouble(IStanding::getPoints).reversed();
+                case WINS -> Comparator.comparingInt(IStanding::getWins).reversed();
+                case HEAD_TO_HEAD -> StandingsCalculator::headToHead;
+                case GAME_DIFF -> Comparator.comparingInt(IStanding::getGameDiff).reversed();
+                case GAMES_WON -> Comparator.comparingInt(IStanding::getGamesWon).reversed();
+                case SCORE_DIFF -> Comparator.comparingInt(IStanding::getScoreDiff).reversed();
+                case SCORE_FOR -> Comparator.comparingInt(IStanding::getScoreFor).reversed();
+                case BUCHHOLZ -> Comparator.comparingDouble(IStanding::getBuchholz).reversed();
+                case MEDIAN_BUCHHOLZ -> Comparator.comparingDouble(IStanding::getMedianBuchholz).reversed();
+                case SONNEBORN_BERGER -> Comparator.comparingDouble(IStanding::getSonnebornBerger).reversed();
+                case FORFEITS -> Comparator.comparingInt(IStanding::getForfeits);
+                case SEED -> Comparator.comparingInt(s -> s.getSeed() > 0 ? s.getSeed() : Integer.MAX_VALUE);
+                case RANDOM -> Comparator.comparingInt(s -> Long.hashCode(randomSeed * 31 + s.getParticipantID()));
+            };
             cmp = cmp == null ? c : cmp.thenComparing(c);
         }
         // Always finish on a stable, total order so equal rows never swap between recounts.
         Comparator<IStanding> stable = Comparator.comparingLong(IStanding::getParticipantID);
         return cmp == null ? stable : cmp.thenComparing(stable);
-    }
-
-    private static Comparator<IStanding> single(Tiebreaker t, IPhase phase, long randomSeed) {
-        return switch (t) {
-            case POINTS -> Comparator.comparingDouble(IStanding::getPoints).reversed();
-            case WINS -> Comparator.comparingInt(IStanding::getWins).reversed();
-            case HEAD_TO_HEAD -> StandingsCalculator::headToHead;
-            case GAME_DIFF -> Comparator.comparingInt(IStanding::getGameDiff).reversed();
-            case GAMES_WON -> Comparator.comparingInt(IStanding::getGamesWon).reversed();
-            case SCORE_DIFF -> Comparator.comparingInt(IStanding::getScoreDiff).reversed();
-            case SCORE_FOR -> Comparator.comparingInt(IStanding::getScoreFor).reversed();
-            case BUCHHOLZ -> Comparator.comparingDouble(IStanding::getBuchholz).reversed();
-            case MEDIAN_BUCHHOLZ -> Comparator.comparingDouble(IStanding::getMedianBuchholz).reversed();
-            case SONNEBORN_BERGER -> Comparator.comparingDouble(IStanding::getSonnebornBerger).reversed();
-            case FORFEITS -> Comparator.comparingInt(IStanding::getForfeits);
-            case SEED -> Comparator.comparingInt(s -> s.getSeed() > 0 ? s.getSeed() : Integer.MAX_VALUE);
-            case RANDOM -> Comparator.comparingInt(s -> Long.hashCode(randomSeed * 31 + s.getParticipantID()));
-        };
     }
 
     /**

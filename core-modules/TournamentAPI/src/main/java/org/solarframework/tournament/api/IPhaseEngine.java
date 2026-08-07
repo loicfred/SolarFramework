@@ -33,4 +33,14 @@ public interface IPhaseEngine {
 
     /** Entrants that qualify out of this phase, in the order they should be seeded into the next. */
     List<IParticipant> getQualifiers(IPhase phase);
+
+    /**
+     * Re-derives the progression a phase's current results imply, for a phase whose links were never
+     * followed or were followed only halfway — an import written match by match, or a run whose later
+     * match was reported before the one feeding it. Non-destructive: it only ever <em>fills</em> an
+     * empty slot, so no reported result is disturbed.
+     *
+     * @return the matches it changed
+     */
+    List<IMatch> repair(IPhase phase);
 }

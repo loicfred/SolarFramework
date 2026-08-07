@@ -29,24 +29,24 @@ import java.util.stream.Collectors;
 @DiscriminatorFormula("'0'")
 public abstract class IMatchGame extends DatabaseObject.ID_RECORD_OBJ<Long, IMatchGame> {
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "MatchID", nullable = false, insertable = false, updatable = false)
     private IMatch match;
 
     @Column(name = "MatchID", nullable = false)
     private Long matchID;
     /** 1-based game number within the series. */
-    @Column(name = "GameNumber", nullable = false)
+    @Column(name = "GameNumber", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 1")
     private int gameNumber = 1;
-    @Column(name = "Score1", nullable = false)
+    @Column(name = "Score1", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int score1 = 0;
-    @Column(name = "Score2", nullable = false)
+    @Column(name = "Score2", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int score2 = 0;
     @Column(name = "WinnerID")
     private Long winnerID;
-    @Column(name = "IsTie", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "IsTie", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean isTie = false;
-    @Column(name = "Forfeited", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "Forfeited", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean forfeited = false;
     /** Map, stage, board colour - whatever varies game to game. */
     @Column(name = "Stage", length = 160)

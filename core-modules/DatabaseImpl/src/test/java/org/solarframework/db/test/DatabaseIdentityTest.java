@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.hibernate.collection.spi.PersistentCollection;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.db.test.obj.Order;
 import org.solarframework.db.test.obj.User;
@@ -19,10 +20,9 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
  * Object identity across the read and write paths, running against the same in-memory H2 database
  * as {@link DatabaseCoherencyTest}.
  *
- * <p>Two things are under test and they are separate: an object built with {@code new} must load its
- * associations like a fetched one (the {@code == null} guard on the getters, which a read makes true by
- * dropping the placeholders it hydrated), and a row must map
- * to exactly one Java object whichever path produced it (the identity map fed by every write).
+ * <p>Two things are under test: an association reports what its object holds and nothing else, and a row
+ * maps to exactly one Java object whichever path produced it - which is what makes a child queried
+ * separately the same object as the one attached in memory.
  */
 @SpringBootTest(classes = Database_Main.class, properties = {
         "spring.datasource.url=jdbc:h2:mem:solartest;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER",
@@ -59,36 +59,48 @@ class DatabaseIdentityTest {
         return SolarDBManager.getById(User.class, id).orElseThrow();
     }
 
-    // ====== ASSOCIATIONS ON A HAND-BUILT OBJECT ======
-
-    /** The original complaint: a {@code new} object holds no ORM collection, so its getter has to fetch - and must land on the same children as the fetched object, not a second copy of them. */
-    @Test
-    void newObjectLoadsTheSameAssociationsAsAFetchedOne() {
-        User u = makeNewUserWith2Orders(1);
-        assertEquals(List.of("Egg", "Steak"), u.getOrders().stream().map(Order::getItem).sorted().toList(), "a hand-built user must still find its orders");
-        List<Order> mine = u.getOrders(), theirs = fetchUser(1).getOrders(); // the lists are each getter's own; the children in them must not be copies
-        assertEquals(mine.size(), theirs.size(), "both sides must resolve to the same orders");
-        for (int i = 0; i < mine.size(); i++) assertSame(mine.get(i), theirs.get(i), "both sides must resolve to the same orders");
-        assertSame(u, u.getOrders().getFirst().getUser(), "and the way back must lead to the user we wrote");
+    private List<Order> fetchOrdersOf(long userId) {
+        return SolarDBManager.getAllWhere(Order.class, "UserID = ?", userId);
     }
 
-    /**
-     * The getter memoizes into the field, so a child written elsewhere only shows up once the row is read
-     * again - which now refreshes the object you are holding instead of building you another one.
-     */
+    // ====== ASSOCIATIONS ======
+
+
     @Test
-    void reReadingTheRowRefreshesTheAssociationsInPlace() {
+    void aReadHandsBackItsChildren() {
+        makeNewUserWith2Orders(1);
+        assertEquals(List.of("Egg", "Steak"), fetchUser(1).getOrders().stream().map(Order::getItem).sorted().toList(), "a fetched user must report the orders it owns");
+    }
+
+    @Test
+    void aReadLeavesAFaultableBagRatherThanAnEmptyList() {
+        makeNewUserWith2Orders(1);
+        SolarDBManager.resetAllCaches(); // so the read hands back Hibernate's object, not the registered writer
+        User u = fetchUser(1);
+        assertInstanceOf(PersistentCollection.class, u.orders, "the read must leave the bag in place - nulling it is what made every child invisible");
+        assertFalse(((PersistentCollection<?>) u.orders).wasInitialized(), "and must not have faulted it yet");
+        assertEquals(2, u.getOrders().size(), "first access faults it, closed EntityManager or not");
+    }
+
+    @Test
+    void aHandBuiltObjectStillStartsWithAnEmptyMutableList() {
+        User u = new User(2L, "Fred", "fred@gmail.com");
+        assertTrue(u.getOrders().isEmpty(), "a new object owns no children yet");
+        u.addOrder("Milk", 3);
+        assertEquals(1, u.getOrders().size(), "and its list must be mutable, so a graph can be built before it is saved");
+    }
+
+    @Test
+    void attachedChildrenAreTheSameObjectsTheDatabaseHandsBack() {
         User u = makeNewUserWith2Orders(1);
-        assertEquals(2, u.getOrders().size());
+        assertTrue(u.getOrders().isEmpty(), "the writer never held its children either - it wrote them and let go");
 
-        new Order(103L, u, "Milk", 3).Upsert();
-        assertEquals(2, u.getOrders().size(), "the list already handed out stays put");
+        Order milk = u.addOrder("Milk", 3);
+        assertEquals(List.of(milk), u.getOrders(), "addOrder must attach to the object that owns it");
+        milk.Upsert();
 
-        assertSame(u, fetchUser(1));
-        assertEquals(3, u.getOrders().size(), "re-reading the row must drop the stale children and refetch them");
-
-        u.getOrders().stream().filter(o -> o.getID() == 103L).findFirst().orElseThrow().Delete();
-        assertEquals(2, fetchUser(1).getOrders().size(), "and the same must hold after a delete");
+        for (Order o : fetchOrdersOf(1)) if (o.getID().equals(milk.getID())) assertSame(milk, o, "a child read back must be the object we attached");
+        assertSame(u, fetchOrdersOf(1).getFirst().getUser(), "and the way back must lead to the user we wrote");
     }
 
     // ====== ONE ROW, ONE OBJECT ======
@@ -153,8 +165,8 @@ class DatabaseIdentityTest {
 
         assertSame(u1, fetchUser(1));
         assertSame(u2, fetchUser(2));
-        assertEquals(2, u1.getOrders().size(), "each user must keep its own orders");
-        assertTrue(u1.getOrders().stream().noneMatch(o -> u2.getOrders().contains(o)));
+        assertEquals(2, fetchOrdersOf(1).size(), "each user must keep its own orders");
+        assertTrue(fetchOrdersOf(1).stream().noneMatch(o -> fetchOrdersOf(2).contains(o)));
     }
 
     /** A hard delete must not leave the deleted object behind for the next insert of that id. */
@@ -178,7 +190,7 @@ class DatabaseIdentityTest {
         User fresh = fetchUser(1);
         assertNotSame(u, fresh, "clearing every cache must start from a blank slate");
         assertEquals("Loic", fresh.getName());
-        assertEquals(2, fresh.getOrders().size());
+        assertEquals(2, fetchOrdersOf(1).size());
     }
 
     /** Partial selects map a subset of the columns, so they must stay out of the identity map. */

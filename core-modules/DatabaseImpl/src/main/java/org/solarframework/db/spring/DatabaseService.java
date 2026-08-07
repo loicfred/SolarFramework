@@ -14,6 +14,10 @@ import org.hibernate.boot.MetadataSources;
 import org.hibernate.boot.registry.BootstrapServiceRegistryBuilder;
 import org.hibernate.boot.registry.StandardServiceRegistry;
 import org.hibernate.boot.registry.StandardServiceRegistryBuilder;
+import org.hibernate.engine.spi.SessionFactoryImplementor;
+import org.hibernate.event.service.spi.EventListenerRegistry;
+import org.hibernate.event.spi.EventType;
+import org.hibernate.event.spi.PostLoadEventListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.solarframework.db.api.*;
@@ -276,6 +280,15 @@ public class DatabaseService implements IDatabaseService {
             for (Class<?> c : getEntitiesClasses()) sources.addAnnotatedClass(c);
 
             sessionFactory = sources.buildMetadata().buildSessionFactory();
+            // Collections/proxies faulted out-of-transaction (enable_lazy_load_no_trans) load through a
+            // StatelessSession (AbstractPersistentCollection#openTemporarySessionForLoading), which skips
+            // the event system entirely - no PostLoad, no INIT_COLLECTION - so this can only reach entities
+            // Hibernate loads through one of our own EntityManagers: getById/getAllWhere/getWhere results,
+            // and any to-one association resolved while that EntityManager is still open (eager, or a lazy
+            // one this same call touches). A collection's own elements, and a proxy nothing touches until
+            // after the call returns, are outside what any Interceptor/event hook can reach.
+            ((SessionFactoryImplementor) sessionFactory).getServiceRegistry().getService(EventListenerRegistry.class)
+                    .appendListeners(EventType.POST_LOAD, (PostLoadEventListener) event -> DBInstanceService.canonicalizeToOneAssociations(this, event.getEntity()));
         }
         return sessionFactory;
     }
@@ -614,7 +627,7 @@ public class DatabaseService implements IDatabaseService {
                 Query q = bindParams(em.createNativeQuery(toOrdinalParams(C.newSQL), concreteEntity(clazz)), C.newParams);
                 if (maxResults > 0 && takesLimit(C.newSQL)) q.setMaxResults(maxResults);
                 // Full rows only - the Tuple path below can carry a subset of the columns, which would blank out the rest of the canonical object.
-                return ((List<T>) q.getResultList()).stream().map(o -> { if (lazyRow) DBInstanceService.markUnloaded(o); DBInstanceService.dropPlaceholders(o); return EntityIdentity.canonical(this, o); }).collect(Collectors.toList());
+                return ((List<T>) q.getResultList()).stream().map(o -> { if (lazyRow) DBInstanceService.markUnloaded(o); return EntityIdentity.canonical(this, o); }).collect(Collectors.toList());
             }
             Query q = bindParams(em.createNativeQuery(toOrdinalParams(C.newSQL), Tuple.class), C.newParams);
             if (maxResults > 0 && takesLimit(C.newSQL)) q.setMaxResults(maxResults);

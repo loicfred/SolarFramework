@@ -35,13 +35,13 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     private transient Guild Guild;
 
     @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Discord_RoleInfo> Roles;
+    private List<Discord_RoleInfo> Roles = new ArrayList<>();
     @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Discord_ChannelInfo> Channels;
+    private List<Discord_ChannelInfo> Channels = new ArrayList<>();
     @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<Discord_MessageInfo> Messages;
+    private List<Discord_MessageInfo> Messages = new ArrayList<>();
     @OneToMany(mappedBy = "DGI", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Discord_GuildVariable> Variables;
+    private List<Discord_GuildVariable> Variables = new ArrayList<>();
 
     private transient Object extender;
 
@@ -57,7 +57,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     @Column(name = "Description", length = 2048)
     private String description;
     
-    @Column(name = "DominantColorcode", nullable = false, length = 7)
+    @Column(name = "DominantColorcode", nullable = false, length = 7, columnDefinition = "VARCHAR(7) NOT NULL DEFAULT '#808080'")
     private String dominantColorcode = "#808080";
 
     @Column(name = "InviteLink", length = 128)
@@ -67,7 +67,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     private String iconUrl;
     
     @Convert(converter = Nationality.class)
-    @Column(name = "Nationality", length = 40, nullable = false)
+    @Column(name = "Nationality", length = 40, nullable = false, columnDefinition = "VARCHAR(40) NOT NULL DEFAULT 'International'")
     private Nationalities nationality = Nationalities.International;
     @Converter
     public static class Nationality implements AttributeConverter<Nationalities, String> {
@@ -282,25 +282,20 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
     public Guild getGuild() {
         return Guild == null ? Guild = DiscordAccount.getGuildById(ID) : Guild;
     }
-    // Each association is fetched once per guild instance and then held in its own mapped field, the same shape
-    // IParticipant uses. The Lazy guard is what makes that safe: Hibernate hydrates these with a PersistentBag
-    // that `!= null` never catches and that throws on first read once the EntityManager is closed, while an
-    // instance built with `new` leaves them genuinely null — unloaded() covers both, and the fetched ArrayList
-    // that replaces the placeholder counts as loaded, so later calls reuse it instead of re-querying.
+    /**
+     * Each association is held in its own mapped field, and a read hands it over already able to load: the
+     * PersistentBag Hibernate leaves there faults itself on first access, closed EntityManager or not. The
+     * {@code == null} guard is only for an instance built with {@code new}, which Hibernate never touched
+     * and which needs an empty list it can grow before it is ever saved.
+     */
     public List<Discord_RoleInfo> getRoles() {
-        return Roles == null ? Roles = new ArrayList<>(SolarDBManager.getAllWhere(Discord_RoleInfo.class, "ServerID = ?", getID())) : Roles;
+        return Roles;
     }
     public List<Discord_ChannelInfo> getChannels() {
-        return Channels == null ? Channels = new ArrayList<>(SolarDBManager.getAllWhere(Discord_ChannelInfo.class, "ServerID = ?", getID())) : Channels;
+        return Channels;
     }
     public List<Discord_GuildVariable> getVariables() {
-        return Variables == null ? Variables = new ArrayList<>(SolarDBManager.getAllWhere(Discord_GuildVariable.class, "ServerID = ?", getID())) : Variables;
-    }
-    /** Drops the fetched associations, for the rare caller that has to see a write made through another instance. */
-    public void invalidateCaches() {
-        Roles = null;
-        Channels = null;
-        Variables = null;
+        return Variables;
     }
 
     public Discord_GuildInfo() {}

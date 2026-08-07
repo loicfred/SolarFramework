@@ -7,6 +7,7 @@ import org.solarframework.db.spring.DatabaseObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.solarframework.tournament.api.*;
+import org.solarframework.tournament.impl.StandingsCalculator;
 import org.solarframework.tournament.impl.engine.PhaseEngines;
 import org.solarframework.tournament.obj.*;
 
@@ -129,7 +130,7 @@ public class Match extends IMatch {
         List<IMatch> changed = PhaseEngines.of(phase.getType()).onMatchDecided(phase, this);
         Upsert();
         DatabaseObject.UpsertAll(changed);
-        p.recompute();
+        StandingsCalculator.recompute(p); // in memory only - the save() below persists it
         p.save();
         p.tryComplete();
     }
@@ -142,7 +143,7 @@ public class Match extends IMatch {
         Phase p = (Phase) phase;
         clearDownstream();
         clearResult();
-        p.recompute();
+        StandingsCalculator.recompute(p); // in memory only - the save() below persists it
         if (phase.getStatus() == PhaseStatus.COMPLETE) phase.setStatus(PhaseStatus.RUNNING);
         ITournament t = phase.getTournament();
         if (t != null && t.getStatus() == TournamentStatus.COMPLETE) {
@@ -180,7 +181,6 @@ public class Match extends IMatch {
         setPointsFor2(0);
         setWinnerID(null);
         setLoserID(null);
-        setTie(false);
         setForfeit1(false);
         setForfeit2(false);
         setCompletedAt(null);

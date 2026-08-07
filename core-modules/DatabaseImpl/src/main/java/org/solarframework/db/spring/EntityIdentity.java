@@ -19,10 +19,10 @@ import static org.solarframework.core.util.ClassUtils.*;
  * <p>Two consequences: <b>last writer wins</b> - writing claims the row, and an instance read earlier
  * keeps its state but stops being handed out (an object with no complete id is never canonical); and
  * <b>reads refresh in place</b> - the freshly read state is copied onto the canonical object, overwriting
- * unsaved edits, associations included. Those come back null - {@link DBInstanceService#dropPlaceholders}
- * runs on the fresh object first - which sends the next association getter to the database, the refresh a
- * caller used to get from being handed a new object. Values are held weakly, so an entry dies with the
- * last reference to it.
+ * unsaved edits, associations included. Those come back as an unloaded Hibernate collection/proxy - it
+ * self-faults on first touch under {@code enable_lazy_load_no_trans} regardless of whether the
+ * EntityManager that read it is still open, which is the refresh a caller used to get from being handed a
+ * new object. Values are held weakly, so an entry dies with the last reference to it.
  */
 final class EntityIdentity {
     private static final Cache<String, Object> Instances = Caffeine.newBuilder().weakValues().build();
@@ -55,6 +55,11 @@ final class EntityIdentity {
     }
 
     static void clear() { Instances.invalidateAll(); }
+
+    /** The instance already registered for this row, keyed the same way {@link #keyOf} would for a live object - or null if this service has not seen it yet. */
+    static Object known(DatabaseService service, Class<?> clazz, Object id) {
+        return id == null ? null : Instances.getIfPresent(clazz.getName() + '@' + service.getConnectionString().hashCode() + '/' + id);
+    }
 
     /** Returns the instance callers already hold for this row, refreshed from {@code fresh}, or adopts {@code fresh} as that instance. */
     @SuppressWarnings("unchecked")

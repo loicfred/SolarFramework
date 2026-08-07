@@ -100,15 +100,19 @@ public class Tournament extends ITournament {
     }
 
     @Override
-    public void deleteCascade() {
-        log.info("Deleting tournament '{}' ({})", getName(), getID());
+    public void deleteCascade(boolean hard) {
+        log.info("Deleting tournament '{}' ({}) - {}", getName(), getID(), hard ? "hard" : "soft");
+        // Every row of a run is an ID_RECORD_OBJ, so Delete() only stamps DeletedAt: the aggregate stops being
+        // read but its matches, entrants and table stay in the table for good. Hard is what a caller offering
+        // "delete it for real" needs - nothing is left to be found by an id lookup afterwards.
+        java.util.function.Consumer<DatabaseObject.RECORD_OBJ<?>> drop = hard ? DatabaseObject.RECORD_OBJ::TrueDelete : DatabaseObject.RECORD_OBJ::Delete;
         for (IPhase phase : getPhases()) {
-            for (IMatch m : phase.getMatches()) { m.getGames().forEach(DatabaseObject::Delete); m.Delete(); }
-            phase.getStandings().forEach(DatabaseObject::Delete);
-            phase.Delete();
+            for (IMatch m : phase.getMatches()) { m.getGames().forEach(drop); drop.accept(m); }
+            phase.getStandings().forEach(drop);
+            drop.accept(phase);
         }
-        for (IParticipant p : getParticipants()) { p.getMembers().forEach(DatabaseObject::Delete); p.Delete(); }
-        Delete();
+        for (IParticipant p : getParticipants()) { p.getMembers().forEach(drop); drop.accept(p); }
+        drop.accept(this);
     }
 
     @Override
@@ -165,10 +169,7 @@ public class Tournament extends ITournament {
     public void finish() {
         List<IParticipant> ranking = computeFinalRanking();
         for (int i = 0; i < ranking.size(); i++) ranking.get(i).setFinalRank(i + 1);
-        DatabaseObject.UpsertAll(ranking); // the placements are read back by callers and after a restart, so they have to be written, not just held in memory
-        setWinnerID(ranking.isEmpty() ? null : ranking.getFirst().getID());
-        setRunnerUpID(ranking.size() < 2 ? null : ranking.get(1).getID());
-        setThirdPlaceID(ranking.size() < 3 ? null : ranking.get(2).getID());
+        DatabaseObject.UpsertAll(ranking); // the placements are read back by callers and after a restart, so they have to be written, not just held in memory - and the podium is derived from them
         setStatus(TournamentStatus.COMPLETE);
         setEndsAt(Instant.now());
         save();
@@ -181,6 +182,75 @@ public class Tournament extends ITournament {
         setEndsAt(Instant.now());
         save();
         log.info("'{}' cancelled: {}", getName(), reason);
+    }
+
+    /**
+     * Rebuilds everything about a run that is <em>derived</em> from its matches, for a run whose state
+     * drifted: a phase imported match by match rather than generated (so it never got a table), a bracket
+     * whose later match was reported before the one feeding it (so the winner was never pushed forward),
+     * a phase that played itself out but was never closed.
+     *
+     * <p><b>Nothing here discards a reported result.</b> Every step only ever fills something in:
+     * standings rows are created, never dropped; a downstream slot is filled only when empty; a phase is
+     * regenerated only when it holds no decided match at all, so there is nothing to lose. A phase that is
+     * structurally broken <em>and</em> already has results is reported instead of touched — that call
+     * belongs to the organiser, not to a repair button.
+     *
+     * <p>It also stops one step short of the end: a phase that is finished gets ranked and closed
+     * ({@link Phase#tryComplete()}), but the tournament itself is never finished. {@link #finish()} settles
+     * the podium and is what consumers hang their payouts and announcements off, so it stays an explicit
+     * action — repair only reports that the run is ready for it.
+     *
+     * @return one line per thing fixed or refused, ready to show as-is; empty when the run was already sound
+     */
+    @Override
+    public List<String> repair() {
+        List<String> report = new ArrayList<>();
+        for (IPhase phase : getPhases()) {
+            if (!phase.getStatus().hasStarted()) continue;
+            String tag = "Phase " + (phase.getOrderIndex() + 1) + " '" + phase.getName() + "': ";
+
+            // A standings row is only ever created by the engine in generate(); a phase built any other way has
+            // none, and StandingsCalculator re-ranks the rows it finds rather than creating them - so a phase
+            // with no table stays empty through every recount until the rows exist. The field is read off the
+            // matches, not off getParticipants(), which is itself derived from the very standings that are missing.
+            List<Long> known = new ArrayList<>(phase.getStandings().stream().map(IStanding::getParticipantID).toList());
+            List<IStanding> added = new ArrayList<>();
+            for (IMatch m : phase.getMatches())
+                for (Long pid : List.of(m.getParticipantID1() == null ? -1L : m.getParticipantID1(), m.getParticipantID2() == null ? -1L : m.getParticipantID2())) {
+                    if (pid < 0 || known.contains(pid) || getParticipant(pid).isEmpty()) continue;
+                    known.add(pid);
+                    added.add(new Standing(phase, pid, m.getGroupIndex() == null ? 0 : m.getGroupIndex(), known.size()));
+                }
+            if (!added.isEmpty()) { phase.getStandings().addAll(added); report.add(tag + "created " + added.size() + " missing standings row(s)"); }
+
+            // A phase that never drew its matches: safe to rebuild only while there is no result in it.
+            if (phase.getMatches().isEmpty()) {
+                if (phase.getParticipants().isEmpty()) report.add(tag + "no matches and no entrants to rebuild from - not touched");
+                else { phase.regenerate(); report.add(tag + "no matches at all - rebuilt the phase from its " + phase.getParticipants().size() + " entrant(s)"); }
+                continue;
+            }
+
+            int relinked = PhaseEngines.of(phase.getType()).repair(phase).size();
+            if (relinked > 0) report.add(tag + "filled " + relinked + " match slot(s) the results had already decided");
+
+            // Dangling progression links are the one structural break that cannot be inferred back: the target
+            // match is simply not there, and which pairing it was is not recoverable from what is left.
+            long dangling = phase.getMatches().stream().filter(m -> (m.getNextMatchID() != null && phase.getMatch(m.getNextMatchID()).isEmpty())
+                    || (m.getNextLoserMatchID() != null && phase.getMatch(m.getNextLoserMatchID()).isEmpty())).count();
+            if (dangling > 0) report.add(tag + dangling + " match(es) point at a match that is missing from this phase - it has results, so the bracket was left alone. Rebuild the phase by hand if the pairings are wrong");
+
+            phase.recomputeStandings();
+            if (phase.tryComplete()) report.add(tag + "every match is decided - ranked and closed the phase");
+        }
+
+        // Deliberately not finish(): the podium, the payouts and the announcements ride on it.
+        if (getStatus() == TournamentStatus.RUNNING && !getPhases().isEmpty() && getPhases().stream().allMatch(p -> p.getStatus().isComplete()))
+            report.add("Every phase is complete - the run is ready to be completed, which is left to you as it settles the podium.");
+
+        save();
+        log.info("Repaired '{}': {}", getName(), report.isEmpty() ? "nothing to fix" : String.join(" | ", report));
+        return report;
     }
 
     // ---- registration ---------------------------------------------------------------------------

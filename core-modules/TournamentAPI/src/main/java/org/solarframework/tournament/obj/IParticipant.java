@@ -24,11 +24,11 @@ import java.util.Optional;
 @DiscriminatorFormula("'0'")
 public abstract class IParticipant extends DatabaseObject.ID_RECORD_OBJ<Long, IParticipant> {
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "TournamentID", nullable = false, insertable = false, updatable = false)
     private ITournament tournament;
 
-    @OneToMany(mappedBy = "participant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "participant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<IParticipantMember> members = new ArrayList<>();
 
     @Column(name = "TournamentID", nullable = false)
@@ -38,10 +38,10 @@ public abstract class IParticipant extends DatabaseObject.ID_RECORD_OBJ<Long, IP
     @Column(name = "Tag", length = 32)
     private String tag;
     /** 1-based; 1 is the strongest entrant. 0 means unseeded. */
-    @Column(name = "Seed", nullable = false)
+    @Column(name = "Seed", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int seed = 0;
     @Convert(converter = ParticipantStatusConverter.class)
-    @Column(name = "Status", nullable = false, length = 32)
+    @Column(name = "Status", nullable = false, length = 32, columnDefinition = "VARCHAR(32) NOT NULL DEFAULT 'REGISTERED'")
     private ParticipantStatus status = ParticipantStatus.REGISTERED;
     @Column(name = "Rating")
     private Double rating;
@@ -58,7 +58,7 @@ public abstract class IParticipant extends DatabaseObject.ID_RECORD_OBJ<Long, IP
     @Column(name = "Notes", length = 2000)
     private String notes;
 
-    @Column(name = "CheckedIn", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "CheckedIn", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean checkedIn = false;
     @Column(name = "CheckedInAt")
     private Instant checkedInAt;
@@ -68,7 +68,7 @@ public abstract class IParticipant extends DatabaseObject.ID_RECORD_OBJ<Long, IP
     private Instant withdrawnAt;
 
     /** Final placement across the whole tournament, 1 = champion. 0 while still playing. */
-    @Column(name = "FinalRank", nullable = false)
+    @Column(name = "FinalRank", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int finalRank = 0;
     @Column(name = "EliminatedInPhaseID")
     private Long eliminatedInPhaseID;

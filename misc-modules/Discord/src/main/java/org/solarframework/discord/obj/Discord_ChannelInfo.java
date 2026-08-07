@@ -9,6 +9,7 @@ import net.dv8tion.jda.api.requests.restaction.MessageCreateAction;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.discord.obj.other.ActionServerID;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
@@ -23,7 +24,7 @@ public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
     private Discord_GuildInfo DGI;
 
     @OneToMany(mappedBy = "DCI", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<Discord_MessageInfo> Messages;
+    private List<Discord_MessageInfo> Messages = new ArrayList<>();
 
     private transient Guild G;
     private transient GuildChannel C;
@@ -91,7 +92,7 @@ public class Discord_ChannelInfo extends DatabaseObject<Discord_ChannelInfo> {
     }
 
     public List<Discord_MessageInfo> getMessages() {
-        return Messages == null ? Messages = SolarDBManager.getAllWhere(Discord_MessageInfo.class, "ChannelID = ? AND ChannelAction = ?", getChannelID(), getAction()) : Messages;
+        return Messages;
     }
 
     public String getAsMention() {

@@ -30,98 +30,98 @@ import java.util.Optional;
 @DiscriminatorFormula("'0'")
 public abstract class IPhase extends DatabaseObject.ID_RECORD_OBJ<Long, IPhase> {
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "TournamentID", nullable = false, insertable = false, updatable = false)
     private ITournament tournament;
 
-    @OneToMany(mappedBy = "phase", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "phase", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<IMatch> matches = new ArrayList<>();
 
-    @OneToMany(mappedBy = "phase", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "phase", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<IStanding> standings = new ArrayList<>();
 
     @Column(name = "TournamentID", nullable = false)
     private Long tournamentID;
-    @Column(name = "OrderIndex", nullable = false)
+    @Column(name = "OrderIndex", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int orderIndex = 0;
     @Column(name = "Name", nullable = false, length = 160)
     private String name;
     @Convert(converter = PhaseTypeConverter.class)
-    @Column(name = "Type", nullable = false, length = 32)
+    @Column(name = "Type", nullable = false, length = 32, columnDefinition = "VARCHAR(32) NOT NULL DEFAULT 'SINGLE_ELIMINATION'")
     private PhaseType type = PhaseType.SINGLE_ELIMINATION;
     @Convert(converter = PhaseStatusConverter.class)
-    @Column(name = "Status", nullable = false, length = 32)
+    @Column(name = "Status", nullable = false, length = 32, columnDefinition = "VARCHAR(32) NOT NULL DEFAULT 'PENDING'")
     private PhaseStatus status = PhaseStatus.PENDING;
     /** Convenience mirror of {@code status == COMPLETE}, kept so the column is queryable. */
-    @Column(name = "Complete", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "Complete", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean complete = false;
-    @Column(name = "Started", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "Started", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean started = false;
 
     // ---- format ---------------------------------------------------------------------------------
-    @Column(name = "BestOf", nullable = false)
+    @Column(name = "BestOf", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 1")
     private int bestOf = 1;
-    @Column(name = "DrawAllowed", nullable = false)
+    @Column(name = "DrawAllowed", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean drawAllowed = false;
-    @Column(name = "ThirdPlaceMatch", nullable = false)
+    @Column(name = "ThirdPlaceMatch", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean thirdPlaceMatch = false;
     /** Double elimination only: replay the grand final if the losers-bracket entrant wins it. */
-    @Column(name = "GrandFinalReset", nullable = false)
+    @Column(name = "GrandFinalReset", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 1")
     private boolean grandFinalReset = true;
     @Convert(converter = SeedingMethodConverter.class)
-    @Column(name = "SeedingMethod", nullable = false, length = 32)
+    @Column(name = "SeedingMethod", nullable = false, length = 32, columnDefinition = "VARCHAR(32) NOT NULL DEFAULT 'STANDINGS'")
     private SeedingMethod seedingMethod = SeedingMethod.STANDINGS;
     /** How a match's winner is decided in this phase; defaults to the tournament's setting. */
     @Convert(converter = MatchDecisionModeConverter.class)
-    @Column(name = "MatchDecisionMode", nullable = false, length = 32)
+    @Column(name = "MatchDecisionMode", nullable = false, length = 32, columnDefinition = "VARCHAR(32) NOT NULL DEFAULT 'GAMES_WON'")
     private MatchDecisionMode matchDecisionMode = MatchDecisionMode.GAMES_WON;
 
     // ---- group / round robin --------------------------------------------------------------------
-    @Column(name = "GroupCount", nullable = false)
+    @Column(name = "GroupCount", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 1")
     private int groupCount = 1;
     /** 0 = derive from participant count / groupCount. */
-    @Column(name = "GroupSize", nullable = false)
+    @Column(name = "GroupSize", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int groupSize = 0;
     /** Entrants qualifying out of each group into the next phase. */
-    @Column(name = "AdvancePerGroup", nullable = false)
+    @Column(name = "AdvancePerGroup", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 2")
     private int advancePerGroup = 2;
     /** Hard cap on qualifiers across the whole phase; 0 = advancePerGroup * groupCount. */
-    @Column(name = "AdvanceTotal", nullable = false)
+    @Column(name = "AdvanceTotal", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int advanceTotal = 0;
-    @Column(name = "DoubleRoundRobin", nullable = false)
+    @Column(name = "DoubleRoundRobin", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean doubleRoundRobin = false;
 
     // ---- swiss ----------------------------------------------------------------------------------
     /** 0 = ceil(log2(entrants)). */
-    @Column(name = "SwissRounds", nullable = false)
+    @Column(name = "SwissRounds", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int swissRounds = 0;
     /** Stop pairing an entrant once they reach this many losses; 0 disables. */
-    @Column(name = "SwissCutLosses", nullable = false)
+    @Column(name = "SwissCutLosses", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int swissCutLosses = 0;
 
     // ---- points ---------------------------------------------------------------------------------
-    @Column(name = "PointsPerWin", nullable = false)
+    @Column(name = "PointsPerWin", nullable = false, columnDefinition = "DOUBLE NOT NULL DEFAULT 3")
     private double pointsPerWin = 3;
-    @Column(name = "PointsPerDraw", nullable = false)
+    @Column(name = "PointsPerDraw", nullable = false, columnDefinition = "DOUBLE NOT NULL DEFAULT 1")
     private double pointsPerDraw = 1;
-    @Column(name = "PointsPerLoss", nullable = false)
+    @Column(name = "PointsPerLoss", nullable = false, columnDefinition = "DOUBLE NOT NULL DEFAULT 0")
     private double pointsPerLoss = 0;
-    @Column(name = "PointsPerBye", nullable = false)
+    @Column(name = "PointsPerBye", nullable = false, columnDefinition = "DOUBLE NOT NULL DEFAULT 3")
     private double pointsPerBye = 3;
-    @Column(name = "PointsPerForfeit", nullable = false)
+    @Column(name = "PointsPerForfeit", nullable = false, columnDefinition = "DOUBLE NOT NULL DEFAULT 0")
     private double pointsPerForfeit = 0;
     @Column(name = "Tiebreakers", length = 400)
     private String tiebreakers;
 
     // ---- generated shape ------------------------------------------------------------------------
     /** Power-of-two bracket size for elimination phases, 0 otherwise. */
-    @Column(name = "BracketSize", nullable = false)
+    @Column(name = "BracketSize", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int bracketSize = 0;
-    @Column(name = "TotalRounds", nullable = false)
+    @Column(name = "TotalRounds", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int totalRounds = 0;
-    @Column(name = "CurrentRound", nullable = false)
+    @Column(name = "CurrentRound", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int currentRound = 0;
-    @Column(name = "ParticipantCount", nullable = false)
+    @Column(name = "ParticipantCount", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int participantCount = 0;
     @Column(name = "StartedAt")
     private Instant startedAt;

@@ -35,11 +35,11 @@ import java.util.Optional;
 @DiscriminatorFormula("'0'")
 public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> {
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "PhaseID", nullable = false, insertable = false, updatable = false)
     private IPhase phase;
 
-    @OneToMany(mappedBy = "match", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "match", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<IMatchGame> games = new ArrayList<>();
 
     @Column(name = "TournamentID", nullable = false)
@@ -49,16 +49,16 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
 
     // ---- position in the schedule ---------------------------------------------------------------
     @Convert(converter = BracketSideConverter.class)
-    @Column(name = "BracketSide", nullable = false, length = 32)
+    @Column(name = "BracketSide", nullable = false, length = 32, columnDefinition = "VARCHAR(32) NOT NULL DEFAULT 'WINNERS'")
     private BracketSide bracketSide = BracketSide.WINNERS;
     /** 1-based round within its bracket side. */
-    @Column(name = "Round", nullable = false)
+    @Column(name = "Round", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 1")
     private int round = 1;
     /** 0-based index within the round, top to bottom. */
-    @Column(name = "Position", nullable = false)
+    @Column(name = "Position", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int position = 0;
     /** Human-facing sequential number within the phase. */
-    @Column(name = "MatchNumber", nullable = false)
+    @Column(name = "MatchNumber", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int matchNumber = 0;
     @Column(name = "GroupIndex")
     private Integer groupIndex;
@@ -77,29 +77,27 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
     private String slot2Label;
 
     // ---- result ---------------------------------------------------------------------------------
-    @Column(name = "Score1", nullable = false)
+    @Column(name = "Score1", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int score1 = 0;
-    @Column(name = "Score2", nullable = false)
+    @Column(name = "Score2", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int score2 = 0;
     /** Raw points aggregated over every game (rounds, goals, kills...) - used for tiebreakers. */
-    @Column(name = "PointsFor1", nullable = false)
+    @Column(name = "PointsFor1", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int pointsFor1 = 0;
-    @Column(name = "PointsFor2", nullable = false)
+    @Column(name = "PointsFor2", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int pointsFor2 = 0;
-    @Column(name = "BestOf", nullable = false)
+    @Column(name = "BestOf", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 1")
     private int bestOf = 1;
     @Convert(converter = MatchStateConverter.class)
-    @Column(name = "State", nullable = false, length = 32)
+    @Column(name = "State", nullable = false, length = 32, columnDefinition = "VARCHAR(32) NOT NULL DEFAULT 'PENDING'")
     private MatchState state = MatchState.PENDING;
     @Column(name = "WinnerID")
     private Long winnerID;
     @Column(name = "LoserID")
     private Long loserID;
-    @Column(name = "IsTie", nullable = false, columnDefinition = "TINYINT(1)")
-    private boolean isTie = false;
-    @Column(name = "Forfeit1", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "Forfeit1", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean forfeit1 = false;
-    @Column(name = "Forfeit2", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "Forfeit2", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean forfeit2 = false;
 
     // ---- progression ----------------------------------------------------------------------------
@@ -147,7 +145,7 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
     // ---- relations ------------------------------------------------------------------------------
 
     public IPhase getPhase() {
-        return phase == null ? phase = retrieveEntityServiceFor(IPhase.class).getById(phaseID).orElse(null) : phase;
+        return phase;
     }
     public void setPhase(IPhase p) { this.phase = p; this.phaseID = p == null ? null : p.getID(); }
 
@@ -242,23 +240,20 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
         decide();
     }
 
-    /** Recomputes winner, loser and tie flags from the current series score. */
+    /** Recomputes winner and loser from the current series score; {@link #isTie()} follows from the result. */
     public void decide() {
         IPhase phase = getPhase();
-        boolean drawAllowed = phase != null && phase.isDrawAllowed();
         boolean byPoints = phase != null && phase.getMatchDecisionMode() == MatchDecisionMode.TOTAL_POINTS;
         int a = byPoints ? pointsFor1 : score1, b = byPoints ? pointsFor2 : score2;
-        if (a > b) { winnerID = participantID1; loserID = participantID2; isTie = false; }
-        else if (b > a) { winnerID = participantID2; loserID = participantID1; isTie = false; }
-        else if (drawAllowed) { winnerID = null; loserID = null; isTie = true; }
-        else { winnerID = null; loserID = null; isTie = false; }
+        if (a > b) { winnerID = participantID1; loserID = participantID2; }
+        else if (b > a) { winnerID = participantID2; loserID = participantID1; }
+        else { winnerID = null; loserID = null; }
     }
 
     /** Score, winner and timestamps for a match decided without play. */
     public void awardWalkover(Long walkoverWinnerID) {
         this.winnerID = walkoverWinnerID;
         this.loserID = getOpponentID(walkoverWinnerID).orElse(null);
-        this.isTie = false;
         if (Objects.equals(walkoverWinnerID, participantID1)) { score1 = getGamesToWin(); score2 = 0; forfeit2 = true; }
         else { score2 = getGamesToWin(); score1 = 0; forfeit1 = true; }
         setState(MatchState.WALKOVER);
@@ -269,12 +264,16 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
     public void awardBye() {
         this.winnerID = participantID1 != null ? participantID1 : participantID2;
         this.loserID = null;
-        this.isTie = false;
         setState(MatchState.BYE);
         this.completedAt = Instant.now();
     }
 
-    public boolean isTie() { return isTie; }
+    /** The guards are the point: an unplayed match sits at 0-0, and a bye is 0-0 with a winner. */
+    public boolean isTie() {
+        IPhase phase = getPhase();
+        if (winnerID != null || phase == null || !phase.isDrawAllowed() || !getState().isDecided()) return false;
+        return phase.getMatchDecisionMode() == MatchDecisionMode.TOTAL_POINTS ? pointsFor1 == pointsFor2 : score1 == score2;
+    }
     public boolean isComplete() { return getState().isDecided(); }
     public boolean isBye() { return getState() == MatchState.BYE; }
     public boolean isWalkover() { return getState() == MatchState.WALKOVER; }
@@ -373,7 +372,6 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
     public void setWinnerID(Long winnerID) { this.winnerID = winnerID; }
     public Long getLoserID() { return loserID; }
     public void setLoserID(Long loserID) { this.loserID = loserID; }
-    public void setTie(boolean tie) { this.isTie = tie; }
     public boolean isForfeit1() { return forfeit1; }
     public void setForfeit1(boolean forfeit1) { this.forfeit1 = forfeit1; }
     public boolean isForfeit2() { return forfeit2; }

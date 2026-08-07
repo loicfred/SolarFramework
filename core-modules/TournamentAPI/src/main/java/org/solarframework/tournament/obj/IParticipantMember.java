@@ -15,7 +15,7 @@ import java.time.Instant;
 @DiscriminatorFormula("'0'")
 public abstract class IParticipantMember extends DatabaseObject.ID_RECORD_OBJ<Long, IParticipantMember> {
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "ParticipantID", nullable = false, insertable = false, updatable = false)
     private IParticipant participant;
 
@@ -25,9 +25,9 @@ public abstract class IParticipantMember extends DatabaseObject.ID_RECORD_OBJ<Lo
     private String name;
     @Column(name = "Role", length = 80)
     private String role;
-    @Column(name = "Captain", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "Captain", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean captain = false;
-    @Column(name = "Substitute", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "Substitute", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean substitute = false;
     @Column(name = "Rating")
     private Double rating;

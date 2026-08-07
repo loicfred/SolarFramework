@@ -68,13 +68,9 @@ public class BracketLayout {
 
     private void drawTitle() {
         String sub = phase.getType() + (phase.getParticipantCount() > 0 ? " - " + phase.getParticipantCount() + " entrants" : "");
-        model.text(th.getPadding(), th.getPadding() + th.getTitleFontSize(), title(), th.getTitleFontSize(), th.getHeaderColor(), "start", true);
-        model.text(th.getPadding(), th.getPadding() + th.getTitleFontSize() + th.getHeaderFontSize() + 4, sub, th.getHeaderFontSize(), th.getMutedTextColor(), "start", false);
-    }
-
-    private String title() {
         String t = phase.getTournament() == null ? null : phase.getTournament().getName();
-        return t == null ? phase.getName() : t + " - " + phase.getName();
+        model.text(th.getPadding(), th.getPadding() + th.getTitleFontSize(), t == null ? phase.getName() : t + " - " + phase.getName(), th.getTitleFontSize(), th.getHeaderColor(), "start", true);
+        model.text(th.getPadding(), th.getPadding() + th.getTitleFontSize() + th.getHeaderFontSize() + 4, sub, th.getHeaderFontSize(), th.getMutedTextColor(), "start", false);
     }
 
     // ---- bracket ---------------------------------------------------------------------------------
@@ -114,8 +110,16 @@ public class BracketLayout {
 
         placeGrandFinal(grandFinal, reset, winners, losers, wbRounds, lbRounds, Math.max(wbCols.size(), lbCols.size()) + 1, matchesTop);
 
-        if (hasLosers) drawSectionDivider(dividerY, Math.max(wbCols.size(), lbCols.size()));
-        if (th.isShowRoundHeaders()) drawBracketHeaders(wbCols, wbRounds, lbCols, lbRounds, lbHeaderY);
+        // Rule plus caption marking the losers bracket off as its own bracket below the main one. It stops short
+        // of the grand final column, which straddles both sections.
+        if (hasLosers) {
+            model.poly(th.getSlotBorder(), 1, th.getPadding(), dividerY, columnX(th.getPadding(), Math.max(wbCols.size(), lbCols.size())) + th.getSlotWidth(), dividerY);
+            model.text(th.getPadding(), dividerY - (th.headerClearance() - th.getHeaderFontSize()), "LOSERS BRACKET", th.getHeaderFontSize(), th.getAccentColor(), "start", true);
+        }
+        if (th.isShowRoundHeaders()) {
+            for (int c = 0; c < wbCols.size(); c++) model.text(columnX(th.getPadding(), c + 1), headerY, Brackets.roundName(wbCols.get(c), wbRounds), th.getHeaderFontSize(), th.getMutedTextColor(), "start", true);
+            for (int c = 0; c < lbCols.size(); c++) model.text(columnX(th.getPadding(), c + 1), lbHeaderY, lbCols.get(c) == lbRounds ? "Losers Final" : "Losers Round " + lbCols.get(c), th.getHeaderFontSize(), th.getMutedTextColor(), "start", true);
+        }
         drawConnectors();
         for (IMatch m : phase.getMatches()) drawMatch(m);
         drawCaption(thirdPlace.isEmpty() ? null : thirdPlace.getFirst());
@@ -194,17 +198,6 @@ public class BracketLayout {
         maxY = Math.max(maxY, y + th.matchHeight());
     }
 
-    private void drawBracketHeaders(List<Integer> wbCols, int wbRounds, List<Integer> lbCols, int lbRounds, double lbHeaderY) {
-        for (int c = 0; c < wbCols.size(); c++) model.text(columnX(th.getPadding(), c + 1), headerY, Brackets.roundName(wbCols.get(c), wbRounds), th.getHeaderFontSize(), th.getMutedTextColor(), "start", true);
-        for (int c = 0; c < lbCols.size(); c++) model.text(columnX(th.getPadding(), c + 1), lbHeaderY, lbCols.get(c) == lbRounds ? "Losers Final" : "Losers Round " + lbCols.get(c), th.getHeaderFontSize(), th.getMutedTextColor(), "start", true);
-    }
-
-    /** Rule plus caption marking the losers bracket off as its own bracket below the main one. It stops short of the grand final column, which straddles both sections. */
-    private void drawSectionDivider(double y, int columns) {
-        model.poly(th.getSlotBorder(), 1, th.getPadding(), y, columnX(th.getPadding(), columns) + th.getSlotWidth(), y);
-        model.text(th.getPadding(), y - (th.headerClearance() - th.getHeaderFontSize()), "LOSERS BRACKET", th.getHeaderFontSize(), th.getAccentColor(), "start", true);
-    }
-
     /** A small caption above a match's own box - used for the grand final, its reset and third place, since none of them share a round-header column. */
     private void drawCaption(IMatch m) {
         if (m == null) return;
@@ -281,7 +274,7 @@ public class BracketLayout {
         double baseline = y + th.getSlotHeight() / 2.0 + th.getSlotFontSize() * 0.36;
 
         if (th.isShowSeeds()) {
-            int seed = seedOf(pid);
+            int seed = pid == null ? 0 : phase.getStanding(pid).map(IStanding::getSeed).orElse(0);
             if (seed > 0) model.text(textX, baseline, String.valueOf(seed), Math.max(9, th.getSlotFontSize() - 2), th.getMutedTextColor(), "start", false, dataId);
             textX += th.getSeedWidth();
             available -= th.getSeedWidth();
@@ -303,10 +296,6 @@ public class BracketLayout {
         if (m.getState() == MatchState.BYE) return slot == 1 && m.getParticipantID1() != null || slot == 2 && m.getParticipantID2() != null ? "BYE" : "";
         if (!m.getState().isDecided() && m.getScore1() == 0 && m.getScore2() == 0) return "";
         return String.valueOf(slot == 1 ? m.getScore1() : m.getScore2());
-    }
-
-    private int seedOf(Long participantID) {
-        return participantID == null ? 0 : phase.getStanding(participantID).map(IStanding::getSeed).orElse(0);
     }
 
     // ---- group / swiss ---------------------------------------------------------------------------

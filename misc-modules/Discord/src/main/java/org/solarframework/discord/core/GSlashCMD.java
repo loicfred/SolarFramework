@@ -3,6 +3,7 @@ package org.solarframework.discord.core;
 import net.dv8tion.jda.api.entities.Guild;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.build.OptionData;
+import net.dv8tion.jda.api.interactions.commands.build.SubcommandData;
 import org.solarframework.discord.core.annotation.GSlashCommand;
 import org.solarframework.discord.core.annotation.SlashCommand;
 import org.solarframework.discord.obj.Discord_GuildInfo;
@@ -17,8 +18,15 @@ public abstract class GSlashCMD extends CMD {
         return serverIds == null ? serverIds = serverIds() : serverIds;
     }
     public abstract List<Long> serverIds();
+    /** Drops the memoized guild list so the next registration pass re-reads it (a run started since boot changes the answer). */
+    public void invalidateServerIDs() { serverIds = null; }
 
     public List<OptionData> commandParameters(Guild guild) {
+        return List.of();
+    }
+
+    /** See {@link SlashCMD#commandSubcommands()} — a non-empty list replaces {@link #commandParameters(Guild)} at registration. */
+    public List<SubcommandData> commandSubcommands(Guild guild) {
         return List.of();
     }
 

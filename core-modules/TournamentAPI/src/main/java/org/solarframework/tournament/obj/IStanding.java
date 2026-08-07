@@ -25,7 +25,7 @@ import java.util.stream.Stream;
 @DiscriminatorFormula("'0'")
 public abstract class IStanding extends DatabaseObject.ID_RECORD_OBJ<Long, IStanding> {
 
-    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "PhaseID", nullable = false, insertable = false, updatable = false)
     private IPhase phase;
 
@@ -36,17 +36,17 @@ public abstract class IStanding extends DatabaseObject.ID_RECORD_OBJ<Long, IStan
     @Column(name = "ParticipantID", nullable = false)
     private Long participantID;
     /** 0 for a single-table phase, otherwise the group this entrant sits in. */
-    @Column(name = "GroupIndex", nullable = false)
+    @Column(name = "GroupIndex", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int groupIndex = 0;
     /** Seed within the phase (may differ from the tournament-wide seed). */
-    @Column(name = "Seed", nullable = false)
+    @Column(name = "Seed", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int seed = 0;
     /** Set by the format's engine once the phase is ranked. */
-    @Column(name = "Rank", nullable = false)
+    @Column(name = "Rank", nullable = false, columnDefinition = "INT NOT NULL DEFAULT 0")
     private int rank = 0;
-    @Column(name = "Qualified", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "Qualified", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean qualified = false;
-    @Column(name = "Eliminated", nullable = false, columnDefinition = "TINYINT(1)")
+    @Column(name = "Eliminated", nullable = false, columnDefinition = "TINYINT(1) NOT NULL DEFAULT 0")
     private boolean eliminated = false;
 
     protected IStanding() {}

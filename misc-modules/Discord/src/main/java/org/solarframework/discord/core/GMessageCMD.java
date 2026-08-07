@@ -13,6 +13,8 @@ public abstract class GMessageCMD extends CMD {
         return serverIds == null ? serverIds = serverIds() : serverIds;
     }
     public abstract List<Long> serverIds();
+    /** Drops the memoized guild list so the next registration pass re-reads it. */
+    public void invalidateServerIDs() { serverIds = null; }
 
     public abstract void onMessageContextCommand(MessageContextInteractionEvent event);
 
