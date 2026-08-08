@@ -1,0 +1,45 @@
+Copyright (c) 2026 Loïc Fred. All rights reserved.
+
+PROPRIETARY SOFTWARE — NO LICENSE GRANTED
+
+This software and its source code, assets, configuration and accompanying
+documentation ("SolarFramework", the "Software") are the exclusive property of the
+copyright holder and are protected by French and international copyright law
+(Code de la propriété intellectuelle, arts. L112-2 13° and L122-6; Berne
+Convention).
+
+No license, right or permission of any kind is granted by the mere fact of
+possessing, receiving or being given access to the Software. Without the prior
+written permission of the copyright holder, you may not:
+
+  1. copy, reproduce, publish, host, mirror or otherwise make the Software
+     available, in whole or in part, in source or compiled form;
+  2. modify, adapt, translate or create derivative works from the Software;
+  3. distribute, sell, sublicense, lend, rent or transfer the Software or any
+     part of it to any third party;
+  4. run or operate the Software, or any service based on it, whether publicly
+     or privately, commercially or not;
+  5. reverse-engineer, decompile or disassemble any compiled form of the
+     Software, except to the strict extent such a restriction is void under
+     applicable law (in France, art. L122-6-1).
+
+Access granted to an individual — for contribution, review, testing or hosting
+— is personal, revocable at any time, and confers no ownership. Any
+contribution submitted to the Software is assigned to the copyright holder
+unless a separate written agreement states otherwise.
+
+THIRD-PARTY COMPONENTS
+
+The Software depends on third-party libraries and tools that remain governed by
+their own respective licenses. Nothing in this notice extends to, restricts, or
+supersedes those licenses.
+
+NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+Permission requests: loicmaitredufeu@gmail.com
