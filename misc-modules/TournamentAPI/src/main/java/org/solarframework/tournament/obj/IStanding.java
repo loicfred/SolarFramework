@@ -25,7 +25,7 @@ import java.util.stream.Stream;
 @DiscriminatorFormula("'0'")
 public abstract class IStanding extends DatabaseObject.ID_RECORD_OBJ<Long, IStanding> {
 
-    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "PhaseID", nullable = false, insertable = false, updatable = false)
     private IPhase phase;
 

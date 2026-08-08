@@ -13,19 +13,20 @@
     <file url="file://$PROJECT_DIR$/core-modules/DatabaseAPI/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/DatabaseCommon/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/DatabaseImpl/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/core-modules/DatabaseImpl2/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/DatabaseImplV2/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/Excel/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/Excels/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/JSON/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/Language/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/Plugin/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/core-modules/TournamentAPI/src/main/java" charset="UTF-8" />
-    <file url="file://$PROJECT_DIR$/core-modules/TournamentImpl/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/ZIP/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/misc-modules/CertificateGenerator/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/misc-modules/Discord/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/misc-modules/TournamentAPI/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/misc-modules/TournamentImpl/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/src/main/resources" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/untitled/src/main/java" charset="UTF-8" />

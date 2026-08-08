@@ -2,6 +2,7 @@ package org.solarframework.db.spring;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import jakarta.persistence.OneToMany;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
@@ -71,8 +72,10 @@ final class EntityIdentity {
             Instances.put(key, fresh);
             return fresh;
         }
-        for (Field f : getSerializableFieldsOfClassFamily(fresh.getClass())) if (!Modifier.isFinal(f.getModifiers())) setFieldValue(f, known, getFieldValue(f, fresh));
+        for (Field f : getSerializableFieldsOfClassFamily(fresh.getClass())) if (!Modifier.isFinal(f.getModifiers()) && !f.isAnnotationPresent(OneToMany.class)) setFieldValue(f, known, getFieldValue(f, fresh));
         // byte[] stays out of the copy above on purpose - a blob-less read must not blank the bytes the canonical object already holds - but a read that did fetch them still has to carry them over.
+        // @OneToMany stays out too, but still needs refreshing: replaceInverseCollections gave fresh its own LazyMappedCollection bound to fresh as owner - copying that reference onto known would hand the canonical object a collection whose back-reference wiring points at the wrong (duplicate) instance. known gets the same refresh, just bound to itself.
+        DBInstanceService.replaceInverseCollections(service, known);
         for (Field f : DBInstanceService.lazyFieldsOf(fresh.getClass())) if (!DBInstanceService.unloaded(f, fresh)) setFieldValue(f, known, getFieldValue(f, fresh));
         return (T) known;
     }

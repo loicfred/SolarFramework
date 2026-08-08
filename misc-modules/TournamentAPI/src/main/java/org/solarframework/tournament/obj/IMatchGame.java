@@ -29,7 +29,7 @@ import java.util.stream.Collectors;
 @DiscriminatorFormula("'0'")
 public abstract class IMatchGame extends DatabaseObject.ID_RECORD_OBJ<Long, IMatchGame> {
 
-    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "MatchID", nullable = false, insertable = false, updatable = false)
     private IMatch match;
 

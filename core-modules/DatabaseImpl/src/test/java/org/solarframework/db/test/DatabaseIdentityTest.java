@@ -4,7 +4,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
-import org.hibernate.collection.spi.PersistentCollection;
 import org.solarframework.db.spring.DatabaseObject;
 import org.solarframework.db.test.obj.Order;
 import org.solarframework.db.test.obj.User;
@@ -72,13 +71,34 @@ class DatabaseIdentityTest {
         assertEquals(List.of("Egg", "Steak"), fetchUser(1).getOrders().stream().map(Order::getItem).sorted().toList(), "a fetched user must report the orders it owns");
     }
 
+    /**
+     * The static/no-transaction case this was written for: read the owner first (canonical via EntityIdentity),
+     * then walk its lazily-faulted orders - each child's back-reference must already be the exact owner
+     * instance, wired by DBInstanceService#replaceInverseCollections at PostLoad time, not resolved via a
+     * second query the way an untouched Hibernate association proxy would need.
+     */
     @Test
-    void aReadLeavesAFaultableBagRatherThanAnEmptyList() {
+    void collectionChildrenAlreadyHaveTheirOwnerWiredWithNoExtraQuery() {
+        User u = makeNewUserWith2Orders(1);
+        SolarDBManager.resetAllCaches();
+        User reread = fetchUser(1);
+
+        assertSame(reread, reread.getOrders().getFirst().getUser());
+        assertSame(reread, reread.getOrders().getLast().getUser());
+    }
+
+    /**
+     * The field is no longer Hibernate's own PersistentBag - PostLoad replaces it with a lazy list backed by
+     * the framework's own query path (see DBInstanceService#replaceInverseCollections), specifically so a
+     * loaded child's back-reference can be wired to the owner with no per-getter code and no extra query
+     * once the owner is already known. It must still stay unfaulted until something actually touches it.
+     */
+    @Test
+    void aReadLeavesAFaultableListRatherThanAnEmptyList() {
         makeNewUserWith2Orders(1);
-        SolarDBManager.resetAllCaches(); // so the read hands back Hibernate's object, not the registered writer
+        SolarDBManager.resetAllCaches(); // so the read hands back a fresh lazy list, not the registered writer's
         User u = fetchUser(1);
-        assertInstanceOf(PersistentCollection.class, u.orders, "the read must leave the bag in place - nulling it is what made every child invisible");
-        assertFalse(((PersistentCollection<?>) u.orders).wasInitialized(), "and must not have faulted it yet");
+        assertTrue(java.lang.reflect.Proxy.isProxyClass(u.orders.getClass()), "the read must leave a lazy, faultable list in place - nulling it is what made every child invisible");
         assertEquals(2, u.getOrders().size(), "first access faults it, closed EntityManager or not");
     }
 

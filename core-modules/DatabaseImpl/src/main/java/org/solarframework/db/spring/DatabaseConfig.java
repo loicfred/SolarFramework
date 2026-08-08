@@ -9,12 +9,23 @@ import org.springframework.cache.support.SimpleCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * {@code @EnableTransactionManagement} is spelled out explicitly rather than left to Spring Boot's own
+ * TransactionAutoConfiguration: Boot only builds that infrastructure when a TransactionManager bean already
+ * exists at context-refresh time ({@code @ConditionalOnBean(TransactionManager.class)}), but every
+ * TransactionManager this framework registers is built lazily, on first use, by JpaSourceRegistrar - long
+ * after refresh. Declaring it here builds the AOP infrastructure unconditionally; TransactionInterceptor
+ * still resolves the actual TransactionManager bean lazily per invocation, so this works whether or not one
+ * has been registered yet when the context starts.
+ */
 @Configuration
 @EnableCaching
+@EnableTransactionManagement
 public class DatabaseConfig {
     protected static String defaultConnectionString;
 

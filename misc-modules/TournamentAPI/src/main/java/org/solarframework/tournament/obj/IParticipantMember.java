@@ -15,7 +15,7 @@ import java.time.Instant;
 @DiscriminatorFormula("'0'")
 public abstract class IParticipantMember extends DatabaseObject.ID_RECORD_OBJ<Long, IParticipantMember> {
 
-    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "ParticipantID", nullable = false, insertable = false, updatable = false)
     private IParticipant participant;
 

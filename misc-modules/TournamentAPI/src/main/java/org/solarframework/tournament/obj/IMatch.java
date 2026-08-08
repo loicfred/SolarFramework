@@ -35,11 +35,11 @@ import java.util.Optional;
 @DiscriminatorFormula("'0'")
 public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> {
 
-    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "PhaseID", nullable = false, insertable = false, updatable = false)
     private IPhase phase;
 
-    @OneToMany(mappedBy = "match", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "match", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<IMatchGame> games = new ArrayList<>();
 
     @Column(name = "TournamentID", nullable = false)

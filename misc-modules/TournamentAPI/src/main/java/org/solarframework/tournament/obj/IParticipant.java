@@ -24,11 +24,11 @@ import java.util.Optional;
 @DiscriminatorFormula("'0'")
 public abstract class IParticipant extends DatabaseObject.ID_RECORD_OBJ<Long, IParticipant> {
 
-    @ManyToOne(fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    @ManyToOne(fetch = FetchType.LAZY, cascade = CascadeType.ALL)
     @JoinColumn(referencedColumnName = "ID", name = "TournamentID", nullable = false, insertable = false, updatable = false)
     private ITournament tournament;
 
-    @OneToMany(mappedBy = "participant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "participant", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<IParticipantMember> members = new ArrayList<>();
 
     @Column(name = "TournamentID", nullable = false)

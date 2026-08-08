@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.Cache;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -51,15 +52,23 @@ public class DatabaseManager implements IDatabaseManager {
     private transient List<DatabaseObject<?>> bundleObjects;
     @JsonIgnore
     private transient Instant Cooldown = Instant.now().minusSeconds(5);
+    @JsonIgnore
+    private transient final ConfigurableApplicationContext context;
 
-    protected DatabaseManager(@Qualifier("databaseCacheManager") CacheManager dbCacheManager, DatabaseService defaultService) {
+    protected DatabaseManager(@Qualifier("databaseCacheManager") CacheManager dbCacheManager, DatabaseService defaultService, ConfigurableApplicationContext context) {
         defaultConnectionString = defaultService.getConnectionString();
         this.dbCacheManager = dbCacheManager;
+        this.context = context;
         defaultService.setManager(this);
         addSource(defaultService);
         DefaultDBService = defaultService;
         SolarDBManager = this;
         reload();
+    }
+
+    /** Used by DatabaseService#getJpaBeans to lazily build its own JPA beans on first real use. */
+    ConfigurableApplicationContext getContext() {
+        return context;
     }
 
     public CacheManager getDbCacheManager() {
@@ -115,12 +124,36 @@ public class DatabaseManager implements IDatabaseManager {
                     log.info("Entity [{}] is registered for [{}].", C.getName(), ds.getName());
                     RegisterBundleObjects(C);
                 }
+                warnAboutCrossSourceRelations(ds, C);
             } else {
                 log.error("Entity class [{}] is NOT CHILD of DatabaseObject<>.", C.getName());
             }
         } catch (Exception e) {
             e.printStackTrace();
             log.error("{} does not have a default constructor.", C.getName());
+        }
+    }
+
+    /**
+     * A OneToMany/ManyToOne/OneToOne/ManyToMany pointing at an entity registered for a different data source
+     * can never be resolved by a real SQL join - they are different connections, possibly different database
+     * engines entirely - and a write spanning both is not covered by either source's own transaction. Single
+     * source setups can never trigger this (getServiceByEntity always resolves to the one source there), so
+     * it only fires once a second source is actually registered.
+     */
+    private void warnAboutCrossSourceRelations(IDatabaseService ds, Class<?> C) {
+        for (Class<?> c = C; c != null && c != Object.class; c = c.getSuperclass()) {
+            for (Field f : c.getDeclaredFields()) {
+                if (!(f.isAnnotationPresent(OneToMany.class) || f.isAnnotationPresent(ManyToOne.class)
+                        || f.isAnnotationPresent(OneToOne.class) || f.isAnnotationPresent(ManyToMany.class))) continue;
+                Class<?> target = Collection.class.isAssignableFrom(f.getType()) ? getGenericOf(f, 0) : f.getType();
+                if (target == null) continue;
+                IDatabaseService targetService = getServiceByEntity(target);
+                if (targetService != null && targetService != ds) {
+                    log.warn("Entity [{}] field [{}] relates to [{}], which is registered for a different data source ([{}] vs [{}]) - cross-source relations cannot be resolved by a real SQL join and are not covered by either source's transactions.",
+                            C.getName(), f.getName(), target.getName(), ds.getName(), targetService.getName());
+                }
+            }
         }
     }
 
@@ -147,11 +180,17 @@ public class DatabaseManager implements IDatabaseManager {
         if (ds.getConnectionString().isEmpty() || ds.getName().isEmpty() || ds.getPassword().isEmpty() || ds.getUsername().isEmpty() || getSources().stream().anyMatch(d -> d.getConnectionString().equalsIgnoreCase(ds.getConnectionString()) || d.getName().equals(ds.getName()))) return false;
         if (getDefaultService() != null && ds.isDefault()) return false;
         storedDataSources.add(ds);
+        // No JPA registration here on purpose - DatabaseService#getJpaBeans builds it lazily on first real
+        // use, so adding many sources (plugin-driven consumers can add several) stays cheap for the common
+        // case of a source nothing ever opens a transaction against.
         return true;
     }
     public boolean removeNonDefaultSources() {
         return getSources().removeIf(ds -> {
-            if (!ds.isDefault()) ds.reload();
+            if (!ds.isDefault()) {
+                ds.reload();
+                if (ds instanceof DatabaseService concrete) JpaSourceRegistrar.unregister(concrete, context);
+            }
             return !ds.isDefault();
         });
     }

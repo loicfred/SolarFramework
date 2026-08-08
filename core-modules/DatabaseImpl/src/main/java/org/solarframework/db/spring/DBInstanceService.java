@@ -2,7 +2,9 @@ package org.solarframework.db.spring;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.OneToOne;
 import org.hibernate.proxy.HibernateProxy;
 import org.hibernate.proxy.LazyInitializer;
@@ -26,6 +28,7 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     protected static final Map<String, Set<Field>> CachedFields = new HashMap<>();
     protected static final Map<String, List<Field>> LazyFields = new HashMap<>();
     protected static final Map<String, List<Field>> ToOneFields = new HashMap<>();
+    protected static final Map<String, List<Field>> OneToManyFields = new HashMap<>();
 
     protected transient DatabaseObject<T> dbObject;
     protected transient IDatabaseService dbService;
@@ -110,6 +113,56 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
         }
     }
 
+    static List<Field> oneToManyFieldsOf(Class<?> clazz) {
+        return OneToManyFields.computeIfAbsent(clazz.getName(), _ -> getAllFieldsOfClassFamily(clazz).stream().filter(f -> {
+            OneToMany o2m = f.getAnnotation(OneToMany.class);
+            return o2m != null && !o2m.mappedBy().isBlank();
+        }).toList());
+    }
+
+    /**
+     * Replaces every @OneToMany(mappedBy=...) collection on a freshly loaded entity with a lazy list backed
+     * by the framework's own query path, wiring each loaded child's back-reference directly to this entity -
+     * the "for (Order o : orders) o.user = this" a getter would otherwise have to write by hand.
+     *
+     * <p>Called from PostLoad, which fires reliably whether or not a transaction is bound - unlike
+     * Hibernate's own collection self-faulting, which runs through a StatelessSession out-of-transaction and
+     * skips the entire event system (confirmed empirically - neither PostLoad nor INIT_COLLECTION reach that
+     * path). Replacing the field outright, rather than trying to hook Hibernate's own bag, is exactly why
+     * this reaches the case the earlier InitializeCollectionEventListener attempt could not.
+     *
+     * <p>This deliberately reverses the collections half of the framework's own prior decision (see
+     * docs/superpowers/specs/2026-08-03-lazy-associations-design.md) to trust Hibernate's own bag
+     * self-faulting rather than a custom mechanism - that decision was made without transaction-aware
+     * identity in place yet, and did not need to solve back-reference wiring. The field is no longer a
+     * Hibernate-tracked PersistentCollection afterward, so JPA-level collection cascade (persist/remove
+     * propagating from a saved parent to elements added to this list) no longer applies - this framework's
+     * own explicit per-object .Upsert()/.Update()/.Delete() calls are unaffected and remain how writes here
+     * actually happen.
+     */
+    static void replaceInverseCollections(DatabaseService source, Object entity) {
+        for (Field f : oneToManyFieldsOf(entity.getClass())) {
+            OneToMany o2m = f.getAnnotation(OneToMany.class);
+            Class<?> elementType = getGenericOf(f, 0);
+            if (elementType == null) continue;
+            Field backField = findFieldInClassFamily(elementType, o2m.mappedBy());
+            if (backField == null) continue;
+            JoinColumn joinColumn = backField.getAnnotation(JoinColumn.class);
+            if (joinColumn == null) continue;
+
+            Set<Field> ownerIdFields = idFieldsOf(entity.getClass());
+            if (ownerIdFields.isEmpty()) continue;
+            Object ownerId = getFieldValue(ownerIdFields.iterator().next(), entity);
+            if (ownerId == null) continue;
+
+            setFieldValue(f, entity, LazyMappedCollection.of(() -> {
+                List<?> loaded = source.getAllWhere(elementType, joinColumn.name() + " = ?", ownerId);
+                for (Object child : loaded) setFieldValue(backField, child, entity);
+                return loaded;
+            }));
+        }
+    }
+
     private Set<Field> getIdAndUniqueFields() {
         Set<Field> fs = CachedFields.get(entityClass.getName()).stream().filter(f -> f.isAnnotationPresent(Id.class)).collect(Collectors.toSet());
         fs.addAll(CachedFields.get(entityClass.getName()).stream().filter(f -> f.isAnnotationPresent(Column.class) && f.getAnnotation(Column.class).unique()).collect(Collectors.toSet()));
@@ -166,6 +219,10 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
     }
     @Override
     public int Upsert(List<String> conflictCols) {
+        if (dbService instanceof DatabaseService ds && TransactionResolver.isBound(ds)) {
+            TransactionalAccess.write(ds, dbObject, false);
+            return 1;
+        }
         try {
             InsertArgumentManager insertArgMgr = makeInsertManager(true, false);
             String sql = getType().Upsert(tableName, insertArgMgr.columns(), insertArgMgr.questionMarks(), insertArgMgr.duplicateKeyUpdateClause(), conflictCols == null || conflictCols.isEmpty() ? null : conflictCols.stream().collect(Collectors.joining(", ")));
@@ -240,6 +297,10 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
 
     @Override
     public int Update() {
+        if (dbService instanceof DatabaseService ds && TransactionResolver.isBound(ds)) {
+            TransactionalAccess.write(ds, dbObject, false);
+            return 1;
+        }
         try {
             remember();
             Set<Field> writable = cachedFields.stream().filter(f -> !unloaded(f, dbObject)).collect(Collectors.toSet());
@@ -290,6 +351,10 @@ public class DBInstanceService<T> implements IDBObjectService<T> {
 
     @Override
     public int Delete() {
+        if (dbService instanceof DatabaseService ds && TransactionResolver.isBound(ds)) {
+            TransactionalAccess.write(ds, dbObject, true);
+            return 1;
+        }
         try {
             if (dbService instanceof DatabaseService s) EntityIdentity.forget(s, dbObject); // hard delete: no instance should outlive the row
             List<Object> whereValues = cleanParameterList(idFields.stream().map(ID -> getFieldValue(ID, dbObject)).collect(Collectors.toList()));

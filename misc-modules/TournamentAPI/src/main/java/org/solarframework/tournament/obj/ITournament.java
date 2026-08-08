@@ -32,10 +32,10 @@ import java.util.Optional;
 @DiscriminatorFormula("'0'")
 public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITournament> {
 
-    @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<IPhase> phases = new ArrayList<>();
 
-    @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<IParticipant> participants = new ArrayList<>();
 
     // ---- identity -------------------------------------------------------------------------------

@@ -78,6 +78,8 @@ public class DatabaseService implements IDatabaseService {
     private transient Metadata metadata;
     @JsonIgnore
     private transient volatile SessionFactory sessionFactory;
+    @JsonIgnore
+    transient JpaSourceRegistrar.JpaSourceBeans jpaBeans; // package-visible: TransactionResolver reads it raw, without triggering the lazy build below
 
 
     private transient Long ping;
@@ -288,9 +290,27 @@ public class DatabaseService implements IDatabaseService {
             // one this same call touches). A collection's own elements, and a proxy nothing touches until
             // after the call returns, are outside what any Interceptor/event hook can reach.
             ((SessionFactoryImplementor) sessionFactory).getServiceRegistry().getService(EventListenerRegistry.class)
-                    .appendListeners(EventType.POST_LOAD, (PostLoadEventListener) event -> DBInstanceService.canonicalizeToOneAssociations(this, event.getEntity()));
+                    .appendListeners(EventType.POST_LOAD, (PostLoadEventListener) event -> {
+                        DBInstanceService.canonicalizeToOneAssociations(this, event.getEntity());
+                        DBInstanceService.replaceInverseCollections(this, event.getEntity());
+                    });
         }
         return sessionFactory;
+    }
+
+    /**
+     * Lazily builds this source's JPA EntityManagerFactory/JpaTransactionManager on first access, so adding
+     * many sources via DatabaseManager#addSource/LoadFromFile stays cheap - only a source someone actually
+     * opens a transaction against ever pays the Hibernate bootstrap cost. TransactionResolver deliberately
+     * reads the raw {@code jpaBeans} field instead of calling this getter, so merely checking "is a
+     * transaction bound right now" never itself triggers the build.
+     */
+    public synchronized JpaSourceRegistrar.JpaSourceBeans getJpaBeans() {
+        if (jpaBeans == null && manager instanceof DatabaseManager dm) JpaSourceRegistrar.register(this, dm.getContext());
+        return jpaBeans;
+    }
+    public void setJpaBeans(JpaSourceRegistrar.JpaSourceBeans jpaBeans) {
+        this.jpaBeans = jpaBeans;
     }
     public synchronized DataSource getDataSource() {
         if (this.dataSource != null) return dataSource;
@@ -316,6 +336,7 @@ public class DatabaseService implements IDatabaseService {
         dataSource = null;
         jdbcTemplate = null;
         transactionTemplate = null;
+        jpaBeans = null; // built around the dataSource just closed above - stale until something re-registers it
 
         for (IEntityInfo EI : getEntities()) {
             manager.getEntityClassloaders().entrySet().stream().filter(cl -> Objects.equals(cl.getKey(), EI.getClassLoader())).findFirst().ifPresent((cl) -> {
@@ -433,6 +454,7 @@ public class DatabaseService implements IDatabaseService {
         return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + where, id);
     }
     public <T> Optional<T> getById(Class<T> clazz, Object... id) {
+        if (TransactionResolver.isBound(this)) return TransactionalAccess.getById(this, clazz, id.length == 1 ? id[0] : id);
         return getById(selectOf(clazz), clazz, id);
     }
 
@@ -440,6 +462,7 @@ public class DatabaseService implements IDatabaseService {
         return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + withActiveFilter(clazz, whereClause), args);
     }
     public <T> Optional<T> getWhere(Class<T> clazz, String whereClause, Object... args) {
+        if (TransactionResolver.isBound(this)) return TransactionalAccess.getWhere(this, clazz, whereClause, args);
         return getWhere(selectOf(clazz), clazz, whereClause, args);
     }
 
@@ -448,6 +471,7 @@ public class DatabaseService implements IDatabaseService {
         return this.doQueryAll(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + (where == null ? "" : " WHERE " + where), null);
     }
     public <T> List<T> getAll(Class<T> clazz) {
+        if (TransactionResolver.isBound(this)) return TransactionalAccess.getAll(this, clazz);
         return getAll(selectOf(clazz), clazz);
     }
 
@@ -455,6 +479,7 @@ public class DatabaseService implements IDatabaseService {
         return this.doQueryAll(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + withActiveFilter(clazz, whereClause), args);
     }
     public <T> List<T> getAllWhere(Class<T> clazz, String whereClause, Object... args) {
+        if (TransactionResolver.isBound(this)) return TransactionalAccess.getAllWhere(this, clazz, whereClause, args);
         return getAllWhere(selectOf(clazz), clazz, whereClause, args);
     }
     public <T> Set<T> getAllWhereDistinct(String select, Class<T> clazz, String whereClause, Object... args) {
@@ -465,6 +490,7 @@ public class DatabaseService implements IDatabaseService {
     }
 
     public <T> int Count(Class<T> clazz) {
+        if (TransactionResolver.isBound(this)) return (int) TransactionalAccess.count(this, clazz);
         String where = withActiveFilter(clazz, null);
         return this.doQueryValue(Integer.class, "SELECT COUNT(*) FROM " + getTableName(clazz) + (where == null ? "" : " WHERE " + where)).orElse(0);
     }
