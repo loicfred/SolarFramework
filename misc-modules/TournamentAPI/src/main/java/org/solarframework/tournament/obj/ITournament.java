@@ -287,6 +287,8 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
     public abstract void closeRegistration();
     public abstract void start();
     public abstract void finish();
+    /** Restamps {@code finalRank} for the whole field off the phases as they stand, settling nothing else. Returns how many entrants moved. */
+    public abstract int recomputeFinalRanks();
     public abstract void cancel(String reason);
     /**
      * Puts a run whose state drifted back into a consistent one, without ever discarding a result.
@@ -436,9 +438,13 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
     public Long getRunnerUpID() { return getRunnerUp().map(IParticipant::getID).orElse(null); }
     public Long getThirdPlaceID() { return getThirdPlace().map(IParticipant::getID).orElse(null); }
 
-    /** Podium in finishing order, empty entries dropped. */
+    /**
+     * Podium in finishing order. Placings are shared, so this is not capped at three entries: a bracket with
+     * no third place match ranks both semifinal losers third and both belong on it.
+     */
     public List<IParticipant> getPodium() {
-        return java.util.stream.Stream.of(getWinner(), getRunnerUp(), getThirdPlace()).flatMap(Optional::stream).toList();
+        return getParticipants().stream().filter(p -> p.getFinalRank() >= 1 && p.getFinalRank() <= 3)
+                .sorted(java.util.Comparator.comparingInt(IParticipant::getFinalRank).thenComparingInt(IParticipant::getSeed)).toList();
     }
 
     @Override

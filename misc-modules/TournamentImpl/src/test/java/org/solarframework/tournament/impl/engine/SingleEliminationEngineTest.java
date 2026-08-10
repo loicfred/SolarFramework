@@ -69,6 +69,33 @@ class SingleEliminationEngineTest {
         assertTrue(thirdPlace.getFirst().getState().isDecided());
     }
     @Test
+    void bothSemifinalLosersAreThirdWhenNoThirdPlaceMatchSeparatesThem() {
+        Tournament t = new Tournament("SE");
+        IPhase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
+        phase.setThirdPlaceMatch(false);
+        engine.generate(phase, field(t, 4));
+        playThrough(phase);
+        assertEquals(List.of(1, 2, 3, 3), engine.rank(phase).stream().map(IStanding::getRank).toList());
+    }
+    @Test
+    void aPlayedThirdPlaceMatchSplitsTheSemifinalLosers() {
+        Tournament t = new Tournament("SE");
+        IPhase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
+        phase.setThirdPlaceMatch(true);
+        engine.generate(phase, field(t, 4));
+        playThrough(phase);
+        assertEquals(List.of(1, 2, 3, 4), engine.rank(phase).stream().map(IStanding::getRank).toList());
+    }
+    @Test
+    void everyRoundOfExitsSharesAPlacingAndTheNextRankSkipsTheTie() {
+        Tournament t = new Tournament("SE");
+        IPhase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
+        phase.setThirdPlaceMatch(false);
+        engine.generate(phase, field(t, 8));
+        playThrough(phase);
+        assertEquals(List.of(1, 2, 3, 3, 5, 5, 5, 5), engine.rank(phase).stream().map(IStanding::getRank).toList());
+    }
+    @Test
     void oddFieldStillProducesAFullyDecidedBracket() {
         Tournament t = new Tournament("SE");
         IPhase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);

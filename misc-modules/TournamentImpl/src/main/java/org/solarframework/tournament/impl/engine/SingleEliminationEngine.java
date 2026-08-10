@@ -93,6 +93,11 @@ public class SingleEliminationEngine extends AbstractPhaseEngine {
     /**
      * Knockout placement is "how far did you get", not win count - so the table is rebuilt for its
      * game totals and then re-ranked by the round each entrant was knocked out in.
+     *
+     * <p>A bracket never played the matches that would separate entrants knocked out at the same stage,
+     * so they <em>share</em> a placing and the next rank skips the tie: 1, 2, 3, 3, 5, 5, 5, 5. Both
+     * semifinal losers are third unless a third place match was played to split them. An entrant with no
+     * recorded loss - the winner, or a withdrawal that never played - is never tied to anyone.
      */
     @Override
     public List<IStanding> rank(IPhase phase) {
@@ -104,8 +109,18 @@ public class SingleEliminationEngine extends AbstractPhaseEngine {
                 .thenComparing(Comparator.comparingInt(IStanding::getWins).reversed())
                 .thenComparing(Comparator.comparingInt(IStanding::getGameDiff).reversed())
                 .thenComparingInt(IStanding::getSeed));
-        for (int i = 0; i < rows.size(); i++) rows.get(i).setRank(i + 1);
+        for (int i = 0, rank = 0; i < rows.size(); i++) {
+            if (i == 0 || !sameStage(rows.get(i - 1), rows.get(i), exit, thirdPlaceBonus)) rank = i + 1;
+            rows.get(i).setRank(rank);
+        }
         return rows;
+    }
+
+    /** Two entrants share a placing when they went out in the same round and nothing else separated them. */
+    private boolean sameStage(IStanding a, IStanding b, Map<Long, Integer> exit, Map<Long, Integer> thirdPlaceBonus) {
+        Integer ea = exit.get(a.getParticipantID());
+        return ea != null && ea.equals(exit.get(b.getParticipantID()))
+                && thirdPlaceBonus.getOrDefault(a.getParticipantID(), 0).equals(thirdPlaceBonus.getOrDefault(b.getParticipantID(), 0));
     }
 
     /** Round in which each entrant lost; absent means they are still alive or won it all. */

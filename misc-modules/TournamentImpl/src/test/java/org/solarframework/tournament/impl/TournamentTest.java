@@ -45,6 +45,28 @@ class TournamentTest {
         assertEquals("P1", t.getWinner().orElseThrow().getName());
     }
     @Test
+    void aSharedPlacingSurvivesIntoTheFinalRankAndOntoThePodium() {
+        Tournament t = open("Cup", PhaseType.SINGLE_ELIMINATION, 4);
+        t.setThirdPlaceMatch(false);
+        t.start();
+        playToCompletion(t);
+        assertEquals(List.of(1, 2, 3, 3), t.getFinalRanking().stream().map(IParticipant::getFinalRank).toList());
+        assertEquals(4, t.getPodium().size()); // both semifinal losers are third, so the podium is not three entries
+    }
+    @Test
+    void recomputeFinalRanksRestampsAStalePlacingAndWritesOnlyWhatMoved() {
+        Tournament t = open("Cup", PhaseType.SINGLE_ELIMINATION, 4);
+        t.setThirdPlaceMatch(false);
+        t.start();
+        playToCompletion(t);
+        assertEquals(0, t.recomputeFinalRanks()); // finish() already placed the field, so a second pass writes nothing
+        List<IParticipant> ranked = t.getFinalRanking();
+        for (int i = 0; i < ranked.size(); i++) ranked.get(i).setFinalRank(i + 1); // the pre-tie numbering a run finished before shared placings carries
+        assertEquals(1, t.recomputeFinalRanks()); // only the entrant wrongly stamped fourth moves
+        assertEquals(List.of(1, 2, 3, 3), t.getFinalRanking().stream().map(IParticipant::getFinalRank).toList());
+        assertEquals(TournamentStatus.COMPLETE, t.getStatus()); // and nothing finish() settles around it was touched
+    }
+    @Test
     void doubleEliminationFullFlowEndsWithASeededWinner() {
         Tournament t = open("Double Elim Cup", PhaseType.DOUBLE_ELIMINATION, 6);
         t.start();

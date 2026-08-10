@@ -17,6 +17,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -165,11 +166,37 @@ public class Tournament extends ITournament {
         throw TournamentException.of("'%s' cannot start with %d incomplete roster(s): %s", getName(), shortTeams.size(), detail);
     }
 
+    /**
+     * Writes every entrant's {@code finalRank} from the phases as they stand, and <em>only</em> that - none of
+     * the status, timestamp or podium settling {@link #finish()} does around it. Split out so a run whose
+     * placings predate a change to how a format ranks can be restamped without being finished a second time,
+     * which would re-announce it and pay it out again.
+     *
+     * @return how many entrants actually moved; 0 means the stored placings were already right
+     */
+    @Override
+    public int recomputeFinalRanks() {
+        LinkedHashMap<IParticipant, String> placings = rankingWithTieKeys();
+        List<IParticipant> ranking = new ArrayList<>(placings.keySet());
+        List<IParticipant> moved = new ArrayList<>();
+        // A phase that ranked two entrants equal (both semifinal losers of a bracket with no third place match)
+        // places them equal here too, and the tie then skips the ranks it consumed: 1, 2, 3, 3, 5.
+        for (int i = 0, rank = 0; i < ranking.size(); i++) {
+            String key = placings.get(ranking.get(i));
+            if (key == null || i == 0 || !key.equals(placings.get(ranking.get(i - 1)))) rank = i + 1;
+            if (ranking.get(i).getFinalRank() == rank) continue;
+            ranking.get(i).setFinalRank(rank);
+            moved.add(ranking.get(i));
+        }
+        // The placements are read back by callers and after a restart, so they have to be written, not just held
+        // in memory - and the podium is derived from them. UpsertAll takes its table off the head of the list.
+        if (!moved.isEmpty()) DatabaseObject.UpsertAll(moved);
+        return moved.size();
+    }
+
     @Override
     public void finish() {
-        List<IParticipant> ranking = computeFinalRanking();
-        for (int i = 0; i < ranking.size(); i++) ranking.get(i).setFinalRank(i + 1);
-        DatabaseObject.UpsertAll(ranking); // the placements are read back by callers and after a restart, so they have to be written, not just held in memory - and the podium is derived from them
+        recomputeFinalRanks();
         setStatus(TournamentStatus.COMPLETE);
         setEndsAt(Instant.now());
         save();
@@ -398,21 +425,27 @@ public class Tournament extends ITournament {
         return computeFinalRanking();
     }
 
+    private List<IParticipant> computeFinalRanking() { return new ArrayList<>(rankingWithTieKeys().keySet()); }
+
     /**
      * Ranks the last phase that has been played, then appends everyone eliminated earlier in
      * reverse phase order, so entrants knocked out in the group stage still get a placement.
+     *
+     * <p>Each entrant is mapped to the phase and table rank it was placed by: two entrants carrying the
+     * same key were ranked equal by that phase and share a placing. A null key is an entrant no phase
+     * ranked at all, which ties with nobody.
      */
-    private List<IParticipant> computeFinalRanking() {
-        List<IParticipant> out = new ArrayList<>();
+    private LinkedHashMap<IParticipant, String> rankingWithTieKeys() {
+        LinkedHashMap<IParticipant, String> out = new LinkedHashMap<>();
         List<IPhase> phases = new ArrayList<>(getPhases());
         Collections.reverse(phases);
         for (IPhase phase : phases) {
             if (!phase.getStatus().hasStarted()) continue;
             for (IStanding s : PhaseEngines.of(phase.getType()).rank(phase).stream().sorted(Comparator.comparingInt(IStanding::getRank)).toList()) {
-                s.getParticipant().filter(p -> !out.contains(p)).ifPresent(out::add);
+                s.getParticipant().filter(p -> !out.containsKey(p)).ifPresent(p -> out.put(p, phase.getID() + ":" + s.getGroupIndex() + ":" + s.getRank()));
             }
         }
-        getParticipants().stream().filter(p -> !out.contains(p)).forEach(out::add);
+        getParticipants().stream().filter(p -> !out.containsKey(p)).forEach(p -> out.put(p, null));
         return out;
     }
 
