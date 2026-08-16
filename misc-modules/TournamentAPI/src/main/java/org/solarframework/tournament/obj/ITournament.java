@@ -32,7 +32,10 @@ import java.util.Optional;
 @DiscriminatorFormula("'0'")
 public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITournament> {
 
+    // @OrderBy so the play order comes out of the load, not out of a sort on every read: getPhases() is shared
+    // by every request thread and re-sorting bumps the list's modCount, killing any iteration already in flight.
     @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("orderIndex")
     private List<IPhase> phases = new ArrayList<>();
 
     @OneToMany(mappedBy = "tournament", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
@@ -172,9 +175,20 @@ public abstract class ITournament extends DatabaseObject.ID_RECORD_OBJ<Long, ITo
 
     // ---- children -------------------------------------------------------------------------------
 
-    /** Phases in play order. Loaded from the database on first access when one is registered. */
+    /**
+     * Phases in play order. Loaded from the database on first access when one is registered.
+     *
+     * <p>The sort belongs to the load and to nothing else. A read must not structurally modify the list it
+     * hands back: one {@code ITournament} instance is shared by every thread (the identity map keys on the row),
+     * so {@code List.sort} — which bumps {@code modCount} on every call, sorted or not — threw
+     * {@code ConcurrentModificationException} out of any iteration another thread had in flight, which is
+     * {@link #getMatches()} on every page that draws a bracket. {@code @OrderBy} covers the mapped load;
+     * {@code addPhase} appends at {@code size()} and {@code removePhase} reindexes, so the order is kept by
+     * the mutators rather than restored by the reader.
+     */
     public List<IPhase> getPhases() {
-        if (phases == null) phases = new ArrayList<>(retrieveEntityServiceFor(IPhase.class).getAllWhere("TournamentID = ?", ID));
+        if (phases != null) return phases;
+        phases = new ArrayList<>(retrieveEntityServiceFor(IPhase.class).getAllWhere("TournamentID = ?", ID));
         phases.sort(Comparator.comparingInt(IPhase::getOrderIndex));
         return phases;
     }

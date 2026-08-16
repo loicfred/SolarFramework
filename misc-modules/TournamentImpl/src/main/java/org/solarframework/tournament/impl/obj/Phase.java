@@ -65,10 +65,17 @@ public class Phase extends IPhase {
         log.info("Regenerated phase '{}'", getName());
     }
 
-    /** Recomputes, persists and returns this phase's table, ranked. */
+    /**
+     * Recomputes, persists and returns this phase's table, ranked <em>by the format's own engine</em> - not by
+     * {@link StandingsCalculator} directly, which only knows the tiebreaker chain. A knockout table is ordered by
+     * how far each entrant got and shares a placing between entrants who went out at the same stage; ranking it on
+     * points would put a quarterfinalist with a big game difference above a semifinalist, and would renumber the
+     * shared placings 1..n. {@code AbstractPhaseEngine.rank} <em>is</em> {@code StandingsCalculator.recompute}, so
+     * every format but single and double elimination is unaffected by going through the engine.
+     */
     @Override
     public List<IStanding> recomputeStandings() {
-        List<IStanding> rows = StandingsCalculator.recompute(this);
+        List<IStanding> rows = PhaseEngines.of(getType()).rank(this);
         DatabaseObject.UpsertAll(rows);
         return rows.stream().sorted(Comparator.comparingInt(IStanding::getGroupIndex).thenComparingInt(IStanding::getRank)).toList();
     }

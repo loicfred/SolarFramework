@@ -11,6 +11,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ClassUtils {
 
@@ -53,22 +56,43 @@ public class ClassUtils {
         return null;
     }
 
+    /**
+     * A class's field list cannot change at runtime, and these three sit on the hottest path the database
+     * layer has: every row of every entity read runs {@code getSerializableFieldsOfClassFamily} once in
+     * {@code EntityIdentity#canonical}, plus a {@code findFieldInClassFamily} per mapped collection and
+     * another full walk per to-one association - and all of it happens inside the {@code withEm} block, so
+     * the JDBC connection is <b>checked out for the whole of it</b>. Uncached, one row cost several walks of
+     * the class hierarchy, each calling {@code getDeclaredFields()} (which clones its array on every call),
+     * {@code setAccessible} on every field, and building two more lists. At twenty thousand rows across
+     * twenty refresher threads that is millions of throwaway {@code Field[]} clones holding the pool down and
+     * feeding the GC pressure at the same time - the pool exhaustion and the OOM kill out of one cause.
+     *
+     * <p>Keyed on the {@code Class}, not its name: the values are {@code Field}s that already pin the class,
+     * so a name key buys no unpinning and would hand back another classloader's fields for a class of the
+     * same name. Lists are unmodifiable - a caller that mutated one would corrupt every later lookup.
+     */
+    private static final Map<Class<?>, List<Field>> AllFields = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, List<Field>> SerializableFields = new ConcurrentHashMap<>();
+    private static final Map<Class<?>, Map<String, Optional<Field>>> FieldsByName = new ConcurrentHashMap<>();
+
     public static List<Field> getAllFieldsOfClassFamily(Class<?> clazz) {
-        List<Field> fields = new ArrayList<>();
-        for (Class<?> c = clazz; c != null; c = c.getSuperclass()) {
-            fields.addAll(Arrays.stream(c.getDeclaredFields()).peek(f -> f.setAccessible(true)).toList());
-        }
-        Collections.reverse(fields);
-        return fields;
+        return AllFields.computeIfAbsent(clazz, k -> {
+            List<Field> fields = new ArrayList<>();
+            for (Class<?> c = k; c != null; c = c.getSuperclass()) {
+                fields.addAll(Arrays.stream(c.getDeclaredFields()).peek(f -> f.setAccessible(true)).toList());
+            }
+            Collections.reverse(fields);
+            return List.copyOf(fields);
+        });
     }
     public static List<Field> getSerializableFieldsOfClassFamily(Class<?> clazz) {
-        return getAllFieldsOfClassFamily(clazz).stream().filter(f -> !Modifier.isTransient(f.getModifiers()) && !Modifier.isStatic(f.getModifiers()) && !f.getType().equals(byte[].class) && !f.getType().equals(Byte[].class)).toList();
+        return SerializableFields.computeIfAbsent(clazz, k -> getAllFieldsOfClassFamily(k).stream().filter(f -> !Modifier.isTransient(f.getModifiers()) && !Modifier.isStatic(f.getModifiers()) && !f.getType().equals(byte[].class) && !f.getType().equals(Byte[].class)).toList());
     }
     public static List<Field> getFieldsWithAnnotation(Class<?> clazz, Class<? extends Annotation> annotationClass) {
         return getAllFieldsOfClassFamily(clazz).stream().filter(f -> f.getAnnotation(annotationClass) != null).toList();
     }
     public static Field findFieldInClassFamily(Class<?> clazz, String fieldName) {
-        return getAllFieldsOfClassFamily(clazz).stream().filter(f -> f.getName().equals(fieldName)).findFirst().orElse(null);
+        return FieldsByName.computeIfAbsent(clazz, _ -> new ConcurrentHashMap<>()).computeIfAbsent(fieldName, n -> getAllFieldsOfClassFamily(clazz).stream().filter(f -> f.getName().equals(n)).findFirst()).orElse(null);
     }
 
     public static boolean isClassRelated(Object obj, Object obj2) {

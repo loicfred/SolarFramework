@@ -30,6 +30,8 @@ public interface IDatabaseService {
     long getIdleTimeout();
     long getMaxLifetime();
     long getConnectionTimeout();
+    long getKeepaliveTime();
+    long getLeakDetectionThreshold();
 
     void setName(String name);
     void setUsername(String username);
@@ -41,6 +43,8 @@ public interface IDatabaseService {
     void setIdleTimeout(long idleTimeout);
     void setMaxLifetime(long maxLifetime);
     void setConnectionTimeout(long connectionTimeout);
+    void setKeepaliveTime(long keepaliveTime);
+    void setLeakDetectionThreshold(long leakDetectionThreshold);
 
 
     void setEntities(Collection<IEntityInfo> entities);

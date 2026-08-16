@@ -23,13 +23,7 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
  * maps to exactly one Java object whichever path produced it - which is what makes a child queried
  * separately the same object as the one attached in memory.
  */
-@SpringBootTest(classes = Database_Main.class, properties = {
-        "spring.datasource.url=jdbc:h2:mem:solartest;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=test",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.jpa.hibernate.ddl-auto=none"
-})
+@SolarH2Test
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DatabaseIdentityTest {
 
@@ -100,6 +94,20 @@ class DatabaseIdentityTest {
         User u = fetchUser(1);
         assertTrue(java.lang.reflect.Proxy.isProxyClass(u.orders.getClass()), "the read must leave a lazy, faultable list in place - nulling it is what made every child invisible");
         assertEquals(2, u.getOrders().size(), "first access faults it, closed EntityManager or not");
+    }
+
+    /**
+     * The replacement must satisfy the field's own declared type, the way Hibernate picks PersistentSet or
+     * PersistentBag off it - a Set-declared inverse collection used to die at Field#set with "Can not set
+     * java.util.Set field ... to jdk.proxy1.$ProxyN" because every field got a List proxy.
+     */
+    @Test
+    void aSetDeclaredInverseCollectionFaultsTheSameWayAListDoes() {
+        makeNewUserWith2Orders(1);
+        SolarDBManager.resetAllCaches();
+        User u = fetchUser(1);
+        assertTrue(java.lang.reflect.Proxy.isProxyClass(u.orderSet.getClass()), "a Set field must be left lazy too, not loaded eagerly");
+        assertEquals(List.of("Egg", "Steak"), u.getOrderSet().stream().map(Order::getItem).sorted().toList(), "and it must fault into the same children the List sees");
     }
 
     @Test

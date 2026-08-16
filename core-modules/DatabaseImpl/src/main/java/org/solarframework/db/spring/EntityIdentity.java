@@ -2,6 +2,7 @@ package org.solarframework.db.spring;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.github.benmanes.caffeine.cache.Scheduler;
 import jakarta.persistence.OneToMany;
 
 import java.lang.reflect.Field;
@@ -26,7 +27,19 @@ import static org.solarframework.core.util.ClassUtils.*;
  * new object. Values are held weakly, so an entry dies with the last reference to it.
  */
 final class EntityIdentity {
-    private static final Cache<String, Object> Instances = Caffeine.newBuilder().weakValues().build();
+    /**
+     * Deliberately no TTL. This is an identity map, not a cache: callers hold the objects it hands out, so
+     * evicting a live one means the next read builds a second object for the same row, and {@link #canonical}
+     * then refreshes <i>that</i> one while the holder's copy silently goes stale and writes over it. Only
+     * reachability can tell when an eviction is unobservable, which is what {@code weakValues} keys on -
+     * {@code expireAfterAccess} would be worse than useless here, since a long-lived object is reached through
+     * its own reference and never through this map, so the hottest entries would be the first to go.
+     *
+     * <p>The scheduler is what makes that promptly true: Caffeine drains its reference queues during
+     * maintenance, which otherwise only piggybacks on the next read or write, leaving collected values' keys
+     * (a string per row) resident until the next burst of traffic.
+     */
+    private static final Cache<String, Object> Instances = Caffeine.newBuilder().weakValues().scheduler(Scheduler.systemScheduler()).build();
 
     private EntityIdentity() {}
 

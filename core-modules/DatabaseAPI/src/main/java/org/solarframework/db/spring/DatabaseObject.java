@@ -8,14 +8,17 @@ import org.solarframework.db.api.IDatabaseService;
 import java.lang.annotation.Annotation;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
 public class DatabaseObject<T> {
-    protected static final Map<String, String> TableNames = new HashMap<>();
-    protected static final Map<String, IDatabaseService> serviceCache = new HashMap<>();
-    protected static final Map<String, IDatabaseService.ENTITY<?>> entityServiceCache = new HashMap<>();
+    // ConcurrentHashMap: every entity construction hits TableNames, and consumers read on many threads at once -
+    // a concurrent computeIfAbsent on a plain HashMap can lose an entry or spin inside a resize.
+    protected static final Map<String, String> TableNames = new ConcurrentHashMap<>();
+    protected static final Map<String, IDatabaseService> serviceCache = new ConcurrentHashMap<>();
+    protected static final Map<String, IDatabaseService.ENTITY<?>> entityServiceCache = new ConcurrentHashMap<>();
 
     public String getTableName() {
         return getTableName(getClass());

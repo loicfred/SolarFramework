@@ -5,6 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.solarframework.db.spring.DatabaseService;
 import org.solarframework.db.spring.JpaSourceRegistrar;
 import org.solarframework.db.test.Database_Main;
+import org.solarframework.db.test.SolarH2Test;
+import org.solarframework.db.test.obj.Order;
 import org.solarframework.db.test.obj.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -16,13 +18,7 @@ import java.time.Instant;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
-@SpringBootTest(classes = Database_Main.class, properties = {
-        "spring.datasource.url=jdbc:h2:mem:publicapitx;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=test",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.jpa.hibernate.ddl-auto=none"
-})
+@SolarH2Test
 class PublicApiTransactionalTest {
 
     @Autowired
@@ -36,6 +32,7 @@ class PublicApiTransactionalTest {
         source = (DatabaseService) SolarDBManager.getDefaultService();
         if (source.getJpaBeans() == null) JpaSourceRegistrar.register(source, context);
         tx = new TransactionTemplate(source.getJpaBeans().transactionManager());
+        SolarDBManager.getServiceByEntity(Order.class).doUpdate(Order.class, "DELETE FROM orders"); // child table first: every H2 class shares one schema, so rows another class left behind still hold the FK
         SolarDBManager.getServiceByEntity(User.class).doUpdate(User.class, "DELETE FROM user");
 
         User u = new User(701L, "Api", "api@example.com");

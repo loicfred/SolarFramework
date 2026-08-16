@@ -43,6 +43,7 @@ import java.sql.DatabaseMetaData;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -79,8 +80,7 @@ public class DatabaseService implements IDatabaseService {
     @JsonIgnore
     private transient volatile SessionFactory sessionFactory;
     @JsonIgnore
-    transient JpaSourceRegistrar.JpaSourceBeans jpaBeans; // package-visible: TransactionResolver reads it raw, without triggering the lazy build below
-
+    transient JpaSourceRegistrar.JpaSourceBeans jpaBeans;
 
     private transient Long ping;
     private transient String pingError;
@@ -97,6 +97,8 @@ public class DatabaseService implements IDatabaseService {
     @Value("${spring.datasource.hikari.idle-timeout:#{null}}") private Long idleTimeout;
     @Value("${spring.datasource.hikari.max-lifetime:#{null}}") private Long maxLifetime;
     @Value("${spring.datasource.hikari.connection-timeout:#{null}}") private Long connectionTimeout;
+    @Value("${spring.datasource.hikari.keepalive-time:#{null}}") private Long keepaliveTime;
+    @Value("${spring.datasource.hikari.leak-detection-threshold:#{null}}") private Long leakDetectionThreshold;
 
     public DatabaseService(@Qualifier("databaseCacheManager") CacheManager dbCacheManager) {
         this.dbCacheManager = dbCacheManager;
@@ -153,6 +155,12 @@ public class DatabaseService implements IDatabaseService {
     public long getConnectionTimeout() {
         return connectionTimeout != null ? connectionTimeout : 30_000L;
     }
+    public long getKeepaliveTime() {
+        return keepaliveTime != null ? keepaliveTime : 0L;
+    }
+    public long getLeakDetectionThreshold() {
+        return leakDetectionThreshold != null ? leakDetectionThreshold : 0L;
+    }
     public boolean isDefault() {
         return Objects.equals(getConnectionString(), defaultConnectionString);
     }
@@ -188,10 +196,15 @@ public class DatabaseService implements IDatabaseService {
     public void setConnectionTimeout(long connectionTimeout) {
         this.connectionTimeout = connectionTimeout;
     }
+    public void setKeepaliveTime(long keepaliveTime) {
+        this.keepaliveTime = keepaliveTime;
+    }
+    public void setLeakDetectionThreshold(long leakDetectionThreshold) {
+        this.leakDetectionThreshold = leakDetectionThreshold;
+    }
 
     public void setEntities(Collection<IEntityInfo> entities) {
-        clearEntities();
-        this.entities = sortByDependency(entities);
+        this.entities = sortByDependency(entities); // no clearEntities() first: the list is replaced outright, and its reload() only made this tear the source down twice
         reload();
     }
     public void addEntities(IEntityInfo... entities) {
@@ -325,6 +338,8 @@ public class DatabaseService implements IDatabaseService {
         config.setIdleTimeout(getIdleTimeout());
         config.setMaxLifetime(getMaxLifetime());
         config.setConnectionTimeout(getConnectionTimeout());
+        config.setKeepaliveTime(getKeepaliveTime());
+        config.setLeakDetectionThreshold(getLeakDetectionThreshold());
         config.setPoolName("MyHikariPool-" + getName().replace(" ", "_"));
         return dataSource = new HikariDataSource(config);
     }
@@ -424,7 +439,7 @@ public class DatabaseService implements IDatabaseService {
         return "(" + whereClause.substring(0, m.start()) + ") AND DeletedAt IS NULL " + whereClause.substring(m.start() + 1);
     }
 
-    private static final Map<String, String> LazySelects = new HashMap<>();
+    private static final Map<String, String> LazySelects = new ConcurrentHashMap<>();
 
     /**
      * The select list every read uses by default: every column of the table, with the blob ones replaced by a
@@ -513,30 +528,80 @@ public class DatabaseService implements IDatabaseService {
 
     // ====== GETTERS ======
 
+    /**
+     * A result past this many rows is served but never stored. The big ones are the list/leaderboard queries
+     * nobody re-requests with identical arguments, and a single one of them outweighs every other entry in the
+     * cache combined - it used to be held for a full hour and counted as 1 of the 10 000 permitted entries.
+     */
+    private static final int MAX_CACHED_ROWS = 1_000;
+
+    /**
+     * {@code <connection>|<owner>|<shape>|<type>|<sql>|<args>}. Three things ride on this shape.
+     *
+     * <p>The <b>owner</b> segment names the entity class an entry's rows belong to, and is empty for a scalar,
+     * a Row, a non-entity DTO, or - see {@link #staysOnOneTable} - a statement whose rows depend on a table
+     * other than its own. That is what lets {@link DatabaseManager#resetCacheForClass} decide what a write
+     * invalidates from the key alone, instead of reflecting over every element of every cached list on every
+     * write. Empty means "attributable to no table", so it is dropped on any write.
+     * It is deliberately <i>not</i> the only place the type appears: the <b>type</b> segment repeats it
+     * unconditionally, because two different requested types over the same SQL are two different results and
+     * blanking the owner for both would have them share an entry and hand one back as the other.
+     *
+     * <p>The <b>shape</b> segment separates "one"/"all"/"set" because the same SQL can be asked for as a single
+     * value, a List or a Set. And the sql and args go in verbatim rather than through {@code Objects.hash}: an
+     * int hash over ten thousand live entries collides with a probability around one percent, and a collision
+     * here does not miss - it serves another query's rows as if they were yours.
+     */
+    private String cacheKey(Class<?> type, String shape, String sql, Object[] args) {
+        String name = type == null ? "" : type.getName();
+        return getConnectionString().hashCode() + "|" + (type != null && DatabaseObject.class.isAssignableFrom(type) && staysOnOneTable(sql) ? name : "") + "|" + shape + "|" + name + "|" + sql + "|" + (args == null ? "" : Arrays.deepToString(args));
+    }
+
+    /** No whitespace before the paren on purpose: {@code AND (a OR b)} is a grouped predicate, not a call, and allowing it would strip attribution from most ordinary where clauses. */
+    private static final Pattern CALLS_A_FUNCTION = Pattern.compile("[A-Za-z_][A-Za-z0-9_]*\\(");
+
+    /**
+     * Whether this statement's rows can only have been changed by a write to its own table - which is what
+     * makes attributing the entry to one entity class sound.
+     *
+     * <p>Attribution by class is the cheap invalidation signal, but it is only as good as the assumption that
+     * a query reads the table it selects from. {@code SELECT * FROM item WHERE price > 40} keeps that promise;
+     * {@code ... JOIN clanmember}, {@code ... WHERE ID IN (SELECT ...)} and {@code ... WHERE
+     * GetClanMemberCount(ID) > 0} do not, and the last one is the reason this is decided on the SQL rather than
+     * on the entity graph: a stored function's body is invisible to any association check, so a mapped
+     * relation between the two entities is the only thing that would have caught it, and that is luck rather
+     * than a rule. A statement that reaches further gets no owner and is dropped on any write.
+     *
+     * <p>Deliberately conservative and deliberately not memoised. Every test is a linear scan of a string the
+     * caller just built by concatenation, next to a database round trip - and a wrong answer in the safe
+     * direction only costs an eviction, while memoising it would key a permanent map on raw SQL, which callers
+     * are free to build with values interpolated into it.
+     */
+    static boolean staysOnOneTable(String sql) {
+        String u = sql.toUpperCase();
+        if (u.contains(" JOIN ") || u.indexOf("SELECT", u.indexOf("SELECT") + 1) > 0) return false;
+        return !CALLS_A_FUNCTION.matcher(u).find();
+    }
+
     private <T> T getCachedOrCompute(String cacheName, String cacheKey, Supplier<T> supplier) {
         Cache cache = dbCacheManager.getCache(cacheName);
         if (cache != null) {
-            Cache.ValueWrapper cached = cache.get(getConnectionString().hashCode() + cacheKey);
+            Cache.ValueWrapper cached = cache.get(cacheKey);
             if (cached != null) return (T) cached.get();
         }
         T result = supplier.get();
-        if (cache != null && result != null) cache.put(getConnectionString().hashCode() + cacheKey, result);
+        if (cache != null && result != null && !(result instanceof Collection<?> c && c.size() > MAX_CACHED_ROWS)) cache.put(cacheKey, result);
         return result;
     }
 
-    // Cache keys are prefixed per result shape ("one", "all", ...) because the same SQL+args
-    // can be requested as a single value, a List, or a Set — without the prefix those collide.
     public <T> Optional<T> doQuery(Class<T> clazz, String sql, Object... args) {
-        String cacheKey = "one" + Objects.hash(clazz, sql, args != null ? Arrays.deepHashCode(args) : null);
-        return getCachedOrCompute("DBObject", cacheKey, () -> doQueryNoCache(clazz, sql, args));
+        return getCachedOrCompute("DBObject", cacheKey(clazz, "one", sql, args), () -> doQueryNoCache(clazz, sql, args));
     }
     public <T> List<T> doQueryAll(Class<T> clazz, String sql, Object... args) {
-        String cacheKey = "all" + Objects.hash(clazz, sql, Arrays.deepHashCode(args));
-        return getCachedOrCompute("DBObject", cacheKey, () -> doQueryAllNoCache(clazz, sql, args));
+        return getCachedOrCompute("DBObject", cacheKey(clazz, "all", sql, args), () -> doQueryAllNoCache(clazz, sql, args));
     }
     public <T> Set<T> doQueryAllDistinct(Class<T> clazz, String sql, Object... args) {
-        String cacheKey = "set" + Objects.hash(clazz, sql, Arrays.deepHashCode(args));
-        return getCachedOrCompute("DBObject", cacheKey, () -> doQueryAllDistinctNoCache(clazz, sql, args));
+        return getCachedOrCompute("DBObject", cacheKey(clazz, "set", sql, args), () -> doQueryAllDistinctNoCache(clazz, sql, args));
     }
 
     public <T> Optional<T> doQueryNoCache(Class<T> clazz, String sql, Object... args) {
@@ -547,20 +612,24 @@ public class DatabaseService implements IDatabaseService {
         return runNativeQuery(clazz, sql, args, -1);
     }
     public <T> Set<T> doQueryAllDistinctNoCache(Class<T> clazz, String sql, Object... args) {
-        return new HashSet<>(doQueryAll(clazz, sql, args));
+        return new HashSet<>(doQueryAllNoCache(clazz, sql, args)); // ...NoCache must not populate the cache through the cached overload
     }
 
+    /**
+     * Rows live in their own cache, on a much shorter TTL. A {@link Row} is a LinkedHashMap per row - the most
+     * expensive shape anything here stores, roughly 40 bytes per column on top of the boxed values - and these
+     * are the list/report queries, so they were both the heaviest entries and the least likely to be re-asked
+     * identically. Their invalidation is unchanged: attributable to no table, so any write drops all of them,
+     * which {@link DatabaseManager#resetCacheForClass} now does by clearing this cache outright.
+     */
     public Optional<Row> doQuery(String sql, Object... args) {
-        String cacheKey = "rowone" + Objects.hash(sql, args != null ? Arrays.deepHashCode(args) : null);
-        return getCachedOrCompute("DBObject", cacheKey, () -> doQueryNoCache(sql, args));
+        return getCachedOrCompute("DBRow", cacheKey(null, "rowone", sql, args), () -> doQueryNoCache(sql, args));
     }
     public List<Row> doQueryAll(String sql, Object... args) {
-        String cacheKey = "rowall" + Objects.hash(sql, args != null ? Arrays.deepHashCode(args) : null);
-        return getCachedOrCompute("DBObject", cacheKey, () -> doQueryAllNoCache(sql, args));
+        return getCachedOrCompute("DBRow", cacheKey(null, "rowall", sql, args), () -> doQueryAllNoCache(sql, args));
     }
     public Set<Row> doQueryAllDistinct(String sql, Object... args) {
-        String cacheKey = "rowset" + Objects.hash(sql, args != null ? Arrays.deepHashCode(args) : null);
-        return getCachedOrCompute("DBObject", cacheKey, () -> doQueryAllDistinctNoCache(sql, args));
+        return getCachedOrCompute("DBRow", cacheKey(null, "rowset", sql, args), () -> doQueryAllDistinctNoCache(sql, args));
     }
 
     public Optional<Row> doQueryNoCache(String sql, Object... args) {
@@ -574,9 +643,9 @@ public class DatabaseService implements IDatabaseService {
         return new HashSet<>(runNativeRowQuery(sql, args, -1));
     }
 
+    /** {@code clazz} here is the scalar's own type (Integer for a COUNT), never a DatabaseObject - so the key comes out with no owner and any write drops it. */
     public <T> Optional<T> doQueryValue(Class<T> clazz, String sql, Object... args) {
-        String cacheKey = "val" + Objects.hash(clazz, sql, args != null ? Arrays.deepHashCode(args) : null);
-        return getCachedOrCompute("DBObject", cacheKey, () -> doQueryValueNoCache(clazz, sql, args));
+        return getCachedOrCompute("DBObject", cacheKey(clazz, "val", sql, args), () -> doQueryValueNoCache(clazz, sql, args));
     }
     public <T> Optional<T> doQueryValueNoCache(Class<T> clazz, String sql, Object... args) {
         return withEm(this, em -> {
@@ -616,7 +685,7 @@ public class DatabaseService implements IDatabaseService {
         });
     }
 
-    private static final Map<Class<?>, Class<?>> ConcreteEntities = new HashMap<>();
+    private static final Map<Class<?>, Class<?>> ConcreteEntities = new ConcurrentHashMap<>();
 
     /**
      * Abstract @Entity roots (ITournament, IMatch...) cannot be the target of a native query: Hibernate skips the

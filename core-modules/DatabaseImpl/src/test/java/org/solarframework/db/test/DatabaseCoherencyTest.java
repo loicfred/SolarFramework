@@ -23,13 +23,7 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
  * Every test follows the same idea: warm the cache through one read path,
  * write through some other path, then assert that every read path sees the change.
  */
-@SpringBootTest(classes = Database_Main.class, properties = {
-        "spring.datasource.url=jdbc:h2:mem:solartest;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=test",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.jpa.hibernate.ddl-auto=none"
-})
+@SolarH2Test
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DatabaseCoherencyTest {
 

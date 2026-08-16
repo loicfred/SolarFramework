@@ -31,8 +31,7 @@ public class Database_Main {
 
     static void main(String[] args) {
         SpringApplication.run(Database_Main.class, args);
-        SolarDBManager.createAllSchemasIfMissing();
-        SolarDBManager.verifyEntities();
+//        SolarDBManager.verifyEntities();
 //        User u = new User(1L, "Loic", "loic@gmail.com");
 //        u.Upsert();
 //        new Order(1L, u, "Steak", 1).Upsert();

@@ -39,7 +39,9 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
     @JoinColumn(referencedColumnName = "ID", name = "PhaseID", nullable = false, insertable = false, updatable = false)
     private IPhase phase;
 
+    // Ordered by the load rather than by a sort on every read - see getGames().
     @OneToMany(mappedBy = "match", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @OrderBy("gameNumber")
     private List<IMatchGame> games = new ArrayList<>();
 
     @Column(name = "TournamentID", nullable = false)
@@ -193,8 +195,15 @@ public abstract class IMatch extends DatabaseObject.ID_RECORD_OBJ<Long, IMatch> 
 
     // ---- games ----------------------------------------------------------------------------------
 
+    /**
+     * The series in game order. Sorted on the load only: an entity instance is shared by every thread, so a
+     * read that re-sorts the list bumps its {@code modCount} and throws {@code ConcurrentModificationException}
+     * into whatever iteration another thread is already running over it. {@code addGame} appends at
+     * {@code size() + 1}, so the order is the mutator's to keep.
+     */
     public List<IMatchGame> getGames() {
-        if (games == null) games = new ArrayList<>(retrieveEntityServiceFor(IMatchGame.class).getAllWhere("MatchID = ?", ID));
+        if (games != null) return games;
+        games = new ArrayList<>(retrieveEntityServiceFor(IMatchGame.class).getAllWhere("MatchID = ?", ID));
         games.sort(Comparator.comparingInt(IMatchGame::getGameNumber));
         return games;
     }

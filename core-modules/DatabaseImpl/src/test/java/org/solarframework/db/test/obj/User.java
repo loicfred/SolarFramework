@@ -6,7 +6,9 @@ import org.solarframework.db.spring.DatabaseObject;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
@@ -16,6 +18,11 @@ public class User extends DatabaseObject.ID_RECORD_OBJ<Long, User> {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     public List<Order> orders = new ArrayList<>();
+
+    // Same association declared as a Set: PostLoad must honour the field's own type, not hand every
+    // inverse collection a List proxy. See LazyMappedCollection.
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    public Set<Order> orderSet = new LinkedHashSet<>();
 
     @Column(name = "Name")
     private String name;
@@ -61,6 +68,10 @@ public class User extends DatabaseObject.ID_RECORD_OBJ<Long, User> {
 
     public List<Order> getOrders() {
         return orders;
+    }
+
+    public Set<Order> getOrderSet() {
+        return orderSet;
     }
 
     public Order addOrder(String item, int amount) {

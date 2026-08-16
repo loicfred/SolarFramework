@@ -32,7 +32,7 @@
     </dependencyManagement>
 
     <dependencies>
-        <!-- gateway pulls in WebFlux + Reactor Netty -->
+
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-gateway-server-webflux</artifactId>

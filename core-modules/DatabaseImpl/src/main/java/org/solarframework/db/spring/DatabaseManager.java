@@ -27,6 +27,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 import static org.solarframework.core.util.ClassUtils.*;
@@ -84,6 +85,7 @@ public class DatabaseManager implements IDatabaseManager {
             LazyFields.clear();
             DatabaseService.clearLazySelects();
             serviceCache.clear();
+            AffectedBy.clear(); // derived from what is registered, which is exactly what this method changes
             resetAllCaches();
 
             if (IsSingleSource()) {
@@ -310,36 +312,59 @@ public class DatabaseManager implements IDatabaseManager {
             }
         });
     }
+    /**
+     * The entity class names a write to a given class invalidates. Memoised because the reflection behind it
+     * used to run <i>per element of every cached list, on every write</i> - a mass refresh made that quadratic,
+     * and walking every value also kept every cached object hot so nothing could age out. Cleared by
+     * {@link #reload()}, which is the only thing that changes what is registered.
+     */
+    private final Map<Class<?>, Set<String>> AffectedBy = new ConcurrentHashMap<>();
+
+    /**
+     * Evicts by key. {@link DatabaseService#cacheKey} puts the owning entity class in the second segment, so
+     * what a write invalidates is decidable without touching a single cached value.
+     *
+     * <p>Two kinds of entry are dropped on <i>any</i> write, because neither can be attributed to a table.
+     * One is an entry with no owner - a scalar, a Row, a non-entity DTO, or a statement that reaches past its
+     * own table, which {@link DatabaseService#staysOnOneTable} decides at key-build time and is what makes
+     * attribution sound for everything else. The other is an entry that cached an <b>empty</b> result, kept as
+     * a second line rather than a mechanism: an empty list names no row, so if the shape test ever calls a
+     * statement single-table when it is not, the entry most likely to be silently wrong - the one waiting for
+     * a row to start matching - is dropped anyway. It costs nothing, since the pass already walks every entry
+     * and this is one {@code isEmpty()} on a value it is already holding.
+     */
     public void resetCacheForClass(Class<?> dbClazz, boolean items, boolean lists) {
+        if (!items && !lists) return;
+        resetCache("DBRow"); // every Row entry is ownerless, so "drop the ones a write affects" is the whole cache - clear it outright rather than walk it
         Cache cache = dbCacheManager.getCache("DBObject");
-        if (cache == null || (!items && !lists)) return;
+        if (cache == null) return;
+        Set<String> affected = AffectedBy.computeIfAbsent(dbClazz, c -> {
+            Set<String> names = getSources().stream().flatMap(ds -> ds.getEntitiesClasses().stream()).distinct().filter(e -> isAffectedByChangeOf(e, c)).map(Class::getName).collect(Collectors.toCollection(HashSet::new));
+            names.add(c.getName()); // a class read through an unregistered root (or written before the scan ran) still invalidates itself
+            return names;
+        });
         com.github.benmanes.caffeine.cache.Cache<Object, Object> nativeCache = (com.github.benmanes.caffeine.cache.Cache<Object, Object>) cache.getNativeCache();
-        nativeCache.asMap().forEach((key, cacheItem) -> {
-            // Single results are cached wrapped in Optional (see DatabaseService.doQuery); unwrap before matching.
-            Object value = cacheItem instanceof Optional<?> opt ? opt.orElse(null) : cacheItem;
-            if (value == null) { // cached empty result: the write may have created a row that now matches
-                cache.evict(key);
-            } else if (value instanceof Collection<?> col) {
-                if (lists && (col.isEmpty() || col.stream().anyMatch(e -> isAffectedByChangeOf(e, dbClazz)))) {
-                    cache.evict(key);
-                }
-            } else if (items && isAffectedByChangeOf(value, dbClazz)) {
-                cache.evict(key);
-            }
+        nativeCache.asMap().entrySet().removeIf(en -> {
+            Object v = en.getValue(); // single results are cached wrapped in Optional (see DatabaseService.doQuery)
+            if (v == null || (v instanceof Optional<?> o && o.isEmpty()) || (v instanceof Collection<?> col && col.isEmpty())) return true;
+            String key = en.getKey().toString();
+            int a = key.indexOf('|'), b = a < 0 ? -1 : key.indexOf('|', a + 1);
+            if (b < 0) return true; // not a key this class wrote - drop it rather than keep something unattributable
+            String owner = key.substring(a + 1, b);
+            if (owner.isEmpty()) return true;
+            if (!affected.contains(owner)) return false;
+            int c = key.indexOf('|', b + 1);
+            return "one".equals(c < 0 ? "" : key.substring(b + 1, c)) ? items : lists;
         });
     }
 
     /**
-     * A cached object is stale after a write to {@code changed} when it is of that class itself,
-     * or when either side declares a mapped association to the other — loaded relations
-     * (e.g. User.orders) embed the other entity's rows inside the cached object.
-     * Non-entity values (scalars like COUNT results, Rows) cannot be attributed to a table,
-     * so they are evicted on any write.
+     * A cached entry is stale after a write to {@code changed} when it holds that class itself, or when either
+     * side declares a mapped association to the other — loaded relations (e.g. User.orders) embed the other
+     * entity's rows inside the cached object.
      */
-    private boolean isAffectedByChangeOf(Object cached, Class<?> changed) {
-        if (!(cached instanceof DatabaseObject<?>)) return true;
-        Class<?> cachedClass = cached.getClass();
-        return isClassRelated(cachedClass, changed) || hasRelationTo(cachedClass, changed) || hasRelationTo(changed, cachedClass);
+    private boolean isAffectedByChangeOf(Class<?> cached, Class<?> changed) {
+        return isClassRelated(cached, changed) || hasRelationTo(cached, changed) || hasRelationTo(changed, cached);
     }
 
     private boolean hasRelationTo(Class<?> from, Class<?> to) {

@@ -7,7 +7,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIf;
 import org.solarframework.db.test.obj.User;
+import org.solarframework.db.spring.SolarRegistryListener;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.TestExecutionListeners;
 
 import java.io.InputStream;
 import java.sql.Connection;
@@ -24,8 +26,13 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
  * <p>Runs on the MariaDB of {@code src/test/resources/application.properties} (no property overrides here,
  * unlike the H2 tests) and disables itself when that server is unreachable, so the build never depends on it.
  * It only ever touches its own ids.
+ *
+ * <p>The one class in this module on a second context, hence the only reason {@link SolarRegistryListener}
+ * has to exist: the static {@link org.solarframework.db.spring.DatabaseRegistry} would otherwise still point
+ * here for every {@link SolarH2Test} class that runs afterwards in the same JVM.
  */
 @SpringBootTest(classes = Database_Main.class)
+@TestExecutionListeners(value = SolarRegistryListener.class, mergeMode = TestExecutionListeners.MergeMode.MERGE_WITH_DEFAULTS)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @EnabledIf("serverIsUp")
 class DatabaseIdentityRemoteTest {

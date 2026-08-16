@@ -53,6 +53,23 @@ class TournamentTest {
         assertEquals(List.of(1, 2, 3, 3), t.getFinalRanking().stream().map(IParticipant::getFinalRank).toList());
         assertEquals(4, t.getPodium().size()); // both semifinal losers are third, so the podium is not three entries
     }
+    /**
+     * The table is ranked by the engine, not by the tiebreaker chain: a knockout phase shares a placing and orders
+     * by bracket exit. Consumers recompute it constantly (a panel refresh, {@code repair()}), and going through
+     * StandingsCalculator directly renumbered it 1..n every time, wiping what tryComplete() had written.
+     */
+    @Test
+    void aPlayoffTableIsRankedByBracketExitAndSurvivesARecount() {
+        Tournament t = open("Cup", PhaseType.SINGLE_ELIMINATION, 8);
+        t.setThirdPlaceMatch(false);
+        t.start();
+        IPhase bracket = t.getPhases().getFirst();
+        playToCompletion(t);
+        assertEquals(List.of(1, 2, 3, 3, 5, 5, 5, 5), bracket.recomputeStandings().stream().map(IStanding::getRank).toList());
+        bracket.recomputeStandings(); // what SolarTournament.Refresh() does on every panel interaction
+        assertFalse(bracket.tryComplete()); // already closed, so it cannot put the ranks back - the recount has to be right on its own
+        assertEquals(List.of(1, 2, 3, 3, 5, 5, 5, 5), bracket.recomputeStandings().stream().map(IStanding::getRank).toList());
+    }
     @Test
     void recomputeFinalRanksRestampsAStalePlacingAndWritesOnlyWhatMoved() {
         Tournament t = open("Cup", PhaseType.SINGLE_ELIMINATION, 4);
@@ -390,5 +407,34 @@ class TournamentTest {
         assertEquals(2, p1.getMatchesWon()); // top seed wins the semifinal and the final
         assertEquals(0, p1.getMatchesLost());
         assertTrue(p1.getGamesWon() > 0);
+    }
+
+    /**
+     * A read may not structurally modify the list it hands back. One entity instance is shared by every thread
+     * (the identity map keys on the row), so {@code getPhases()} re-sorting the live list bumped its modCount on
+     * every call and threw ConcurrentModificationException into any iteration already running over it - which is
+     * {@code getMatches()}, i.e. every page that draws a bracket. Single-threaded here because the same reentrancy
+     * proves it: with the sort in place the second loop pass throws.
+     */
+    @Test
+    void readingThePhaseListDoesNotDisturbAnIterationAlreadyRunningOverIt() {
+        Tournament t = Tournament.create("Cup", PhaseType.GROUP, PhaseType.SINGLE_ELIMINATION);
+        int seen = 0;
+        for (IPhase p : t.getPhases()) { t.getPhases(); assertNotNull(p); seen++; }
+        assertEquals(2, seen);
+        assertEquals(List.of(0, 1), t.getPhases().stream().map(IPhase::getOrderIndex).toList()); // still in play order
+    }
+
+    @Test
+    void readingTheGameListDoesNotDisturbAnIterationAlreadyRunningOverIt() {
+        Tournament t = open("Cup", PhaseType.SINGLE_ELIMINATION, 4);
+        t.start();
+        IMatch m = t.getPlayableMatches().getFirst();
+        m.addGame(3, 1);
+        m.addGame(1, 3);
+        int seen = 0;
+        for (IMatchGame g : m.getGames()) { m.getGames(); assertNotNull(g); seen++; }
+        assertEquals(2, seen);
+        assertEquals(List.of(1, 2), m.getGames().stream().map(IMatchGame::getGameNumber).toList());
     }
 }

@@ -26,13 +26,7 @@ import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
  * sentinel, the getter fetches it on demand, and every write skips the columns still holding that sentinel
  * so an unread blob is never overwritten with NULL.
  */
-@SpringBootTest(classes = Database_Main.class, properties = {
-        "spring.datasource.url=jdbc:h2:mem:solartest;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER",
-        "spring.datasource.username=sa",
-        "spring.datasource.password=test",
-        "spring.datasource.driver-class-name=org.h2.Driver",
-        "spring.jpa.hibernate.ddl-auto=none"
-})
+@SolarH2Test
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class DatabaseBlobTest {
 

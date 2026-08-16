@@ -191,6 +191,10 @@ public class Tournament extends ITournament {
         // The placements are read back by callers and after a restart, so they have to be written, not just held
         // in memory - and the podium is derived from them. UpsertAll takes its table off the head of the list.
         if (!moved.isEmpty()) DatabaseObject.UpsertAll(moved);
+        // rankingWithTieKeys() ranked every started phase's table on the way here; without this the rows are correct
+        // in memory and stale on disk, and the next read shows the old numbering beside the new finalRank.
+        for (IPhase phase : getPhases())
+            if (phase.getStatus().hasStarted() && !phase.getStandings().isEmpty()) DatabaseObject.UpsertAll(phase.getStandings());
         return moved.size();
     }
 
