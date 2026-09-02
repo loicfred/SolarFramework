@@ -23,6 +23,6 @@ public class Main {
                 .regenerateCerts();
         builder.build();
 
-        new ProxyServer().start().block();
+        new ProxyServer().start().stayConnected();
     }
 }

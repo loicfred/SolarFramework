@@ -31,6 +31,17 @@ public class User extends DatabaseObject.ID_RECORD_OBJ<Long, User> {
     @Column(name = "Avatar", columnDefinition = "MEDIUMBLOB")
     private byte[] avatar = Lazy.UNLOADED;
 
+    // Columns are matched to fields by the field's own name, so a @Transient field can be named after a real
+    // column. It must still never be written: this pair reproduces ChatMessage, where the transient list won
+    // the column its String was meant to own and reached the query as an unmappable parameter.
+    @Column(name = "Tags")
+    private String tagsText;
+    @Transient
+    private List<String> tags = new ArrayList<>(List.of("not", "a", "column"));
+
+    public String getTagsText() { return tagsText; }
+    public void setTagsText(String tagsText) { this.tagsText = tagsText; }
+
     public String getName() {
         return name;
     }

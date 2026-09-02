@@ -9,12 +9,12 @@ import org.solarframework.tournament.api.dto.BracketTheme;
 import org.solarframework.tournament.impl.engine.DoubleEliminationEngine;
 import org.solarframework.tournament.impl.engine.GroupEngine;
 import org.solarframework.tournament.impl.engine.SingleEliminationEngine;
-import org.solarframework.tournament.impl.obj.Participant;
-import org.solarframework.tournament.impl.obj.Tournament;
-import org.solarframework.tournament.obj.IMatch;
-import org.solarframework.tournament.obj.IParticipant;
-import org.solarframework.tournament.obj.IPhase;
-import org.solarframework.tournament.obj.ITournament;
+import org.solarframework.tournament.obj.Participant;
+import org.solarframework.tournament.obj.Tournament;
+import org.solarframework.tournament.obj.Match;
+import org.solarframework.tournament.obj.Participant;
+import org.solarframework.tournament.obj.Phase;
+import org.solarframework.tournament.obj.Tournament;
 
 import java.io.File;
 import java.io.IOException;
@@ -31,8 +31,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class BracketRendererTest {
     private final BracketRenderer renderer = new BracketRenderer();
 
-    private List<IParticipant> field(ITournament t, int n) {
-        List<IParticipant> out = new ArrayList<>();
+    private List<Participant> field(Tournament t, int n) {
+        List<Participant> out = new ArrayList<>();
         for (int i = 1; i <= n; i++) out.add(new Participant(t, "P" + i, i));
         t.getParticipants().addAll(out); // Match resolves participants through the tournament's list, same as Tournament.register()
         return out;
@@ -41,7 +41,7 @@ class BracketRendererTest {
     @Test
     void rendersAPngWithAValidSignatureForABracketPhase() {
         Tournament t = new Tournament("Cup");
-        IPhase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
+        Phase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
         new SingleEliminationEngine().generate(phase, field(t, 5));
         byte[] png = renderer.renderPng(phase);
         assertTrue(png.length > 8);
@@ -53,7 +53,7 @@ class BracketRendererTest {
     @Test
     void rendersSvgMarkupForABracketPhase() {
         Tournament t = new Tournament("Cup");
-        IPhase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
+        Phase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
         new SingleEliminationEngine().generate(phase, field(t, 4));
         String svg = renderer.renderSvg(phase);
         assertTrue(svg.startsWith("<svg"));
@@ -63,7 +63,7 @@ class BracketRendererTest {
     @Test
     void rendersSvgForAGroupPhaseTable() {
         Tournament t = new Tournament("League");
-        IPhase phase = t.addPhase("Groups", PhaseType.GROUP);
+        Phase phase = t.addPhase("Groups", PhaseType.GROUP);
         phase.setGroupCount(2);
         new GroupEngine(PhaseType.GROUP).generate(phase, field(t, 8));
         String svg = renderer.renderSvg(phase);
@@ -73,9 +73,9 @@ class BracketRendererTest {
     @Test
     void rendersTheWholeTournamentAcrossPhases() {
         Tournament t = new Tournament("Cup");
-        IPhase group = t.addPhase("Groups", PhaseType.GROUP);
+        Phase group = t.addPhase("Groups", PhaseType.GROUP);
         new GroupEngine(PhaseType.GROUP).generate(group, field(t, 4));
-        IPhase bracket = t.addPhase("Playoffs", PhaseType.SINGLE_ELIMINATION);
+        Phase bracket = t.addPhase("Playoffs", PhaseType.SINGLE_ELIMINATION);
         new SingleEliminationEngine().generate(bracket, field(t, 4));
 
         String svg = renderer.renderSvg(t, BracketTheme.dark());
@@ -86,7 +86,7 @@ class BracketRendererTest {
     @Test
     void lightAndDarkThemesProduceDifferentBackgrounds() {
         Tournament t = new Tournament("Cup");
-        IPhase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
+        Phase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
         new SingleEliminationEngine().generate(phase, field(t, 4));
         String dark = renderer.renderSvg(phase, BracketTheme.dark());
         String light = renderer.renderSvg(phase, BracketTheme.light());
@@ -97,7 +97,7 @@ class BracketRendererTest {
     @Test
     void rendersHtmlWithDataParticipantAttributesAndHoverScript() {
         Tournament t = new Tournament("Cup");
-        IPhase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
+        Phase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
         new SingleEliminationEngine().generate(phase, field(t, 4));
         String html = renderer.renderHtml(phase);
         assertTrue(html.startsWith("<!doctype html>"));
@@ -108,7 +108,7 @@ class BracketRendererTest {
     @Test
     void writesHtmlFileToDisk(@TempDir File dir) throws IOException {
         Tournament t = new Tournament("Cup");
-        IPhase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
+        Phase phase = t.addPhase("Bracket", PhaseType.SINGLE_ELIMINATION);
         new SingleEliminationEngine().generate(phase, field(t, 4));
         File out = renderer.writeHtml(phase, BracketTheme.dark(), new File(dir, "bracket.html"));
         assertTrue(out.exists());
@@ -123,8 +123,8 @@ class BracketRendererTest {
     @Test
     void noTwoMatchBoxesOverlapWhenAGrandFinalResetHappens() {
         Tournament t = new Tournament("DE");
-        IPhase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
-        List<IParticipant> field = field(t, 4);
+        Phase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
+        List<Participant> field = field(t, 4);
         DoubleEliminationEngine engine = new DoubleEliminationEngine();
         engine.generate(phase, field);
         forceGrandFinalReset(phase, engine, field);
@@ -135,14 +135,14 @@ class BracketRendererTest {
     @Test
     void noTwoMatchBoxesOverlapInALargerDoubleEliminationBracket() {
         Tournament t = new Tournament("DE8");
-        IPhase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
+        Phase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
         DoubleEliminationEngine engine = new DoubleEliminationEngine();
         engine.generate(phase, field(t, 8));
-        List<IMatch> queue = new ArrayList<>(phase.getPlayableMatches());
+        List<Match> queue = new ArrayList<>(phase.getPlayableMatches());
         while (!queue.isEmpty()) {
-            IMatch m = queue.removeFirst();
+            Match m = queue.removeFirst();
             if (m.getState().isDecided() || !m.isFilled()) continue;
-            IParticipant p1 = m.getParticipant1().orElseThrow(), p2 = m.getParticipant2().orElseThrow();
+            Participant p1 = m.getParticipant1().orElseThrow(), p2 = m.getParticipant2().orElseThrow();
             boolean p1Wins = p1.getSeed() < p2.getSeed();
             m.setScore(p1Wins ? 1 : 0, p1Wins ? 0 : 1);
             m.setState(MatchState.COMPLETE);
@@ -161,14 +161,14 @@ class BracketRendererTest {
     @Test
     void losersBracketRoundsNeverDriftAboveTheOnesBeforeThem() {
         Tournament t = new Tournament("DE8");
-        IPhase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
+        Phase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
         new DoubleEliminationEngine().generate(phase, field(t, 8));
 
         BracketLayout layout = new BracketLayout(phase, BracketTheme.dark());
         layout.build();
 
         Map<Integer, Double> topOfRound = new TreeMap<>();
-        for (IMatch m : phase.getMatches(BracketSide.LOSERS)) {
+        for (Match m : phase.getMatches(BracketSide.LOSERS)) {
             Double y = layout.placedY(m.getID());
             assertNotNull(y, "Losers round " + m.getRound() + " match " + m.getMatchNumber() + " was never placed");
             topOfRound.merge(m.getRound(), y, Math::min);
@@ -191,7 +191,7 @@ class BracketRendererTest {
     @Test
     void noConnectorRunsFromTheWinnersBracketDownIntoTheLosersBracket() {
         Tournament t = new Tournament("DE8");
-        IPhase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
+        Phase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
         new DoubleEliminationEngine().generate(phase, field(t, 8));
 
         BracketTheme th = BracketTheme.dark();
@@ -219,14 +219,14 @@ class BracketRendererTest {
     @Test
     void theGrandFinalSitsOnTheWinnersFinalRowInItsOwnColumn() {
         Tournament t = new Tournament("DE8");
-        IPhase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
+        Phase phase = t.addPhase("Bracket", PhaseType.DOUBLE_ELIMINATION);
         new DoubleEliminationEngine().generate(phase, field(t, 8));
 
         BracketTheme th = BracketTheme.dark();
         BracketLayout layout = new BracketLayout(phase, th);
         layout.build();
 
-        int wbRounds = phase.getMatches(BracketSide.WINNERS).stream().mapToInt(IMatch::getRound).max().orElseThrow();
+        int wbRounds = phase.getMatches(BracketSide.WINNERS).stream().mapToInt(Match::getRound).max().orElseThrow();
         double wbFinalY = phase.getMatches(BracketSide.WINNERS).stream().filter(m -> m.getRound() == wbRounds)
                 .mapToDouble(m -> layout.placedY(m.getID())).min().orElseThrow();
         double lbTop = phase.getMatches(BracketSide.LOSERS).stream().mapToDouble(m -> layout.placedY(m.getID())).min().orElseThrow();
@@ -241,16 +241,16 @@ class BracketRendererTest {
     void aThirdPlaceMatchRequestedAfterPhaseCreationStillShowsOnTheBracket() {
         Tournament t = Tournament.create("Cup", PhaseType.SINGLE_ELIMINATION);
         t.setThirdPlaceMatch(true);
-        IPhase phase = t.getPhases().getFirst();
+        Phase phase = t.getPhases().getFirst();
         new SingleEliminationEngine().generate(phase, field(t, 4));
         assertEquals(1, phase.getMatches(BracketSide.THIRD_PLACE).size());
         assertTrue(renderer.renderSvg(phase).contains("Third place"));
     }
 
     /** Same script verified in DoubleEliminationEngineTest: sends seed 1 through the losers bracket and back into the grand final. */
-    private void forceGrandFinalReset(IPhase phase, DoubleEliminationEngine engine, List<IParticipant> field) {
-        IParticipant p1 = field.get(0), p2 = field.get(1);
-        decide(phase, engine, phase.getMatches(BracketSide.WINNERS, 1).get(0), field.get(3));
+    private void forceGrandFinalReset(Phase phase, DoubleEliminationEngine engine, List<Participant> field) {
+        Participant p1 = field.getFirst(), p2 = field.get(1);
+        decide(phase, engine, phase.getMatches(BracketSide.WINNERS, 1).getFirst(), field.get(3));
         decide(phase, engine, phase.getMatches(BracketSide.WINNERS, 1).get(1), p2);
         decide(phase, engine, phase.getMatches(BracketSide.WINNERS, 2).getFirst(), p2);
         decide(phase, engine, phase.getMatches(BracketSide.LOSERS, 1).getFirst(), p1);
@@ -259,7 +259,7 @@ class BracketRendererTest {
         decide(phase, engine, phase.getMatches(BracketSide.GRAND_FINAL_RESET).getFirst(), p2);
     }
 
-    private void decide(IPhase phase, DoubleEliminationEngine engine, IMatch m, IParticipant winner) {
+    private void decide(Phase phase, DoubleEliminationEngine engine, Match m, Participant winner) {
         m.setScore(winner.getID().equals(m.getParticipantID1()) ? 1 : 0, winner.getID().equals(m.getParticipantID1()) ? 0 : 1);
         m.setState(MatchState.COMPLETE);
         engine.onMatchDecided(phase, m);

@@ -39,6 +39,7 @@ public class BotBuilder {
     private Long TemporaryFilesChannelID;
     private Long LogChannelID;
     private Supplier<Void> AfterReadyAction;
+    protected final List<Object> extraListeners = new ArrayList<>();
 
     public BotBuilder(String token, String commandPackage) {
         this.token = token;
@@ -78,16 +79,33 @@ public class BotBuilder {
                 enableIntents(GatewayIntent.SCHEDULED_EVENTS).
                 enableIntents(GatewayIntent.GUILD_EXPRESSIONS).
                 setActivity(Activity.customStatus("⚙️ Rebooting, please wait a little longer...")).
-                addEventListeners(new DefaultListener(commandPackage)).build();
+                addEventListeners(new DefaultListener(commandPackage)).
+                addEventListeners(extraListeners.toArray()).build();
         onReady = () -> {
-            BotGuild = DiscordAccount.getGuildById(BotGuildID);
-            TemporaryFilesChannel = BotGuild.getTextChannelById(TemporaryFilesChannelID);
-            LogChannel = BotGuild.getTextChannelById(LogChannelID);
-            AfterReadyAction.get();
+            bindReadyTargets();
             return null;
         };
         log.info("Starting bot...");
         return DiscordAccount;
+    }
+    /**
+     * Resolves the guild and channels that were actually configured, then runs the after-ready action. Every target is
+     * optional: a host may run the bot with no home guild and no log channel at all, so an id nobody set has to leave
+     * its field null rather than throw on the gateway thread, where the failure would abort start-up.
+     */
+    protected void bindReadyTargets() {
+        BotGuild = BotGuildID == null ? null : DiscordAccount.getGuildById(BotGuildID);
+        TemporaryFilesChannel = BotGuild == null || TemporaryFilesChannelID == null ? null : BotGuild.getTextChannelById(TemporaryFilesChannelID);
+        LogChannel = BotGuild == null || LogChannelID == null ? null : BotGuild.getTextChannelById(LogChannelID);
+        if (AfterReadyAction != null) AfterReadyAction.get();
+    }
+    /** Closes the gateway and forgets it, so a host that changes the token can connect again without restarting the JVM. */
+    public static void shutdown() {
+        if (DiscordAccount != null) DiscordAccount.shutdown();
+        DiscordAccount = null;
+        BotGuild = null;
+        TemporaryFilesChannel = null;
+        LogChannel = null;
     }
 
     public void setBotGuild(Long BotGuildID) {
@@ -101,6 +119,10 @@ public class BotBuilder {
     }
     public void setAfterReadyAction(Supplier<Void> AfterReadyAction) {
         this.AfterReadyAction = AfterReadyAction;
+    }
+    /** Listeners of the host's own, attached alongside the command dispatcher when the bot is built. */
+    public void addEventListeners(Object... listeners) {
+        extraListeners.addAll(List.of(listeners));
     }
     public void addClassLoaders(List<ClassLoader> loaders) {
         classLoaders.addAll(loaders);

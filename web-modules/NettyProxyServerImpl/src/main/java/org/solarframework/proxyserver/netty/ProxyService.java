@@ -4,7 +4,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.solarframework.proxyserver.obj.BaseDomain;
 import org.solarframework.proxyserver.obj.Domain;
+import org.solarframework.proxyserver.obj.RateLimitRule;
 import org.solarframework.proxyserver.obj.Subdomain;
+import org.solarframework.core.util.RateLimiter;
 import org.solarframework.certs.MKCert;
 
 import java.io.IOException;
@@ -13,6 +15,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -23,6 +26,8 @@ public class ProxyService {
 
     private final String COMMENT_TAG = "# Added by SolarFramework-ProxyManager";
     private final List<Domain> domains;
+    private final RateLimiter rateLimiter = new RateLimiter();
+    private volatile List<RateLimitRule> rateRules = List.of();
 
 
     public List<String> getAbsoluteHosts() {
@@ -88,8 +93,52 @@ public class ProxyService {
         return getAllDomains().stream().filter(dom -> Objects.equals(dom.getHost(), host)).findFirst().orElse(null);
     }
 
-    protected ProxyService(List<Domain> domains, boolean regenCerts) throws Exception {
+    /** The registry the running proxy serves from, so a plugin can reach it without being in this package. */
+    public static ProxyService current() {
+        return WAMPSERVER;
+    }
+
+    /** Whether a request was let in at all, how long it must wait when it was, and whether the rule that decided was
+     *  contributed by another module's own screen - the edge marks a forwarded request with the last one, so the
+     *  application behind it knows the caller was already checked and does not check it again. */
+    public record PermitOutcome(boolean allowed, long waitSeconds, boolean contributed) {
+        static final PermitOutcome ALLOWED = new PermitOutcome(true, 0, false);
+    }
+    /** Turns away a caller no rule allows before it can even spend a permit - a flood from an address nobody
+     *  allowed should not cost the bucket anything - then spends one for the path it asked for and answers the
+     *  seconds it must wait; 0 lets the request through. The first rule in order that claims the path is the one
+     *  that applies, so a narrow rule above a wide one wins. */
+    public PermitOutcome takePermit(String clientIp, String host, String path) {
+        RateLimitRule rule = rateRules.stream().filter(r -> r.matches(host, path)).findFirst().orElse(null);
+        if (rule == null) return PermitOutcome.ALLOWED;
+        if (!rule.allows(clientIp)) return new PermitOutcome(false, 0, rule.isContributed());
+        return new PermitOutcome(true, rule.takePermit(rateLimiter, clientIp), rule.isContributed());
+    }
+
+
+    /** One request refused at the edge - either turned away outright, or made to wait. This module cannot write to
+     *  the application's own audit log - it does not depend on it - so it hands the fact to whoever is listening. */
+    public interface RefusalListener {
+        void onRefusal(String clientIp, String host, String path, long waitSeconds, boolean contributed, boolean blocked);
+    }
+    private static volatile RefusalListener refusalListener = (clientIp, host, path, waitSeconds, contributed, blocked) -> {};
+    /** No-op until the host binds one, the same way {@code ERPEvents} stays quiet until the host sets its dispatcher. */
+    public static void setRefusalListener(RefusalListener listener) {
+        refusalListener = listener == null ? (clientIp, host, path, waitSeconds, contributed, blocked) -> {} : listener;
+    }
+    static void notifyRefusal(String clientIp, String host, String path, long waitSeconds, boolean contributed, boolean blocked) {
+        refusalListener.onRefusal(clientIp, host, path, waitSeconds, contributed, blocked);
+    }
+    /** Swaps the rules live, so editing a limit costs neither a proxy restart nor a certificate regeneration. */
+    public void reloadRateLimits(List<RateLimitRule> rules) {
+        this.rateRules = rules.stream().sorted(Comparator.comparingInt(RateLimitRule::getOrdering)).toList();
+        rateLimiter.clear();
+    }
+
+
+    protected ProxyService(List<Domain> domains, List<RateLimitRule> rateRules, boolean regenCerts) throws Exception {
         this.domains = domains;
+        reloadRateLimits(rateRules);
         if (regenCerts) {
             clearHostEntries();
             for (Domain dom : domains) addHostEntry(dom.getIp(), dom.getHosts());

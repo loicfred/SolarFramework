@@ -64,8 +64,10 @@ public class DefaultListener extends ListenerAdapter {
             DiscordAccount.getPresence().setActivity(Activity.customStatus("✅ Bot start-up done!"));
             log.info("Finished bot start-up!");
         } catch (Exception e) {
-            log.error("Failed to start bot: {}", e.getMessage());
-            System.exit(1);
+            // The bot is one feature of whatever process hosts it, so a bad token or a missing permission takes the
+            // gateway down and nothing else - killing the JVM here would take the host's unrelated work with it.
+            log.error("Failed to start bot, shutting the connection down: {}", e.getMessage());
+            BotBuilder.shutdown();
         }
     }
     private final ExecutorService onGuildReady = Executors.newFixedThreadPool(20);

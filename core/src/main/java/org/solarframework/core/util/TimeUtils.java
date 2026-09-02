@@ -4,10 +4,23 @@ import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.format.ResolverStyle;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.stream.IntStream;
 
 import static org.solarframework.core.Constants.ProgramZoneId;
 
 public class TimeUtils {
+
+    // Month series - the x-axis of a trend chart
+    /** Short chart-axis label for a month: "Aug 26". */
+    public static String monthLabel(YearMonth month) {
+        return month.format(DateTimeFormatter.ofPattern("MMM yy"));
+    }
+    /** The last {@code months} months ending with the current one, oldest first. */
+    public static List<YearMonth> lastMonths(int months) {
+        return IntStream.rangeClosed(1 - months, 0).mapToObj(i -> YearMonth.now().plusMonths(i)).toList();
+    }
+
 
     // Format Check
     public static boolean isDateValid(String text, String pattern) {

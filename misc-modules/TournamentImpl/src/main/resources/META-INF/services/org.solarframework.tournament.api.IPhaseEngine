@@ -1,0 +1,5 @@
+org.solarframework.tournament.impl.engine.SingleEliminationEngine
+org.solarframework.tournament.impl.engine.DoubleEliminationEngine
+org.solarframework.tournament.impl.engine.GroupEngine
+org.solarframework.tournament.impl.engine.RoundRobinEngine
+org.solarframework.tournament.impl.engine.SwissEngine

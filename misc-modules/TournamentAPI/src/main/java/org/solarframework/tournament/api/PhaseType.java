@@ -19,4 +19,14 @@ public enum PhaseType {
     public boolean isFullyPregenerated() { return this != SWISS; }
 
     public static PhaseType of(String name) { return TournamentEnums.parse(PhaseType.class, name, SINGLE_ELIMINATION); }
+
+    /** The name a phase of this type gets when none is given explicitly. */
+    public String defaultName() {
+        return switch (this) {
+            case GROUP -> "Group Stage";
+            case ROUND_ROBIN -> "Round Robin";
+            case SWISS -> "Swiss";
+            case SINGLE_ELIMINATION, DOUBLE_ELIMINATION -> "Playoffs";
+        };
+    }
 }

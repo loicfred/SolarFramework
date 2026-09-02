@@ -1,5 +1,6 @@
 package org.solarframework.tournament.impl.seed;
 
+import org.solarframework.tournament.util.Brackets;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;

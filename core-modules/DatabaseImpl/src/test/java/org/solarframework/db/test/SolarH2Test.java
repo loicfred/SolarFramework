@@ -1,5 +1,6 @@
 package org.solarframework.db.test;
 
+import org.solarframework.db.Database_Main;
 import org.solarframework.db.spring.SolarRegistryListener;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestExecutionListeners;

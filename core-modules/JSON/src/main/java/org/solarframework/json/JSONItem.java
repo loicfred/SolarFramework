@@ -10,6 +10,8 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Type;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.*;
 import java.time.format.DateTimeFormatter;
 
@@ -144,7 +146,12 @@ public abstract class JSONItem<T extends JSONItem<T>> implements Serializable {
     }
 
 
+    /** The folder is made here rather than by each caller: a writer handed config/ai/agents.json owns the making of config/ai. */
     public T WriteJSON(String filePath) {
+        try {
+            Path parent = Path.of(filePath).getParent();
+            if (parent != null) Files.createDirectories(parent);
+        } catch (Exception _) {}
         try (FileWriter writer = new FileWriter(filePath, StandardCharsets.UTF_8)) {
             SimpleGSON.toJson(this, writer);
             return (T) this;

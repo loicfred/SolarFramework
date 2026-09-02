@@ -3,8 +3,8 @@ package org.solarframework.tournament.impl.engine;
 import org.junit.jupiter.api.Test;
 import org.solarframework.tournament.api.MatchState;
 import org.solarframework.tournament.api.PhaseType;
-import org.solarframework.tournament.impl.obj.Participant;
-import org.solarframework.tournament.impl.obj.Tournament;
+import org.solarframework.tournament.obj.Participant;
+import org.solarframework.tournament.obj.Tournament;
 import org.solarframework.tournament.obj.*;
 
 import java.util.ArrayList;
@@ -15,17 +15,17 @@ import java.util.stream.Collectors;
 import static org.junit.jupiter.api.Assertions.*;
 
 class GroupEngineTest {
-    private List<IParticipant> field(ITournament t, int n) {
-        List<IParticipant> out = new ArrayList<>();
+    private List<Participant> field(Tournament t, int n) {
+        List<Participant> out = new ArrayList<>();
         for (int i = 1; i <= n; i++) out.add(new Participant(t, "P" + i, i));
         t.getParticipants().addAll(out); // Match resolves participants through the tournament's list, same as Tournament.register()
         return out;
     }
 
-    private void playAllBySeed(IPhase phase) {
-        for (IMatch m : phase.getMatches()) {
+    private void playAllBySeed(Phase phase) {
+        for (Match m : phase.getMatches()) {
             if (m.getState().isDecided()) continue;
-            IParticipant p1 = m.getParticipant1().orElseThrow(), p2 = m.getParticipant2().orElseThrow();
+            Participant p1 = m.getParticipant1().orElseThrow(), p2 = m.getParticipant2().orElseThrow();
             boolean p1Wins = p1.getSeed() < p2.getSeed();
             m.setScore(p1Wins ? 1 : 0, p1Wins ? 0 : 1);
             m.setState(MatchState.COMPLETE);
@@ -35,7 +35,7 @@ class GroupEngineTest {
     @Test
     void roundRobinSchedulesEveryPairExactlyOnce() {
         Tournament t = new Tournament("RR");
-        IPhase phase = t.addPhase("RR", PhaseType.ROUND_ROBIN);
+        Phase phase = t.addPhase("RR", PhaseType.ROUND_ROBIN);
         new GroupEngine(PhaseType.ROUND_ROBIN).generate(phase, field(t, 5));
         assertEquals(5, phase.getTotalRounds());
         assertEquals(10, phase.getMatches().size()); // C(5,2)
@@ -45,7 +45,7 @@ class GroupEngineTest {
     @Test
     void doubleRoundRobinPlaysEveryPairTwiceWithSwappedSides() {
         Tournament t = new Tournament("RR2");
-        IPhase phase = t.addPhase("RR2", PhaseType.ROUND_ROBIN);
+        Phase phase = t.addPhase("RR2", PhaseType.ROUND_ROBIN);
         phase.setDoubleRoundRobin(true);
         new GroupEngine(PhaseType.ROUND_ROBIN).generate(phase, field(t, 4));
         assertEquals(6, phase.getTotalRounds());
@@ -54,20 +54,20 @@ class GroupEngineTest {
     @Test
     void groupPhaseAdvancesTheTopEntrantsOfEachGroup() {
         Tournament t = new Tournament("GS");
-        IPhase phase = t.addPhase("Groups", PhaseType.GROUP);
+        Phase phase = t.addPhase("Groups", PhaseType.GROUP);
         phase.setGroupCount(2);
         phase.setAdvancePerGroup(2);
         GroupEngine engine = new GroupEngine(PhaseType.GROUP);
         engine.generate(phase, field(t, 8));
         playAllBySeed(phase);
 
-        List<IParticipant> qualifiers = engine.getQualifiers(phase);
+        List<Participant> qualifiers = engine.getQualifiers(phase);
         assertEquals(4, qualifiers.size());
-        for (IParticipant q : qualifiers) {
-            IStanding s = phase.getStanding(q.getID()).orElseThrow();
+        for (Participant q : qualifiers) {
+            Standing s = phase.getStanding(q.getID()).orElseThrow();
             assertTrue(s.isQualified());
             assertTrue(s.getRank() <= 2);
         }
-        assertEquals(4, phase.getStandings().stream().filter(IStanding::isEliminated).count());
+        assertEquals(4, phase.getStandings().stream().filter(Standing::isEliminated).count());
     }
 }

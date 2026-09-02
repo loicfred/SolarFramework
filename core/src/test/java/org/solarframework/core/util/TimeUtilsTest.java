@@ -14,6 +14,18 @@ import static org.solarframework.core.Constants.ProgramZoneId;
 
 class TimeUtilsTest {
 
+    @org.junit.jupiter.api.Test
+    void monthLabelIsShortMonthAndTwoDigitYear() {
+        assertEquals("Aug 26", TimeUtils.monthLabel(java.time.YearMonth.of(2026, 8)));
+    }
+    @org.junit.jupiter.api.Test
+    void lastMonthsEndsWithTheCurrentMonthOldestFirst() {
+        var months = TimeUtils.lastMonths(12);
+        assertEquals(12, months.size());
+        assertEquals(java.time.YearMonth.now(), months.get(11));
+        assertEquals(java.time.YearMonth.now().minusMonths(11), months.getFirst());
+    }
+
     @Test
     void isDateValidAcceptsWellFormedDates() {
         // "uuuu" (year, not year-of-era) is required for STRICT resolution to succeed without an era field

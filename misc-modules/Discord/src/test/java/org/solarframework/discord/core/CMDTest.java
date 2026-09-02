@@ -108,7 +108,7 @@ class CMDTest {
     @Test
     void thePagerRowEncodesTheNeighbouringPagesAfterTheMetadata() {
         List<Button> B = C.makePageRow(ClickMe.class, 2, 10, 25, "42").getButtons();
-        assertEquals("click_me/42/1", B.get(0).getCustomId());
+        assertEquals("click_me/42/1", B.getFirst().getCustomId());
         assertEquals("click_me/42/2", B.get(1).getCustomId());
         assertEquals("click_me/42/3", B.get(2).getCustomId());
         assertFalse(B.get(2).isDisabled());
@@ -117,7 +117,7 @@ class CMDTest {
     void theUnknownTotalPagerRowStopsAtTheLastPage() {
         ActionRow R = C.makePageRow(ClickMe.class, 3, false, "42");
         assertTrue(R.getButtons().get(2).isDisabled());
-        assertFalse(R.getButtons().get(0).isDisabled());
+        assertFalse(R.getButtons().getFirst().isDisabled());
     }
 
     @Test

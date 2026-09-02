@@ -10,9 +10,9 @@
         <module name="CertificateGenerator" />
         <module name="TournamentImpl" />
         <module name="SpringProxyServerImplV2" />
+        <module name="AIAPI" />
         <module name="DatabaseEditor" />
         <module name="WebUtils" />
-        <module name="AI" />
         <module name="NettyProxyServerImpl" />
         <module name="JSON" />
         <module name="DatabaseAPI" />
@@ -23,12 +23,16 @@
         <module name="Excel" />
         <module name="Language" />
         <module name="DatabaseImpl" />
+        <module name="AIImpl" />
         <module name="Discord" />
         <module name="SpringProxyServerImplV1" />
+        <module name="SearchAPI" />
+        <module name="SearchImpl" />
         <module name="Plugin" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
+      <module name="AI" target="25" />
       <module name="AstralCore-Framework" target="25" />
       <module name="AuthenticationAPI" target="25" />
       <module name="AuthenticationImpl" target="25" />
@@ -48,6 +52,8 @@
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="AI" options="-parameters" />
+      <module name="AIAPI" options="-parameters" />
+      <module name="AIImpl" options="-parameters" />
       <module name="AuthenticationAPI" options="-parameters" />
       <module name="AuthenticationImpl" options="-parameters" />
       <module name="CertificateGenerator" options="-parameters" />
@@ -68,6 +74,8 @@
       <module name="ProxyServer" options="-parameters" />
       <module name="ProxyServerAPI" options="-parameters" />
       <module name="ProxyServerImpl" options="-parameters" />
+      <module name="SearchAPI" options="-parameters" />
+      <module name="SearchImpl" options="-parameters" />
       <module name="SolarFramework" options="-parameters" />
       <module name="SpringProxyServerImplV1" options="-parameters" />
       <module name="SpringProxyServerImplV2" options="-parameters" />

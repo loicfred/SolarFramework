@@ -2,7 +2,7 @@ package org.solarframework.tournament.impl;
 
 import org.junit.jupiter.api.Test;
 import org.solarframework.tournament.api.*;
-import org.solarframework.tournament.impl.obj.Tournament;
+import org.solarframework.tournament.obj.Tournament;
 import org.solarframework.tournament.obj.*;
 
 import java.util.List;
@@ -26,21 +26,21 @@ class TournamentRepairTest {
         return t;
     }
 
-    private IMatch playable(Tournament t) { return t.getPlayableMatches().getFirst(); }
+    private Match playable(Tournament t) { return t.getPlayableMatches().getFirst(); }
 
     @Test
     void aHealthyRunReportsNothingAndChangesNothing() {
         Tournament t = started(PhaseType.SINGLE_ELIMINATION, 8);
         playable(t).reportResult(1, 0);
-        List<Long> before = t.getMatches().stream().map(IMatch::getID).toList();
+        List<Long> before = t.getMatches().stream().map(Match::getID).toList();
         assertTrue(t.repair().isEmpty(), "a sound run should have nothing to report");
-        assertEquals(before, t.getMatches().stream().map(IMatch::getID).toList());
+        assertEquals(before, t.getMatches().stream().map(Match::getID).toList());
     }
 
     @Test
     void aPhaseWithNoTableGetsOneRowPerEntrantItsMatchesName() {
         Tournament t = started(PhaseType.SINGLE_ELIMINATION, 8);
-        IPhase p = t.getPhases().getFirst();
+        Phase p = t.getPhases().getFirst();
         p.getStandings().clear(); // what an imported phase looks like: matches, no table
         assertTrue(p.getStandings().isEmpty());
 
@@ -52,9 +52,9 @@ class TournamentRepairTest {
     @Test
     void aWinnerTheBracketNeverCarriedForwardIsPushedIntoTheNextMatch() {
         Tournament t = started(PhaseType.SINGLE_ELIMINATION, 8);
-        IMatch m = playable(t);
+        Match m = playable(t);
         m.reportResult(1, 0);
-        IMatch next = t.getPhases().getFirst().getMatch(m.getNextMatchID()).orElseThrow();
+        Match next = t.getPhases().getFirst().getMatch(m.getNextMatchID()).orElseThrow();
         Long winner = m.getWinnerID();
         assertEquals(winner, next.getParticipantID(m.getNextMatchSlot()));
 
@@ -68,10 +68,10 @@ class TournamentRepairTest {
     @Test
     void aSlotThatAlreadyHasSomebodyIsNeverOverwritten() {
         Tournament t = started(PhaseType.SINGLE_ELIMINATION, 8);
-        IMatch m = playable(t);
+        Match m = playable(t);
         m.reportResult(1, 0);
-        IPhase p = t.getPhases().getFirst();
-        IMatch next = p.getMatch(m.getNextMatchID()).orElseThrow();
+        Phase p = t.getPhases().getFirst();
+        Match next = p.getMatch(m.getNextMatchID()).orElseThrow();
 
         Long intruder = t.getParticipants().getLast().getID();
         next.setParticipant(m.getNextMatchSlot(), intruder);
@@ -82,9 +82,9 @@ class TournamentRepairTest {
     @Test
     void aFinishedPhaseThatWasNeverClosedIsRankedAndClosedButTheRunIsNot() {
         Tournament t = started(PhaseType.ROUND_ROBIN, 4);
-        IPhase p = t.getPhases().getFirst();
-        for (IMatch m : List.copyOf(p.getMatches())) {
-            IParticipant p1 = m.getParticipant1().orElseThrow(), p2 = m.getParticipant2().orElseThrow();
+        Phase p = t.getPhases().getFirst();
+        for (Match m : List.copyOf(p.getMatches())) {
+            Participant p1 = m.getParticipant1().orElseThrow(), p2 = m.getParticipant2().orElseThrow();
             boolean first = p1.getSeed() < p2.getSeed();
             if (!m.getState().isDecided()) m.reportResult(first ? 1 : 0, first ? 0 : 1);
         }
@@ -100,7 +100,7 @@ class TournamentRepairTest {
     @Test
     void aPhaseWithNoMatchesAndNoResultsIsRebuilt() {
         Tournament t = started(PhaseType.SINGLE_ELIMINATION, 8);
-        IPhase p = t.getPhases().getFirst();
+        Phase p = t.getPhases().getFirst();
         p.getMatches().clear(); // drawn, then lost - nothing was ever reported
 
         List<String> report = t.repair();

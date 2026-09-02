@@ -8,6 +8,8 @@
     <file url="file://$PROJECT_DIR$/ProxyServerImpl/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/TestApp/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/AI/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/core-modules/AIAPI/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/core-modules/AIImpl/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/Database-API/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/DatabaseA/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/DatabaseAPI/src/main/java" charset="UTF-8" />
@@ -20,6 +22,8 @@
     <file url="file://$PROJECT_DIR$/core-modules/JSON/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/Language/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/Plugin/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/core-modules/SearchAPI/src/main/java" charset="UTF-8" />
+    <file url="file://$PROJECT_DIR$/core-modules/SearchImpl/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core-modules/ZIP/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core/src/main/java" charset="UTF-8" />
     <file url="file://$PROJECT_DIR$/core/src/main/resources" charset="UTF-8" />

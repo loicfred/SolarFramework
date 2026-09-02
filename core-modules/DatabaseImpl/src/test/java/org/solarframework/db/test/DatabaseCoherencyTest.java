@@ -308,6 +308,58 @@ class DatabaseCoherencyTest {
         assertEquals("B2", fetchUser(2).getName());
     }
 
+    /**
+     * A batch carries one column list for every row, so unlike a single write it cannot leave a null column out -
+     * it has to bind the null. Hibernate infers a parameter's JDBC type from the value it is given, and a bare
+     * null tells it nothing, so this used to die on "No JDBC mapping could be inferred for parameter".
+     */
+    @Test
+    void upsertBatchWritesRowsWithNullColumns() {
+        User named = new User(1L, "A", "a@example.com");
+        User anonymous = new User(2L, "B", null);
+        DatabaseObject.UpsertAll(List.of(named, anonymous));
+
+        assertEquals(2, SolarDBManager.Count(User.class));
+        assertNull(fetchUser(2).getEmail(), "the null must be stored as a null, not skipped or defaulted");
+        assertEquals("a@example.com", fetchUser(1).getEmail(), "the row that did have a value keeps it");
+    }
+
+    /**
+     * A @Transient field is the object's own business, whatever it happens to be called. User.tags is named after
+     * the real "Tags" column on purpose: fields are matched to columns by field name, so before this was filtered
+     * the transient List was handed to the native query as a parameter and the write died on
+     * "No JDBC mapping could be inferred for parameter".
+     */
+    @Test
+    void transientFieldsAreNeverWrittenEvenWhenNamedAfterAColumn() {
+        User u = new User(1L, "A", "a@example.com");
+        u.setTagsText("kept");
+        assertDoesNotThrow(() -> DatabaseObject.UpsertAll(List.of(u)), "a transient field must not reach the query");
+        assertEquals(1, SolarDBManager.Count(User.class));
+
+        // Since 31 Aug 2026 the whole path names columns through DatabaseObject.columnOf, so the String that
+        // owns "Tags" is written and read back under that name however it is called in Java, while the transient
+        // List named after the same column stays the object's own business.
+        assertEquals("kept", fetchUser(1).getTagsText(), "a field whose column is named differently must still be written");
+    }
+
+    /** The renamed column has to travel the update paths as well as the insert, and UpdateOnly is asked for it by the column's own name. */
+    @Test
+    void aRenamedColumnIsWrittenByUpdateAndByUpdateOnly() {
+        User u = new User(1L, "A", "a@example.com");
+        u.setTagsText("first");
+        u.Upsert();
+
+        User stored = fetchUser(1);
+        stored.setTagsText("second");
+        stored.Update();
+        assertEquals("second", fetchUser(1).getTagsText(), "Update has to name the column, not the field");
+
+        stored.setTagsText("third");
+        stored.UpdateOnly("Tags");
+        assertEquals("third", fetchUser(1).getTagsText(), "UpdateOnly matches the column the caller named");
+    }
+
     /** UpsertAll fires the lifecycle hook per item, so the timestamps a RECORD_OBJ needs are filled in by the batch too. */
     @Test
     void upsertAllStampsRecordTimestamps() {

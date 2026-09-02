@@ -367,7 +367,7 @@ public class Discord_GuildInfo extends DatabaseObject.ID_OBJ<Long, Discord_Guild
         String v = value != null ? value.toString() : null;
         if (L.stream().anyMatch(V -> V.getName().equalsIgnoreCase(name) && Objects.equals(V.getValue(), v))) return;
         L.removeIf(V -> V.getName().equalsIgnoreCase(name));
-        L.add(new Discord_GuildVariable(getID(), name, v)); // the constructor is what writes it
+        L.add(new Discord_GuildVariable(getID(), name, v));
     }
     /** A name nobody has set reads as an empty row, and is <em>not</em> written — see the 4-arg constructor. */
     public Discord_GuildVariable getVariable(String name) {

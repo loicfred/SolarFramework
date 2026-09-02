@@ -2,7 +2,7 @@ package org.solarframework.tournament.impl;
 
 import org.junit.jupiter.api.Test;
 import org.solarframework.tournament.api.*;
-import org.solarframework.tournament.impl.obj.Tournament;
+import org.solarframework.tournament.obj.Tournament;
 import org.solarframework.tournament.obj.*;
 
 import java.util.HashSet;
@@ -26,10 +26,10 @@ class TournamentTest {
     private void playToCompletion(Tournament t) {
         int guard = 0;
         while (t.getStatus() != TournamentStatus.COMPLETE && guard++ < 200) {
-            List<IMatch> playable = t.getPlayableMatches();
+            List<Match> playable = t.getPlayableMatches();
             if (playable.isEmpty()) break;
-            for (IMatch m : playable) {
-                IParticipant p1 = m.getParticipant1().orElseThrow(), p2 = m.getParticipant2().orElseThrow();
+            for (Match m : playable) {
+                Participant p1 = m.getParticipant1().orElseThrow(), p2 = m.getParticipant2().orElseThrow();
                 boolean p1Wins = p1.getSeed() < p2.getSeed();
                 m.reportResult(p1Wins ? 1 : 0, p1Wins ? 0 : 1);
             }
@@ -50,7 +50,7 @@ class TournamentTest {
         t.setThirdPlaceMatch(false);
         t.start();
         playToCompletion(t);
-        assertEquals(List.of(1, 2, 3, 3), t.getFinalRanking().stream().map(IParticipant::getFinalRank).toList());
+        assertEquals(List.of(1, 2, 3, 3), t.getFinalRanking().stream().map(Participant::getFinalRank).toList());
         assertEquals(4, t.getPodium().size()); // both semifinal losers are third, so the podium is not three entries
     }
     /**
@@ -63,12 +63,12 @@ class TournamentTest {
         Tournament t = open("Cup", PhaseType.SINGLE_ELIMINATION, 8);
         t.setThirdPlaceMatch(false);
         t.start();
-        IPhase bracket = t.getPhases().getFirst();
+        Phase bracket = t.getPhases().getFirst();
         playToCompletion(t);
-        assertEquals(List.of(1, 2, 3, 3, 5, 5, 5, 5), bracket.recomputeStandings().stream().map(IStanding::getRank).toList());
+        assertEquals(List.of(1, 2, 3, 3, 5, 5, 5, 5), bracket.recomputeStandings().stream().map(Standing::getRank).toList());
         bracket.recomputeStandings(); // what SolarTournament.Refresh() does on every panel interaction
         assertFalse(bracket.tryComplete()); // already closed, so it cannot put the ranks back - the recount has to be right on its own
-        assertEquals(List.of(1, 2, 3, 3, 5, 5, 5, 5), bracket.recomputeStandings().stream().map(IStanding::getRank).toList());
+        assertEquals(List.of(1, 2, 3, 3, 5, 5, 5, 5), bracket.recomputeStandings().stream().map(Standing::getRank).toList());
     }
     @Test
     void recomputeFinalRanksRestampsAStalePlacingAndWritesOnlyWhatMoved() {
@@ -77,10 +77,10 @@ class TournamentTest {
         t.start();
         playToCompletion(t);
         assertEquals(0, t.recomputeFinalRanks()); // finish() already placed the field, so a second pass writes nothing
-        List<IParticipant> ranked = t.getFinalRanking();
+        List<Participant> ranked = t.getFinalRanking();
         for (int i = 0; i < ranked.size(); i++) ranked.get(i).setFinalRank(i + 1); // the pre-tie numbering a run finished before shared placings carries
         assertEquals(1, t.recomputeFinalRanks()); // only the entrant wrongly stamped fourth moves
-        assertEquals(List.of(1, 2, 3, 3), t.getFinalRanking().stream().map(IParticipant::getFinalRank).toList());
+        assertEquals(List.of(1, 2, 3, 3), t.getFinalRanking().stream().map(Participant::getFinalRank).toList());
         assertEquals(TournamentStatus.COMPLETE, t.getStatus()); // and nothing finish() settles around it was touched
     }
     @Test
@@ -104,7 +104,7 @@ class TournamentTest {
         Tournament t = open("League", PhaseType.ROUND_ROBIN, 4);
         t.start();
         playToCompletion(t);
-        List<IParticipant> ranking = t.getFinalRanking();
+        List<Participant> ranking = t.getFinalRanking();
         assertEquals(4, ranking.size());
         assertEquals("P1", ranking.getFirst().getName());
     }
@@ -115,7 +115,7 @@ class TournamentTest {
         t.getPhases().getFirst().setThirdPlaceMatch(true);
         t.start();
         playToCompletion(t);
-        List<IMatch> thirdPlace = t.getPhases().getFirst().getMatches(BracketSide.THIRD_PLACE);
+        List<Match> thirdPlace = t.getPhases().getFirst().getMatches(BracketSide.THIRD_PLACE);
         assertEquals(1, thirdPlace.size());
         assertTrue(thirdPlace.getFirst().getState().isDecided());
         assertNotNull(t.getThirdPlaceID());
@@ -132,7 +132,7 @@ class TournamentTest {
     @Test
     void twoPhaseFlowDistributesQualifiersIntoNextPhaseMatches() {
         Tournament t = Tournament.create("Cup", PhaseType.GROUP, PhaseType.SINGLE_ELIMINATION);
-        IPhase group = t.getPhases().get(0);
+        Phase group = t.getPhases().getFirst();
         group.setGroupCount(1);
         group.setAdvancePerGroup(2);
         t.openRegistration();
@@ -142,19 +142,19 @@ class TournamentTest {
 
         int guard = 0;
         while (group.getStatus() != PhaseStatus.COMPLETE && guard++ < 100) {
-            for (IMatch m : t.getPlayableMatches().stream().filter(m -> m.getPhaseID().equals(group.getID())).toList()) {
-                IParticipant p1 = m.getParticipant1().orElseThrow(), p2 = m.getParticipant2().orElseThrow();
+            for (Match m : t.getPlayableMatches().stream().filter(m -> m.getPhaseID().equals(group.getID())).toList()) {
+                Participant p1 = m.getParticipant1().orElseThrow(), p2 = m.getParticipant2().orElseThrow();
                 boolean p1Wins = p1.getSeed() < p2.getSeed();
                 m.reportResult(p1Wins ? 1 : 0, p1Wins ? 0 : 1);
             }
         }
         assertEquals(PhaseStatus.COMPLETE, group.getStatus());
 
-        IPhase bracket = t.getPhases().get(1);
+        Phase bracket = t.getPhases().get(1);
         assertEquals(PhaseStatus.RUNNING, bracket.getStatus());
         assertEquals(2, bracket.getParticipants().size());
-        List<Long> qualified = group.recomputeStandings().stream().filter(IStanding::isQualified).map(IStanding::getParticipantID).toList();
-        assertEquals(new HashSet<>(qualified), bracket.getParticipants().stream().map(IParticipant::getID).collect(java.util.stream.Collectors.toSet()));
+        List<Long> qualified = group.recomputeStandings().stream().filter(Standing::isQualified).map(Standing::getParticipantID).toList();
+        assertEquals(new HashSet<>(qualified), bracket.getParticipants().stream().map(Participant::getID).collect(java.util.stream.Collectors.toSet()));
 
         playToCompletion(t);
         assertEquals(TournamentStatus.COMPLETE, t.getStatus());
@@ -170,7 +170,7 @@ class TournamentTest {
         t.register("B");
         t.closeRegistration();
         t.start();
-        IMatch m = t.getPlayableMatches().getFirst();
+        Match m = t.getPlayableMatches().getFirst();
         m.reportGame(11, 5);
         assertFalse(m.getState().isDecided());
         m.reportGame(11, 7);
@@ -184,8 +184,8 @@ class TournamentTest {
         Tournament t = Tournament.create("2v2", PhaseType.SINGLE_ELIMINATION);
         t.setTeamSize(2);
         t.openRegistration();
-        IParticipant red = t.registerTeam("Red", List.of("Alice"));   // one player short
-        IParticipant blue = t.register("Blue");                        // no roster at all
+        Participant red = t.registerTeam("Red", List.of("Alice"));   // one player short
+        Participant blue = t.register("Blue");                        // no roster at all
         t.closeRegistration();
 
         assertEquals(1, red.getRosterSize());
@@ -243,8 +243,8 @@ class TournamentTest {
         t.openRegistration();
         t.register("A");
         t.register("B");
-        IParticipant c = t.register("C");
-        IParticipant d = t.register("D");
+        Participant c = t.register("C");
+        Participant d = t.register("D");
 
         assertTrue(t.isFull());
         assertEquals(2, t.getEntrants().size());
@@ -261,10 +261,10 @@ class TournamentTest {
         Tournament t = Tournament.create("Capped", PhaseType.SINGLE_ELIMINATION);
         t.setMaxParticipants(2);
         t.openRegistration();
-        IParticipant a = t.register("A");
+        Participant a = t.register("A");
         t.register("B");
-        IParticipant c = t.register("C");
-        IParticipant d = t.register("D");
+        Participant c = t.register("C");
+        Participant d = t.register("D");
 
         t.unregister(a);
 
@@ -311,9 +311,9 @@ class TournamentTest {
         Tournament t = Tournament.create("Capped", PhaseType.SINGLE_ELIMINATION);
         t.setMaxParticipants(2);
         t.openRegistration();
-        IParticipant a = t.register("A");
+        Participant a = t.register("A");
         t.register("B");
-        IParticipant c = t.register("C");
+        Participant c = t.register("C");
         t.closeRegistration();
         t.start();
 
@@ -327,10 +327,10 @@ class TournamentTest {
         Tournament t = Tournament.create("Duel", PhaseType.SINGLE_ELIMINATION);
         t.openRegistration();
         t.register("A");
-        IParticipant b = t.register("B");
+        Participant b = t.register("B");
         t.closeRegistration();
         t.start();
-        IMatch m = t.getPlayableMatches().getFirst();
+        Match m = t.getPlayableMatches().getFirst();
 
         m.reportResult(2, 1);
         assertEquals(TournamentStatus.COMPLETE, t.getStatus());
@@ -350,7 +350,7 @@ class TournamentTest {
     @Test
     void totalPointsModeDecidesByAggregateScoreNotGamesWon() {
         Tournament t = Tournament.create("Duel", PhaseType.SINGLE_ELIMINATION);
-        IPhase phase = t.getPhases().getFirst();
+        Phase phase = t.getPhases().getFirst();
         phase.setBestOf(3);
         phase.setMatchDecisionMode(MatchDecisionMode.TOTAL_POINTS);
         t.openRegistration();
@@ -358,7 +358,7 @@ class TournamentTest {
         t.register("B");
         t.closeRegistration();
         t.start();
-        IMatch m = t.getPlayableMatches().getFirst();
+        Match m = t.getPlayableMatches().getFirst();
         Long p1 = m.getParticipantID1(), p2 = m.getParticipantID2();
 
         m.reportGame(10, 5); // p1 leads 1-0 on games
@@ -380,13 +380,13 @@ class TournamentTest {
         t.registerTeam("Blue", List.of("Cara", "Dan"));
         t.closeRegistration();
         t.start();
-        IMatch m = t.getPlayableMatches().getFirst();
-        IParticipant side1 = m.getParticipant1().orElseThrow();
-        IParticipant side2 = m.getParticipant2().orElseThrow();
+        Match m = t.getPlayableMatches().getFirst();
+        Participant side1 = m.getParticipant1().orElseThrow();
+        Participant side2 = m.getParticipant2().orElseThrow();
 
-        IMatchGame g = m.reportGame(Map.of(
-                side1.getMembers().get(0), 5, side1.getMembers().get(1), 4,
-                side2.getMembers().get(0), 2, side2.getMembers().get(1), 1));
+        MatchGame g = m.reportGame(Map.of(
+                side1.getMembers().getFirst(), 5, side1.getMembers().get(1), 4,
+                side2.getMembers().getFirst(), 2, side2.getMembers().get(1), 1));
 
         assertEquals(9, g.getScore1()); // side1's game score is the sum of its own members' points
         assertEquals(3, g.getScore2());
@@ -397,7 +397,7 @@ class TournamentTest {
     @Test
     void participantRecordIsDerivedLiveFromDecidedMatches() {
         Tournament t = open("Cup", PhaseType.SINGLE_ELIMINATION, 4);
-        IParticipant p1 = t.getParticipants().stream().filter(p -> p.getName().equals("P1")).findFirst().orElseThrow();
+        Participant p1 = t.getParticipants().stream().filter(p -> p.getName().equals("P1")).findFirst().orElseThrow();
         assertEquals(0, p1.getMatchesWon());
 
         t.start();
@@ -420,21 +420,21 @@ class TournamentTest {
     void readingThePhaseListDoesNotDisturbAnIterationAlreadyRunningOverIt() {
         Tournament t = Tournament.create("Cup", PhaseType.GROUP, PhaseType.SINGLE_ELIMINATION);
         int seen = 0;
-        for (IPhase p : t.getPhases()) { t.getPhases(); assertNotNull(p); seen++; }
+        for (Phase p : t.getPhases()) { t.getPhases(); assertNotNull(p); seen++; }
         assertEquals(2, seen);
-        assertEquals(List.of(0, 1), t.getPhases().stream().map(IPhase::getOrderIndex).toList()); // still in play order
+        assertEquals(List.of(0, 1), t.getPhases().stream().map(Phase::getOrderIndex).toList()); // still in play order
     }
 
     @Test
     void readingTheGameListDoesNotDisturbAnIterationAlreadyRunningOverIt() {
         Tournament t = open("Cup", PhaseType.SINGLE_ELIMINATION, 4);
         t.start();
-        IMatch m = t.getPlayableMatches().getFirst();
+        Match m = t.getPlayableMatches().getFirst();
         m.addGame(3, 1);
         m.addGame(1, 3);
         int seen = 0;
-        for (IMatchGame g : m.getGames()) { m.getGames(); assertNotNull(g); seen++; }
+        for (MatchGame g : m.getGames()) { m.getGames(); assertNotNull(g); seen++; }
         assertEquals(2, seen);
-        assertEquals(List.of(1, 2), m.getGames().stream().map(IMatchGame::getGameNumber).toList());
+        assertEquals(List.of(1, 2), m.getGames().stream().map(MatchGame::getGameNumber).toList());
     }
 }

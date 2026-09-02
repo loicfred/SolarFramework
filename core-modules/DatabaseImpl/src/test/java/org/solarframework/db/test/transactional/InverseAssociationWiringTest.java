@@ -4,12 +4,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.solarframework.db.spring.DatabaseService;
 import org.solarframework.db.spring.JpaSourceRegistrar;
-import org.solarframework.db.test.Database_Main;
 import org.solarframework.db.test.SolarH2Test;
 import org.solarframework.db.test.obj.Order;
 import org.solarframework.db.test.obj.User;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.transaction.support.TransactionTemplate;
 

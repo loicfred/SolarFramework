@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIf;
+import org.solarframework.db.Database_Main;
 import org.solarframework.db.test.obj.User;
 import org.solarframework.db.spring.SolarRegistryListener;
 import org.springframework.boot.test.context.SpringBootTest;

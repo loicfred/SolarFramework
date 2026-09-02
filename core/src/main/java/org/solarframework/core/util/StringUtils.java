@@ -125,6 +125,58 @@ public class StringUtils {
         if (str == null || str.isEmpty()) return str;
         return Character.toUpperCase(str.charAt(0)) + str.substring(1);
     }
+    public static String decapitalize(String str) {
+        if (str == null || str.isEmpty()) return str;
+        return Character.toLowerCase(str.charAt(0)) + str.substring(1);
+    }
+
+    /** A programmer's name as a person reads it: phoneNumber -> "Phone number", DateOfBirth -> "Date of birth". */
+    public static String readable(String name) {
+        if (name == null || name.isBlank()) return name;
+        return capitalize(name.replaceAll("([a-z0-9])([A-Z])", "$1 $2").replace('_', ' ').trim().toLowerCase());
+    }
+
+    /** English plural of a single word: city -> cities, box -> boxes, invoice -> invoices. */
+    public static String plural(String str) {
+        if (str == null || str.isEmpty()) return str;
+        if (str.endsWith("y")) return str.substring(0, str.length() - 1) + "ies";
+        return str + (str.endsWith("s") || str.endsWith("x") ? "es" : "s");
+    }
+
+    /** A count with its word, pluralized as needed: (1, "message") -> "1 message", (2, "message") -> "2 messages". */
+    public static String plural(int count, String str) {
+        return count + " " + (count == 1 ? str : plural(str));
+    }
+
+    /** Null, empty or whitespace only. */
+    public static boolean isBlank(String str) {
+        return str == null || str.isBlank();
+    }
+
+    /** Trim that treats null as empty, so callers can compare without null checks. */
+    public static String trimOrEmpty(String str) {
+        return str == null ? "" : str.trim();
+    }
+    /** Comparison key for user-typed names: trimmed and lower-cased. */
+    public static String trimLower(String str) {
+        return trimOrEmpty(str).toLowerCase();
+    }
+    /** Trim for a column that means "not given" by holding null: an empty box on a form must not be stored as an empty string, or every reader has to test for both. */
+    public static String trimToNull(String str) {
+        return isBlank(str) ? null : str.trim();
+    }
+
+    /** Lower-case, punctuation collapsed to single dashes and no dash at either end - what an HTML anchor or a URL segment needs from a title. */
+    public static String slug(String text) {
+        return text == null ? "" : text.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("(^-|-$)", "");
+    }
+
+    /** What follows the last separator, or the whole string when there is none - e.g. the simple name of a.b.C. */
+    public static String substringAfterLast(String text, String separator) {
+        if (text == null || separator == null || separator.isEmpty()) return text;
+        int lastIndex = text.lastIndexOf(separator);
+        return lastIndex == -1 ? text : text.substring(lastIndex + separator.length());
+    }
 
     public static String PlusMinusSign(double num) {
         if (num > 0) return "+";
@@ -316,13 +368,13 @@ public class StringUtils {
         if (objects == null || objects.isEmpty()) return null;
         List<T> M = new ArrayList<>(objects);
         M.sort(Comparator.comparingDouble((T obj) -> similarity(obj.toString(), string, true)).reversed());
-        return M.get(0);
+        return M.getFirst();
     }
     public static <T> T getMostSimilar(T[] objects, String item) {
         if (objects == null || objects.length == 0) return null;
         List<T> M = new ArrayList<>(Arrays.asList(objects));
         M.sort(Comparator.comparingDouble((T obj) -> similarity(obj.toString(), item, true)).reversed());
-        return M.get(0);
+        return M.getFirst();
     }
     public static <T> T getMostSimilar(List<T> objects, T item) {
         return getMostSimilar(objects, item.toString());

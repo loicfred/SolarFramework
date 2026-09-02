@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-@Component
 public class DatabaseUtils {
 
     /** Runs read-only work with a short-lived EntityManager bound to THIS service's data source. */

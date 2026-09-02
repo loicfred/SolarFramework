@@ -4,8 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import org.solarframework.db.api.IDBObjectService;
 import org.solarframework.db.api.IDatabaseService;
+import org.solarframework.db.api.Identified;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -30,6 +32,17 @@ public class DatabaseObject<T> {
             return clazz.getSimpleName().toLowerCase();
         });
     }
+    /**
+     * The column a field is stored in - its own name, unless {@code @Column(name = ...)} says otherwise. The same
+     * question {@link #getTableName} answers for a class, and it lives beside it for the same reason: insert, update,
+     * select, the row mapper and every screen that names a column all have to agree, and they can only be sure of
+     * that by asking one method rather than each carrying the rule.
+     */
+    public static String columnOf(Field field) {
+        Column column = field.getAnnotation(Column.class);
+        return column == null || column.name().isBlank() ? field.getName() : column.name();
+    }
+
     private static <A extends Annotation> A getAnnotationRecursive(Class<?> clazz, Class<A> annotationClass) {
         if (clazz == null || clazz == Object.class) return null;
         A annotation = clazz.getAnnotation(annotationClass);
@@ -123,6 +136,16 @@ public class DatabaseObject<T> {
         return getService().Delete();
     }
 
+    private static long lastId = 0;
+    /**
+     * The next identifier for a row created now. Reads as the moment of creation, like a plain epoch stamp, but steps
+     * forward when one was already handed out this millisecond - rows are routinely created in a loop, and a loop is
+     * far faster than the clock it would otherwise take its identity from.
+     */
+    public static synchronized long nextId() {
+        return lastId = Math.max(java.time.Instant.now().toEpochMilli(), lastId + 1);
+    }
+
 
     public static int UpsertAll(List<? extends DatabaseObject<?>> items) {
         if (items == null || items.isEmpty()) return 0;
@@ -212,11 +235,12 @@ public class DatabaseObject<T> {
         protected RECORD_OBJ() {}
     }
     @MappedSuperclass
-    public static class ID_OBJ<IDTYPE, T> extends DatabaseObject<T> {
+    public static class ID_OBJ<IDTYPE, T> extends DatabaseObject<T> implements org.solarframework.db.api.Identified<IDTYPE> {
         @Id
         @Column(name = "ID")
         public IDTYPE ID;
 
+        @Override
         public IDTYPE getID() {
             return ID;
         }
@@ -227,11 +251,12 @@ public class DatabaseObject<T> {
         protected ID_OBJ() {}
     }
     @MappedSuperclass
-    public static class ID_RECORD_OBJ<IDTYPE, T> extends RECORD_OBJ<T> {
+    public static class ID_RECORD_OBJ<IDTYPE, T> extends RECORD_OBJ<T> implements Identified<IDTYPE> {
         @Id
         @Column(name = "ID")
         public IDTYPE ID;
 
+        @Override
         public IDTYPE getID() {
             return ID;
         }

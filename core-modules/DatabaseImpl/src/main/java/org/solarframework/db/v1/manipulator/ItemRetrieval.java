@@ -88,7 +88,7 @@ public class ItemRetrieval {
     }
     public TableRow getFirst() {
         try {
-            return process(select + " FROM " + TableName + " " + where + " " + order + " " + offset + " LIMIT 1").get(0);
+            return process(select + " FROM " + TableName + " " + where + " " + order + " " + offset + " LIMIT 1").getFirst();
         } catch (Exception e) {
             if (!e.getMessage().contains("Index 0 out of bounds")) System.err.println(e.getMessage());
             return null;

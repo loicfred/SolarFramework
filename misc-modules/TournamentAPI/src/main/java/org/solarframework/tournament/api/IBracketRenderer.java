@@ -1,8 +1,8 @@
 package org.solarframework.tournament.api;
 
 import org.solarframework.tournament.api.dto.BracketTheme;
-import org.solarframework.tournament.obj.IPhase;
-import org.solarframework.tournament.obj.ITournament;
+import org.solarframework.tournament.obj.Phase;
+import org.solarframework.tournament.obj.Tournament;
 
 import java.io.File;
 import java.io.IOException;
@@ -16,24 +16,24 @@ import java.io.OutputStream;
  */
 public interface IBracketRenderer {
 
-    byte[] renderPng(IPhase phase, BracketTheme theme);
-    byte[] renderPng(IPhase phase);
+    byte[] renderPng(Phase phase, BracketTheme theme);
+    byte[] renderPng(Phase phase);
     /** Every phase of the tournament stacked into one image. */
-    byte[] renderPng(ITournament tournament, BracketTheme theme);
+    byte[] renderPng(Tournament tournament, BracketTheme theme);
 
-    void writePng(IPhase phase, BracketTheme theme, OutputStream out) throws IOException;
-    File writePng(IPhase phase, BracketTheme theme, File target) throws IOException;
+    void writePng(Phase phase, BracketTheme theme, OutputStream out) throws IOException;
+    File writePng(Phase phase, BracketTheme theme, File target) throws IOException;
 
-    String renderSvg(IPhase phase, BracketTheme theme);
-    String renderSvg(IPhase phase);
-    String renderSvg(ITournament tournament, BracketTheme theme);
+    String renderSvg(Phase phase, BracketTheme theme);
+    String renderSvg(Phase phase);
+    String renderSvg(Tournament tournament, BracketTheme theme);
 
-    File writeSvg(IPhase phase, BracketTheme theme, File target) throws IOException;
+    File writeSvg(Phase phase, BracketTheme theme, File target) throws IOException;
 
-    String renderHtml(IPhase phase, BracketTheme theme);
-    String renderHtml(IPhase phase);
-    String renderHtml(ITournament tournament, BracketTheme theme);
+    String renderHtml(Phase phase, BracketTheme theme);
+    String renderHtml(Phase phase);
+    String renderHtml(Tournament tournament, BracketTheme theme);
 
-    File writeHtml(IPhase phase, BracketTheme theme, File target) throws IOException;
-    File writeHtml(ITournament tournament, BracketTheme theme, File target) throws IOException;
+    File writeHtml(Phase phase, BracketTheme theme, File target) throws IOException;
+    File writeHtml(Tournament tournament, BracketTheme theme, File target) throws IOException;
 }

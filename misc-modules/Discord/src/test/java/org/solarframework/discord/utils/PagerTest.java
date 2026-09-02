@@ -49,17 +49,17 @@ class PagerTest {
     @Test
     void rowCarriesTheNeighbouringPages() {
         List<Button> B = row(3, true).getButtons();
-        assertEquals("pager/2", B.get(0).getCustomId());
+        assertEquals("pager/2", B.getFirst().getCustomId());
         assertEquals("pager/3", B.get(1).getCustomId());
         assertEquals("pager/4", B.get(2).getCustomId());
-        assertEquals(Pager.PREV, B.get(0).getLabel());
+        assertEquals(Pager.PREV, B.getFirst().getLabel());
         assertEquals("Page 3", B.get(1).getLabel());
         assertEquals(Pager.NEXT, B.get(2).getLabel());
     }
     @Test
     void rowDisablesTheArrowsAtTheBounds() {
-        assertTrue(row(1, true).getButtons().get(0).isDisabled());
-        assertFalse(row(2, true).getButtons().get(0).isDisabled());
+        assertTrue(row(1, true).getButtons().getFirst().isDisabled());
+        assertFalse(row(2, true).getButtons().getFirst().isDisabled());
         assertTrue(row(2, false).getButtons().get(2).isDisabled());
         assertFalse(row(2, true).getButtons().get(2).isDisabled());
     }

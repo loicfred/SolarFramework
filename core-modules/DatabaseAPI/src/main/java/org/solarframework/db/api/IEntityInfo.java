@@ -2,6 +2,7 @@ package org.solarframework.db.api;
 
 import jakarta.persistence.*;
 import org.solarframework.db.api.dto.TableStats;
+import org.solarframework.db.spring.DatabaseObject;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
@@ -38,8 +39,12 @@ public class IEntityInfo {
     public Set<FieldInfo> getFields() {
         return fields;
     }
+    /** Reads leave blobs behind by default, but a caller naming its own select list steps around that - so it needs these. */
+    public Set<String> getBinaryColumns() {
+        return fields.stream().filter(FieldInfo::isBinary).map(FieldInfo::getColumnName).collect(java.util.stream.Collectors.toSet());
+    }
     public Set<Relation> getRelations() {
-        return new HashSet<>(relations);
+        return relations;
     }
     public Class<?> getEntityClass() { return null;}
     public TableStats getTableStats() { return null;}
@@ -58,7 +63,9 @@ public class IEntityInfo {
             primaryKey = f.getAnnotation(Id.class) != null;
             unique = f.getAnnotation(Column.class) != null && f.getAnnotation(Column.class).unique();
             nullable = f.getAnnotation(Column.class) != null && f.getAnnotation(Column.class).nullable();
-            columnName = f.getAnnotation(Column.class) instanceof Column C ? C.name() : variableName;
+            // asked rather than repeated: @Column(nullable = false) with no name of its own reads as "" here, and as
+            // the field's name everywhere that builds SQL - one rule, so a dictionary entry cannot disagree with a query
+            columnName = DatabaseObject.columnOf(f);
         }
 
         public String getVariableName() {
@@ -69,6 +76,10 @@ public class IEntityInfo {
         }
         public String getType() {
             return type;
+        }
+        /** A byte[] column, which is how every file this platform stores is held. {@code [B} is what the JVM calls that type. */
+        public boolean isBinary() {
+            return "[B".equals(type);
         }
         public boolean isPrimaryKey() {
             return primaryKey;

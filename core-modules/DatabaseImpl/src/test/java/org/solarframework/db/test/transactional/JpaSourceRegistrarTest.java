@@ -5,11 +5,9 @@ import org.junit.jupiter.api.Test;
 import org.solarframework.db.spring.DatabaseService;
 import org.solarframework.db.spring.JpaSourceRegistrar;
 import org.solarframework.db.spring.TransactionResolver;
-import org.solarframework.db.test.Database_Main;
 import org.solarframework.db.test.SolarH2Test;
 import org.solarframework.db.test.obj.User;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ConfigurableApplicationContext;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,8 +30,8 @@ class JpaSourceRegistrarTest {
         assertTrue(beans.entityManagerFactory().isOpen());
         assertSame(beans, source.getJpaBeans(), "DatabaseService must hold onto the beans it was just given");
 
-        assertTrue(context.getBeanFactory().containsSingleton(JpaSourceRegistrar.beanNameOf(source) + "_emf"));
-        assertTrue(context.getBeanFactory().containsSingleton(JpaSourceRegistrar.beanNameOf(source) + "_txManager"));
+        assertTrue(context.getBeanFactory().containsSingleton(source.jpaBeanName() + "_emf"));
+        assertTrue(context.getBeanFactory().containsSingleton(source.jpaBeanName() + "_txManager"));
 
         try (EntityManager em = beans.entityManagerFactory().createEntityManager()) {
             em.getTransaction().begin();
@@ -51,8 +49,8 @@ class JpaSourceRegistrarTest {
     void unregisterClosesTheFactoryAndRemovesTheBeans() {
         DatabaseService source = (DatabaseService) SolarDBManager.getDefaultService();
         JpaSourceRegistrar.JpaSourceBeans beans = JpaSourceRegistrar.register(source, context);
-        String emfName = JpaSourceRegistrar.beanNameOf(source) + "_emf";
-        String txName = JpaSourceRegistrar.beanNameOf(source) + "_txManager";
+        String emfName = source.jpaBeanName() + "_emf";
+        String txName = source.jpaBeanName() + "_txManager";
 
         JpaSourceRegistrar.unregister(source, context);
 
@@ -72,11 +70,11 @@ class JpaSourceRegistrarTest {
         JpaSourceRegistrar.unregister(source, context); // start from a clean slate regardless of prior tests in this class
 
         assertFalse(TransactionResolver.isBound(source), "isBound must never itself trigger the lazy build - a source nothing uses should stay unregistered");
-        assertFalse(context.getBeanFactory().containsSingleton(JpaSourceRegistrar.beanNameOf(source) + "_emf"), "no EntityManagerFactory should exist yet");
+        assertFalse(context.getBeanFactory().containsSingleton(source.jpaBeanName() + "_emf"), "no EntityManagerFactory should exist yet");
 
         JpaSourceRegistrar.JpaSourceBeans beans = source.getJpaBeans(); // the one call that IS allowed to build it
 
         assertNotNull(beans);
-        assertTrue(context.getBeanFactory().containsSingleton(JpaSourceRegistrar.beanNameOf(source) + "_emf"), "getJpaBeans() must have built it on this call");
+        assertTrue(context.getBeanFactory().containsSingleton(source.jpaBeanName() + "_emf"), "getJpaBeans() must have built it on this call");
     }
 }

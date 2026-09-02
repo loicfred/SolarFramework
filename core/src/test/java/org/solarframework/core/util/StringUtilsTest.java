@@ -75,6 +75,79 @@ class StringUtilsTest {
     }
 
     @Test
+    void decapitalizeLowercasesFirstLetter() {
+        assertEquals("hello", StringUtils.decapitalize("Hello"));
+        assertEquals("jobVacancies", StringUtils.decapitalize("JobVacancies"));
+    }
+    @Test
+    void decapitalizeHandlesNullAndEmpty() {
+        assertNull(StringUtils.decapitalize(null));
+        assertEquals("", StringUtils.decapitalize(""));
+    }
+
+    @Test
+    void readableTurnsAFieldNameIntoASentence() {
+        assertEquals("Phone number", StringUtils.readable("phoneNumber"));
+        assertEquals("Date of birth", StringUtils.readable("DateOfBirth"));
+        assertEquals("Old value", StringUtils.readable("old_value"));
+        assertEquals("City", StringUtils.readable("city"));
+    }
+    @Test
+    void readableHandlesNullAndEmpty() {
+        assertNull(StringUtils.readable(null));
+        assertEquals("  ", StringUtils.readable("  "));
+    }
+
+    @Test
+    void pluralAppliesEnglishEndings() {
+        assertEquals("invoices", StringUtils.plural("invoice"));
+        assertEquals("cities", StringUtils.plural("city"));
+        assertEquals("boxes", StringUtils.plural("box"));
+        assertEquals("classes", StringUtils.plural("class"));
+    }
+    @Test
+    void pluralHandlesNullAndEmpty() {
+        assertNull(StringUtils.plural(null));
+        assertEquals("", StringUtils.plural(""));
+    }
+
+    @Test
+    void isBlankCoversNullEmptyAndWhitespace() {
+        assertTrue(StringUtils.isBlank(null));
+        assertTrue(StringUtils.isBlank("   "));
+        assertFalse(StringUtils.isBlank("a"));
+    }
+
+    @Test
+    void trimOrEmptyTreatsNullAsEmpty() {
+        assertEquals("", StringUtils.trimOrEmpty(null));
+        assertEquals("abc", StringUtils.trimOrEmpty("  abc  "));
+    }
+    @Test
+    void trimLowerTrimsAndLowercases() {
+        assertEquals("", StringUtils.trimLower(null));
+        assertEquals("jobvacancy", StringUtils.trimLower("  JobVacancy "));
+    }
+    @Test
+    void trimToNullTreatsAnEmptyBoxAsNothingGiven() {
+        assertNull(StringUtils.trimToNull(null));
+        assertNull(StringUtils.trimToNull(""));
+        assertNull(StringUtils.trimToNull("   "));
+        assertEquals("abc", StringUtils.trimToNull("  abc  "));
+    }
+
+    @Test
+    void substringAfterLastTakesTheTail() {
+        assertEquals("C", StringUtils.substringAfterLast("a.b.C", "."));
+        assertEquals("C", StringUtils.substringAfterLast("C", "."));
+    }
+    @Test
+    void substringAfterLastReturnsInputOnNullOrEmptySeparator() {
+        assertNull(StringUtils.substringAfterLast(null, "."));
+        assertEquals("a.b.C", StringUtils.substringAfterLast("a.b.C", ""));
+    }
+
+    @Test
     void plusMinusSignOnlyForPositiveNumbers() {
         assertEquals("+", StringUtils.PlusMinusSign(5.0));
         assertEquals("", StringUtils.PlusMinusSign(0.0));
@@ -146,5 +219,17 @@ class StringUtilsTest {
     @Test
     void getMostSimilarReturnsNullForEmptyList() {
         assertNull(StringUtils.getMostSimilar(List.<Fruit>of(), "anything"));
+    }
+
+    @Test
+    void slugLowersAndCollapsesPunctuation() {
+        assertEquals("data-integration", StringUtils.slug("Data & Integration"));
+        assertEquals("getting-started", StringUtils.slug("  Getting Started!  "));
+        assertEquals("staff-account", StringUtils.slug("Staff_Account"));
+    }
+    @Test
+    void slugIsEmptyForNothingUsable() {
+        assertEquals("", StringUtils.slug(null));
+        assertEquals("", StringUtils.slug("---"));
     }
 }

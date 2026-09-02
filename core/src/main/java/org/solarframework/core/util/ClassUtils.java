@@ -17,6 +17,25 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class ClassUtils {
 
+    /** Valid Java identifier: what a class, field or package segment is allowed to be called. */
+    public static boolean isValidIdentifier(String name) {
+        return name != null && name.matches("[A-Za-z_][A-Za-z0-9_]*");
+    }
+
+    /** Dotted package name whose every segment is a valid identifier. */
+    public static boolean isValidPackage(String name) {
+        if (name == null || name.isBlank() || name.startsWith(".") || name.startsWith("_")) return false;
+        for (String segment : name.split("\\.", -1)) if (!isValidIdentifier(segment)) return false;
+        return true;
+    }
+
+    /** Whether the running program already holds this package, or one nested under it - used to refuse generating over it. */
+    public static boolean packageExists(String name) {
+        for (Package p : Package.getPackages())
+            if (p.getName().equals(name) || p.getName().startsWith(name + ".")) return true;
+        return false;
+    }
+
     /**
      * Makes a ClassLoader scannable by ClassGraph inside a Spring Boot executable jar.
      * <p>Boot 3.2+ hands out its classpath as {@code jar:nested:/app.jar/!BOOT-INF/lib/x.jar!/} URLs; ClassGraph has no

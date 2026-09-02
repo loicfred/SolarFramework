@@ -47,7 +47,7 @@ public record DatabaseManager(DatabaseType type, String url, String user, String
 
     public long countRows(String tablename) {
         try {
-            return Long.parseLong(processQuery("SELECT COUNT(*) AS total_rows FROM " + tablename.toLowerCase()).get(0).QP.get(0).getValue().toString());
+            return Long.parseLong(processQuery("SELECT COUNT(*) AS total_rows FROM " + tablename.toLowerCase()).getFirst().QP.getFirst().getValue().toString());
         } catch (Exception ignored) {
             return 0;
         }
@@ -55,14 +55,14 @@ public record DatabaseManager(DatabaseType type, String url, String user, String
     public long countRows(String tablename, String whereQuery, Object... o) {
         try {
             whereQuery = "WHERE " + (whereQuery.toLowerCase().startsWith("where ") ? whereQuery.substring(6) : whereQuery);
-            return Long.parseLong(processQuery("SELECT COUNT(*) AS total_rows FROM " + tablename.toLowerCase() + " " + whereQuery, o).get(0).QP.get(0).getValue().toString());
+            return Long.parseLong(processQuery("SELECT COUNT(*) AS total_rows FROM " + tablename.toLowerCase() + " " + whereQuery, o).getFirst().QP.getFirst().getValue().toString());
         } catch (Exception ignored) {
             return 0;
         }
     }
     public <T> long countRows(Class<T> tablename) {
         try {
-            return (long) processQuery("SELECT COUNT(*) AS total_rows FROM " + tablename.getSimpleName().toLowerCase()).get(0).QP.get(0).getValue();
+            return (long) processQuery("SELECT COUNT(*) AS total_rows FROM " + tablename.getSimpleName().toLowerCase()).getFirst().QP.getFirst().getValue();
         } catch (Exception ignored) {
             return 0;
         }
@@ -70,7 +70,7 @@ public record DatabaseManager(DatabaseType type, String url, String user, String
     public <T> long countRows(Class<T> tablename, String whereQuery, Object... o) {
         try {
             whereQuery = "WHERE " + (whereQuery.toLowerCase().startsWith("where ") ? whereQuery.substring(6) : whereQuery);
-            return (long) processQuery("SELECT COUNT(*) AS total_rows FROM " + tablename.getSimpleName().toLowerCase() + " " + whereQuery, o).get(0).QP.get(0).getValue();
+            return (long) processQuery("SELECT COUNT(*) AS total_rows FROM " + tablename.getSimpleName().toLowerCase() + " " + whereQuery, o).getFirst().QP.getFirst().getValue();
         } catch (Exception ignored) {
             return 0;
         }

@@ -22,6 +22,32 @@ import static org.solarframework.core.util.OtherUtils.getHexValue;
 
 public class ImageUtils {
 
+    public static void removeWhiteBackground(String inputFilePath, String outputFilePath) throws IOException {
+        removeWhiteBackground(inputFilePath, outputFilePath, 50);
+    }
+    public static void removeWhiteBackground(String inputFilePath, String outputFilePath, int tolerance) throws IOException {
+        BufferedImage img = ImageUtils.replaceAllMatchingColor(
+                new File(inputFilePath),
+                Color.decode("#FFFFFF"),
+                new Color(255, 255, 255, 0),
+                tolerance
+        );
+        ImageIO.write(img, "png", new File(outputFilePath));
+    }
+
+    public static void removeBlackBackground(String inputFilePath, String outputFilePath) throws IOException {
+        removeBlackBackground(inputFilePath, outputFilePath, 50);
+    }
+    public static void removeBlackBackground(String inputFilePath, String outputFilePath, int tolerance) throws IOException {
+        BufferedImage img = ImageUtils.replaceAllMatchingColor(
+                new File(inputFilePath),
+                Color.decode("#000000"),
+                new Color(0, 0, 0, 0),
+                tolerance
+        );
+        ImageIO.write(img, "png", new File(outputFilePath));
+    }
+
     public static BufferedImage roundImageCorners(BufferedImage img, int radius) {
         BufferedImage roundedImage = new BufferedImage(img.getWidth(), img.getHeight(), BufferedImage.TRANSLUCENT);
         Graphics2D g2d = roundedImage.createGraphics();
@@ -119,7 +145,53 @@ public class ImageUtils {
         return result;
     }
 
+    public static BufferedImage recolorImage(File input, Color color) throws IOException {
+        return recolorImage(ImageIO.read(input), color);
+    }
+    public static BufferedImage recolorImage(String url, Color color) throws IOException {
+        return recolorImage(ImageIO.read(URI.create(url).toURL()), color);
+    }
+    public static BufferedImage recolorImage(InputStream image, Color color) throws IOException {
+        return recolorImage(ImageIO.read(image), color);
+    }
+    public static BufferedImage recolorImage(byte[] bytes, Color color) throws IOException {
+        try (InputStream is = new ByteArrayInputStream(bytes)) {
+            return recolorImage(ImageIO.read(is), color);
+        }
+    }
+    public static BufferedImage recolorImage(BufferedImage image, Color color) throws IOException {
+        if (image == null) throw new IOException("Invalid image.");
 
+        int width = image.getWidth();
+        int height = image.getHeight();
+
+        int targetR = color.getRed();
+        int targetG = color.getGreen();
+        int targetB = color.getBlue();
+
+        BufferedImage result = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                int pixel = image.getRGB(x, y);
+
+                int a = (pixel >> 24) & 0xff;
+                int r = (pixel >> 16) & 0xff;
+                int g = (pixel >> 8) & 0xff;
+                int b = pixel & 0xff;
+
+                int brightness = (int) (0.299 * r + 0.587 * g + 0.114 * b);
+
+                r = targetR * brightness / 255;
+                g = targetG * brightness / 255;
+                b = targetB * brightness / 255;
+
+                result.setRGB(x, y, (a << 24) | (r << 16) | (g << 8) | b);
+            }
+        }
+
+        return result;
+    }
 
     public static BufferedImage reducePixelColor(File input, Color rgbRemove, boolean isZeroTransparent) throws IOException {
         return reducePixelColor(ImageIO.read(input), rgbRemove, isZeroTransparent);

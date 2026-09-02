@@ -7,6 +7,7 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCache;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.cache.support.SimpleCacheManager;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -18,7 +19,15 @@ import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 /**
- * {@code @EnableTransactionManagement} is spelled out explicitly rather than left to Spring Boot's own
+ * The Spring way in, for a host that wants one.
+ * <p>{@link DatabaseManager} and {@link DatabaseService} are deliberately plain objects with no stereotype of their
+ * own, because the stack also has to run where there is no application context at all - inside a plugin, or a plain
+ * {@code main}. This class is the other half: a host that component-scans this package gets the default source and
+ * the manager as beans, seeded from {@code spring.datasource.*}, without doing anything else. What it adds over the
+ * plain path is the two things only a context can give - {@code @Cacheable}/{@code @Transactional} interception, and
+ * the per-source JPA beans {@link JpaSourceRegistrar} registers so a bound transaction can be joined.
+ *
+ * <p>{@code @EnableTransactionManagement} is spelled out explicitly rather than left to Spring Boot's own
  * TransactionAutoConfiguration: Boot only builds that infrastructure when a TransactionManager bean already
  * exists at context-refresh time ({@code @ConditionalOnBean(TransactionManager.class)}), but every
  * TransactionManager this framework registers is built lazily, on first use, by JpaSourceRegistrar - long
@@ -32,13 +41,30 @@ import java.util.concurrent.TimeUnit;
 public class DatabaseConfig {
     protected static String defaultConnectionString;
 
+    /** The default source, seeded from {@code spring.datasource.*} - the {@code @Value} fields on {@link DatabaseService} are injected into it as they were when it was a {@code @Service}, and a plain application sets the same values through the setters instead. */
+    @Bean
+    public DatabaseService solarDefaultDataSource() {
+        return new DatabaseService(databaseCacheManager());
+    }
+
+    @Bean
+    public DatabaseManager solarDBManager(DatabaseService solarDefaultDataSource, ConfigurableApplicationContext context) {
+        return new DatabaseManager(databaseCacheManager(), solarDefaultDataSource, context);
+    }
+
     @Bean("databaseCacheManager")
     public CacheManager databaseCacheManager() {
+        return databaseCaches();
+    }
+
+    /** Built here rather than in a bean method so the plain path gets the same three caches: {@link DatabaseManager}'s no-context constructor calls this, since a manual {@code cache.get}/{@code put} works with no application context and only the {@code @Cacheable} annotations need one. A fresh set per call - two managers must never share cached rows. */
+    public static CacheManager databaseCaches() {
         SimpleCacheManager cacheManager = new SimpleCacheManager();
         CaffeineCache db1 = new CaffeineCache("DBObject", Caffeine.newBuilder().expireAfterWrite(1, TimeUnit.HOURS).maximumWeight(50_000).weigher(DatabaseConfig::rowsOf).softValues().scheduler(Scheduler.systemScheduler()).build());
         CaffeineCache db2 = new CaffeineCache("DBRow", Caffeine.newBuilder().expireAfterWrite(5, TimeUnit.MINUTES).maximumWeight(20_000).weigher(DatabaseConfig::rowsOf).softValues().scheduler(Scheduler.systemScheduler()).build());
         CaffeineCache db3 = new CaffeineCache("DBData", Caffeine.newBuilder().expireAfterWrite(10, TimeUnit.MINUTES).maximumSize(500).build());
         cacheManager.setCaches(List.of(db1, db2, db3));
+        cacheManager.afterPropertiesSet(); // no container to call it on the plain path; a second call from the container is a harmless re-init
         return cacheManager;
     }
 

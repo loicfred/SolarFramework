@@ -81,7 +81,7 @@ public class ItemCreator {
                     for (int i = 0; i < F.size(); i++)
                         stmt.setObject(i + 1, F.get(i).get(obj));
                 } catch (Exception ignored) {}
-                return transferResultToRow(new ArrayList<>(), stmt).get(0);
+                return transferResultToRow(new ArrayList<>(), stmt).getFirst();
             }
         } catch (Exception e) {
             System.err.println(e.getMessage());

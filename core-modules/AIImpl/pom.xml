@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.solarframework.mu</groupId>
+        <artifactId>SolarFramework</artifactId>
+        <version>1.0</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>AIImpl</artifactId>
+
+    <properties>
+        <spring-ai.version>2.0.0-M2</spring-ai.version>
+    </properties>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
+            <artifactId>AIAPI</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
+            <artifactId>core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
+            <artifactId>JSON</artifactId>
+        </dependency>
+
+        <!-- Persistence is a wiring choice: a host that never sets a store pulls in no database code. -->
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
+            <artifactId>DatabaseAPI</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- The model, not the starter. The stack has to run with no application context at all - inside a
+             plugin - so the autoconfiguration the starter exists to contribute cannot be relied on, and every
+             jar it drags in would have to be shaded into whichever plugin carries this module. A Spring host
+             gets its beans from AIConfig instead. -->
+        <dependency>
+            <groupId>org.springframework.ai</groupId>
+            <artifactId>spring-ai-openai</artifactId>
+        </dependency>
+
+        <!-- AIConfig's own: optional, so a plugin carrying this module does not have to bring them along
+             for a class it never loads, while a Spring host that scans the package gets the caches. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-cache</artifactId>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Test-only: what AI_SpringMain needs to actually boot as an application, to smoke-test the
+             Spring path in AIConfig. Main code never depends on the full starter - a plugin carrying
+             this module reaches AIManager and AIService directly, with no application context at all. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

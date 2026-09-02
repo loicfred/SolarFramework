@@ -13,13 +13,13 @@ public class Constants {
     
     public static ZoneId ProgramZoneId = ZoneId.of("Europe/Paris");
 
-    public static void main(String[] args) throws IOException {
+    static void main(String[] args) throws IOException {
+        //removeBlackBackground("D:/blue.png", "D:/blue2.png", 200);
 
-        BufferedImage img2 = ImageUtils.replaceAllMatchingColor(
-                new File("D:/Texture.png"),
-                Color.decode("#000000"),
-                new Color(255,255,255, 255), 50
+        BufferedImage img = ImageUtils.recolorImage(
+                new File("D:/blue.png"),
+                Color.decode("#FF00FF")
         );
-        ImageIO.write(img2, "png", new File("D:/Texture2.png"));
+        ImageIO.write(img, "png", new File("D:/blue2.png"));
     }
 }

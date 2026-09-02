@@ -5,40 +5,46 @@ It contains pre-made Spring components, beans as well as plenty of utility featu
 
 
 # 1. AI Utilities
-An AI dependency that provides a simple interface to interact with the LM Studio API and make chatbots.  
-It makes use of OpenAI Spring dependency.  
+`AIAPI` holds the interfaces and the conversation loop, `AIImpl` the Spring AI backend — add both.
+An `IAIService` is one endpoint and one model; a `Chatbot` is an agent using one; a `Conversation`
+is a transcript plus the loop that adds to it. Tools are declared with `@AITool`, so a toolbox needs
+no Spring AI on its classpath.
 
 ## 1.1. Getting Started
-The following example shows how to use the AI service.
-- aiService.prompt() – Prompt the AI to respond to a message.
-- aiService.chooseBetween() – Choose between multiple options.
-- aiService.startConversation() – Start a conversation with the AI.
+See [docs/AI.md](docs/AI.md) for the full tutorial.
+- DefaultAIService – the endpoint and model. It does not talk: `createChatbot()…build()` gives you something that does.
+- bot.prompt() / chooseBetween() / stream() – one-turn conversations, tools and all.
+- bot.startConversation() – a transcript that keeps going, one per user.
+- conversation.send() – One turn that answers. `run()` is the same loop, reported step by step.
 ```java
-import static org.solarframework.ai.spring.AIService.aiService;
+import static org.solarframework.ai.spring.AIRegistry.DefaultAIService;
 
 @SpringBootApplication
 public class Main {
     static void main(String[] args) {
         SpringApplication.run(Main.class, args);
 
-        List<String> outputs = aiService.chooseBetween("Which of these fruits are red?", List.of("Apple", "Cherry", "Banana", "Orange"));
-        System.out.println(outputs); // [Apple,Cherry]
+        Chatbot quick = DefaultAIService.createChatbot().build(); // a plain bot on that endpoint, reusable
 
-        String output = aiService.prompt("Hi, how are you?");
-        System.out.println(output); // Hi, how can I help you today?
+        List<String> outputs = quick.chooseBetween("Which of these fruits are red?", List.of("Apple", "Cherry", "Banana", "Orange"));
+        System.out.println(outputs); // [Apple, Cherry]
 
-        output = aiService.prompt("What is the current time?", new Toolbox());
-        System.out.println(output); // [The current time from Toolbox]
+        System.out.println(quick.prompt("Hi, how are you?")); // Hi, how can I help you today?
+        System.out.println(quick.prompt("What is the current time?", new Toolbox()));
 
-        SystemMessage instruction = SystemMessage.builder().text("You are an AI assistent designed answer the time related questions of the authAccountUser.").build();
-        Conversation c = aiService.startConversation("Loïc", instruction, new Toolbox());
-        System.out.println(c.talk("What is the current time?")); // The current time is XXX
-        System.out.println(c.talk("Thank you!"));
+        Chatbot bot = DefaultAIService.createChatbot().name("timekeeper")
+                .systemPrompt("You are an assistant that answers time-related questions.")
+                .tools(new Toolbox()).maxSteps(5).build();
+
+        Conversation c = bot.startConversation("conversation-1", "Loïc");
+        System.out.println(c.send("What is the current time?")); // The current time is XXX
+        System.out.println(c.send("Thank you!"));
+        c.save(); // only now does it touch the database
     }
 
     public static class Toolbox {
-        @Tool(description = "Returns the current time.")
-        public String getCurrentTime(String name) {
+        @AITool(description = "Returns the current date and time.")
+        public String getCurrentTime() {
             return LocalDateTime.now().toString();
         }
     }
@@ -285,11 +291,17 @@ Add this Maven dependency to your Spring project:
   <version>1.0</version>
 </parent>
 ```
-Available Modules:  
+Available Modules — `*API` holds the interfaces, `*Impl` the implementation, so add both of a pair:
 ```xml
-<artifactId>AI</artifactId>
-<artifactId>Database</artifactId>
-<artifactId>Discord</artifactId>
-<artifactId>WAMP</artifactId>
-<artifactId>Excel</artifactId>
+<artifactId>core</artifactId>
+<artifactId>DatabaseAPI</artifactId>      <artifactId>DatabaseImpl</artifactId>
+<artifactId>AIAPI</artifactId>            <artifactId>AIImpl</artifactId>
+<artifactId>SearchAPI</artifactId>        <artifactId>SearchImpl</artifactId>
+<artifactId>TournamentAPI</artifactId>    <artifactId>TournamentImpl</artifactId>
+<artifactId>ProxyServerAPI</artifactId>   <artifactId>NettyProxyServerImpl</artifactId>
+<artifactId>SpringProxyServerImplV1</artifactId>  <artifactId>SpringProxyServerImplV2</artifactId>
+<artifactId>Excel</artifactId>            <artifactId>JSON</artifactId>
+<artifactId>Plugin</artifactId>           <artifactId>Language</artifactId>
+<artifactId>WebUtils</artifactId>         <artifactId>DatabaseEditor</artifactId>
+<artifactId>Discord</artifactId>          <artifactId>CertificateGenerator</artifactId>
 ```

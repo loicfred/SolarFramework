@@ -93,4 +93,29 @@ class ClassUtilsTest {
         assertEquals(42, target.childField);
         assertEquals("copied", target.markedField);
     }
+
+    @Test
+    void isValidIdentifierFollowsJavaNamingRules() {
+        assertTrue(ClassUtils.isValidIdentifier("MauCareers_Sector"));
+        assertTrue(ClassUtils.isValidIdentifier("_x9"));
+        assertFalse(ClassUtils.isValidIdentifier("9lives"));
+        assertFalse(ClassUtils.isValidIdentifier("has space"));
+        assertFalse(ClassUtils.isValidIdentifier(null));
+    }
+
+    @Test
+    void isValidPackageChecksEverySegment() {
+        assertTrue(ClassUtils.isValidPackage("org.maucareers.entities"));
+        assertFalse(ClassUtils.isValidPackage("org..entities"));
+        assertFalse(ClassUtils.isValidPackage(".org"));
+        assertFalse(ClassUtils.isValidPackage(""));
+        assertFalse(ClassUtils.isValidPackage(null));
+    }
+
+    @Test
+    void packageExistsFindsLoadedPackagesAndTheirParents() {
+        assertTrue(ClassUtils.packageExists("org.solarframework.core.util"));
+        assertTrue(ClassUtils.packageExists("org.solarframework"));
+        assertFalse(ClassUtils.packageExists("com.nowhere.at.all"));
+    }
 }

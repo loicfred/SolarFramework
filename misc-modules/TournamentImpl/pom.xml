@@ -38,9 +38,26 @@
             <artifactId>hibernate-core</artifactId>
             <scope>provided</scope>
         </dependency>
+        <!-- TournamentConfig's own: optional, so a plugin carrying this module does not have to bring Spring
+             along for a class it never loads, while a Spring host that scans the package gets the renderer. -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- Test-only: what Tournament_Main needs to actually boot as an application, to smoke-test the Spring
+             path in TournamentConfig. Main code never depends on the starter - Tournament_PlainMain is the
+             other half, with no application context at all. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

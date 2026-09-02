@@ -39,7 +39,14 @@ import static org.solarframework.db.spring.DatabaseObject.*;
 import static org.solarframework.db.spring.DatabaseRegistry.DefaultDBService;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
 
-@Service
+/**
+ * {@link IDatabaseManager} over one or more {@link DatabaseService} sources.
+ * <p>Not a Spring bean: the stack has to run where there is no application context at all, so
+ * {@code new DatabaseManager(source)} is the whole of the setup for a plain application, and
+ * {@link DatabaseConfig} is what a Spring host scans to get the same object as a bean. With no context
+ * there are no per-source JPA beans, so {@code @Transactional} can never bind and every read and write
+ * takes the SessionFactory path - which is the ordinary path anyway.
+ */
 public class DatabaseManager implements IDatabaseManager {
     private static final Logger log = LoggerFactory.getLogger(DatabaseManager.class);
 
@@ -56,10 +63,15 @@ public class DatabaseManager implements IDatabaseManager {
     @JsonIgnore
     private transient final ConfigurableApplicationContext context;
 
-    protected DatabaseManager(@Qualifier("databaseCacheManager") CacheManager dbCacheManager, DatabaseService defaultService, ConfigurableApplicationContext context) {
+    /** The no-context way in: name a source, hand it over, and the registry statics are filled exactly as they are under Spring. */
+    public DatabaseManager(DatabaseService defaultService) {
+        this(DatabaseConfig.databaseCaches(), defaultService, null);
+    }
+    public DatabaseManager(CacheManager dbCacheManager, DatabaseService defaultService, ConfigurableApplicationContext context) {
         defaultConnectionString = defaultService.getConnectionString();
         this.dbCacheManager = dbCacheManager;
         this.context = context;
+        defaultService.setDbCacheManager(dbCacheManager);
         defaultService.setManager(this);
         addSource(defaultService);
         DefaultDBService = defaultService;
@@ -67,7 +79,7 @@ public class DatabaseManager implements IDatabaseManager {
         reload();
     }
 
-    /** Used by DatabaseService#getJpaBeans to lazily build its own JPA beans on first real use. */
+    /** Used by DatabaseService#getJpaBeans to lazily build its own JPA beans on first real use. Null when the manager was built with no application context, which is what makes that build skippable. */
     ConfigurableApplicationContext getContext() {
         return context;
     }
@@ -211,7 +223,7 @@ public class DatabaseManager implements IDatabaseManager {
     }
     public IDatabaseService getServiceByEntity(String className) {
         if (IsSingleSource()) return getDefaultService();
-        return getSources().stream().filter(ds -> ds.getEntities().stream().anyMatch(e -> e.getClassName().equals(className))).findFirst().orElse(null);
+        return getSources().stream().filter(ds -> ds.getEntities().stream().anyMatch(e -> e.getClassName().equals(className))).findFirst().orElse(DefaultDBService);
     }
     public IDatabaseService getServiceByEntity(Class<?> entity) {
         return getServiceByEntity(entity.getName());
@@ -320,19 +332,6 @@ public class DatabaseManager implements IDatabaseManager {
      */
     private final Map<Class<?>, Set<String>> AffectedBy = new ConcurrentHashMap<>();
 
-    /**
-     * Evicts by key. {@link DatabaseService#cacheKey} puts the owning entity class in the second segment, so
-     * what a write invalidates is decidable without touching a single cached value.
-     *
-     * <p>Two kinds of entry are dropped on <i>any</i> write, because neither can be attributed to a table.
-     * One is an entry with no owner - a scalar, a Row, a non-entity DTO, or a statement that reaches past its
-     * own table, which {@link DatabaseService#staysOnOneTable} decides at key-build time and is what makes
-     * attribution sound for everything else. The other is an entry that cached an <b>empty</b> result, kept as
-     * a second line rather than a mechanism: an empty list names no row, so if the shape test ever calls a
-     * statement single-table when it is not, the entry most likely to be silently wrong - the one waiting for
-     * a row to start matching - is dropped anyway. It costs nothing, since the pass already walks every entry
-     * and this is one {@code isEmpty()} on a value it is already holding.
-     */
     public void resetCacheForClass(Class<?> dbClazz, boolean items, boolean lists) {
         if (!items && !lists) return;
         resetCache("DBRow"); // every Row entry is ownerless, so "drop the ones a write affects" is the whole cache - clear it outright rather than walk it
@@ -435,6 +434,7 @@ public class DatabaseManager implements IDatabaseManager {
 
 
     public void LoadFromFile(String path) {
+        log.info("Opening database source file: {}", path);
         DataSourceFile db = DataSourceFile.ReadFrom(path);
         List<DatabaseService> readSources = db.getSources();
         if (readSources.isEmpty()) {
@@ -459,6 +459,7 @@ public class DatabaseManager implements IDatabaseManager {
 
         Cooldown = Instant.now().minusSeconds(1);
         reload();
+        log.info("Loaded database source file: {}", path);
     }
     public void SaveAsFile(String path) {
         if (getSources().isEmpty()) {

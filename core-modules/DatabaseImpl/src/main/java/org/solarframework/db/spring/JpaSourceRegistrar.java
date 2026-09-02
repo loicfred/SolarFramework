@@ -30,7 +30,7 @@ public final class JpaSourceRegistrar {
         // field is null, which would recurse forever on exactly the call this check exists to short-circuit.
         if (source.jpaBeans != null) return source.jpaBeans;
         SpringPersistenceUnitInfo mutableInfo = new SpringPersistenceUnitInfo(source.getClass().getClassLoader());
-        mutableInfo.setPersistenceUnitName(beanNameOf(source));
+        mutableInfo.setPersistenceUnitName(source.jpaBeanName());
         mutableInfo.setPersistenceProviderClassName(HibernatePersistenceProvider.class.getName());
         mutableInfo.setNonJtaDataSource(source.getDataSource());
         for (Class<?> c : source.getEntitiesClasses()) mutableInfo.addManagedClassName(c.getName());
@@ -64,8 +64,8 @@ public final class JpaSourceRegistrar {
         // no access to the ApplicationContext to also drop the stale bean registration - clean up here
         // defensively so a re-register after reload() doesn't collide with the orphaned singleton.
         var beanFactory = (org.springframework.beans.factory.support.DefaultListableBeanFactory) context.getBeanFactory();
-        String emfName = beanNameOf(source) + "_emf";
-        String txName = beanNameOf(source) + "_txManager";
+        String emfName = source.jpaBeanName() + "_emf";
+        String txName = source.jpaBeanName() + "_txManager";
         if (beanFactory.containsSingleton(emfName)) beanFactory.destroySingleton(emfName);
         if (beanFactory.containsSingleton(txName)) beanFactory.destroySingleton(txName);
         beanFactory.registerSingleton(emfName, emf);
@@ -80,13 +80,9 @@ public final class JpaSourceRegistrar {
         JpaSourceBeans beans = source.jpaBeans; // raw field - nothing to tear down should never trigger a build just to check
         if (beans == null) return;
         var beanFactory = (org.springframework.beans.factory.support.DefaultListableBeanFactory) context.getBeanFactory();
-        beanFactory.destroySingleton(beanNameOf(source) + "_emf");
-        beanFactory.destroySingleton(beanNameOf(source) + "_txManager");
+        beanFactory.destroySingleton(source.jpaBeanName() + "_emf");
+        beanFactory.destroySingleton(source.jpaBeanName() + "_txManager");
         source.setJpaBeans(null);
         beans.entityManagerFactory().close();
-    }
-
-    public static String beanNameOf(DatabaseService source) {
-        return "solarJpa_" + source.getName().replaceAll("\\W+", "_");
     }
 }

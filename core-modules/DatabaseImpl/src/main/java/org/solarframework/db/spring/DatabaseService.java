@@ -60,7 +60,13 @@ import static org.solarframework.db.spring.DatabaseUtils.withEm;
 import static org.solarframework.db.spring.QueryTranslation.QueryCurrentDatabase;
 import static org.solarframework.db.spring.QueryTranslation.QueryDatabaseStats;
 
-@Service
+/**
+ * One data source: one connection string, one Hikari pool, one SessionFactory, and the entities registered against it.
+ * <p>Not a Spring bean. Under {@link DatabaseConfig} the default source gets its {@code @Value} fields injected from
+ * {@code spring.datasource.*}; every other source - and every source of an application with no context at all - is
+ * configured through the setters instead, which is what {@code DatabaseManager#makeNewSource} and {@code DataSourceFile}
+ * already do.
+ */
 @SuppressWarnings("all")
 public class DatabaseService implements IDatabaseService {
     private static Logger log = LoggerFactory.getLogger(DatabaseService.class);
@@ -100,11 +106,15 @@ public class DatabaseService implements IDatabaseService {
     @Value("${spring.datasource.hikari.keepalive-time:#{null}}") private Long keepaliveTime;
     @Value("${spring.datasource.hikari.leak-detection-threshold:#{null}}") private Long leakDetectionThreshold;
 
-    public DatabaseService(@Qualifier("databaseCacheManager") CacheManager dbCacheManager) {
-        this.dbCacheManager = dbCacheManager;
+    /** The caches are left for whichever manager takes this source to hand over - {@code DatabaseManager}'s constructor sets them on the default source, {@code makeNewSource} and {@code LoadFromFile} on every other. */
+    public DatabaseService() {
         setName("Database (Default)");
         // NOTE: @Value fields are injected AFTER the constructor runs; they are null here.
         // Configuration derived from them happens in init() below.
+    }
+    public DatabaseService(CacheManager dbCacheManager) {
+        this();
+        this.dbCacheManager = dbCacheManager;
     }
 
     public <T> IDBObjectService<T> makeObjectManager(DatabaseObject<T> dbobject) {
@@ -127,6 +137,10 @@ public class DatabaseService implements IDatabaseService {
 
     public String getName() {
         return name;
+    }
+    /** The Spring bean name this source's JPA infrastructure (EMF, tx manager) is registered under. */
+    public String jpaBeanName() {
+        return "solarJpa_" + name.replaceAll("\\W+", "_");
     }
     public String getUsername() {
         return username;
@@ -317,9 +331,13 @@ public class DatabaseService implements IDatabaseService {
      * opens a transaction against ever pays the Hibernate bootstrap cost. TransactionResolver deliberately
      * reads the raw {@code jpaBeans} field instead of calling this getter, so merely checking "is a
      * transaction bound right now" never itself triggers the build.
+     *
+     * <p>Stays null with no application context - the beans it would build are registered singletons, so there is
+     * nowhere to put them. Nothing breaks: TransactionResolver then always answers "not bound", and every read and
+     * write takes the SessionFactory path instead.
      */
     public synchronized JpaSourceRegistrar.JpaSourceBeans getJpaBeans() {
-        if (jpaBeans == null && manager instanceof DatabaseManager dm) JpaSourceRegistrar.register(this, dm.getContext());
+        if (jpaBeans == null && manager instanceof DatabaseManager dm && dm.getContext() != null) JpaSourceRegistrar.register(this, dm.getContext());
         return jpaBeans;
     }
     public void setJpaBeans(JpaSourceRegistrar.JpaSourceBeans jpaBeans) {
@@ -365,7 +383,7 @@ public class DatabaseService implements IDatabaseService {
     // ====== SHORT CUTS ======
 
     public <O> Optional<O> getSingleColumnOfTableById(String column, Class<O> item, Class<?> table, Object... id) {
-        return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + DBInstanceService.idFieldsOf(table).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND ")), id);
+        return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + DBInstanceService.idFieldsOf(table).stream().map(f -> DatabaseObject.columnOf(f) + " = ?").collect(Collectors.joining(" AND ")), id);
     }
     public <O> Optional<O> getSingleColumnOfTableWhere(String column, Class<O> item, Class<?> table, String where, Object... args) {
         return doQueryValueNoCache(item, "SELECT " + column + " FROM " + getTableName(table) + " WHERE " + where, args);
@@ -457,7 +475,7 @@ public class DatabaseService implements IDatabaseService {
         List<Field> lazy = DBInstanceService.lazyFieldsOf(clazz);
         List<String> columns = getTableStats(getTableName(clazz)).getColumnNames();
         if (columns.isEmpty()) return "*"; // table not created yet - nothing to enumerate, and not cached either
-        String select = Stream.concat(columns.stream().filter(c -> lazy.stream().noneMatch(f -> f.getName().equalsIgnoreCase(c))), lazy.stream().map(f -> "NULL AS " + f.getName())).collect(Collectors.joining(", "));
+        String select = Stream.concat(columns.stream().filter(c -> lazy.stream().noneMatch(f -> DatabaseObject.columnOf(f).equalsIgnoreCase(c))), lazy.stream().map(f -> "NULL AS " + DatabaseObject.columnOf(f))).collect(Collectors.joining(", "));
         LazySelects.put(clazz.getName(), select);
         return select;
     }
@@ -465,7 +483,7 @@ public class DatabaseService implements IDatabaseService {
 
     /** Bypasses the soft-delete filter on purpose - if the caller already has an ID, they get the row even if it was soft-deleted. */
     public <T> Optional<T> getById(String select, Class<T> clazz, Object... id) {
-        String where = DBInstanceService.idFieldsOf(clazz).stream().map(f -> f.getName() + " = ?").collect(Collectors.joining(" AND "));
+        String where = DBInstanceService.idFieldsOf(clazz).stream().map(f -> DatabaseObject.columnOf(f) + " = ?").collect(Collectors.joining(" AND "));
         return this.doQuery(clazz, "SELECT " + select + " FROM " + getTableName(clazz) + " WHERE " + where, id);
     }
     public <T> Optional<T> getById(Class<T> clazz, Object... id) {
@@ -585,12 +603,13 @@ public class DatabaseService implements IDatabaseService {
 
     private <T> T getCachedOrCompute(String cacheName, String cacheKey, Supplier<T> supplier) {
         Cache cache = dbCacheManager.getCache(cacheName);
+        String key = cacheKey + "-" + getConnectionString().hashCode();
         if (cache != null) {
-            Cache.ValueWrapper cached = cache.get(cacheKey);
+            Cache.ValueWrapper cached = cache.get(key);
             if (cached != null) return (T) cached.get();
         }
         T result = supplier.get();
-        if (cache != null && result != null && !(result instanceof Collection<?> c && c.size() > MAX_CACHED_ROWS)) cache.put(cacheKey, result);
+        if (cache != null && result != null && !(result instanceof Collection<?> c && c.size() > MAX_CACHED_ROWS)) cache.put(key, result);
         return result;
     }
 
@@ -606,7 +625,7 @@ public class DatabaseService implements IDatabaseService {
 
     public <T> Optional<T> doQueryNoCache(Class<T> clazz, String sql, Object... args) {
         List<T> results = runNativeQuery(clazz, sql, args, 1);
-        return results.isEmpty() ? Optional.empty() : Optional.ofNullable(results.get(0));
+        return results.isEmpty() ? Optional.empty() : Optional.ofNullable(results.getFirst());
     }
     public <T> List<T> doQueryAllNoCache(Class<T> clazz, String sql, Object... args) {
         return runNativeQuery(clazz, sql, args, -1);
@@ -634,7 +653,7 @@ public class DatabaseService implements IDatabaseService {
 
     public Optional<Row> doQueryNoCache(String sql, Object... args) {
         List<Row> rows = runNativeRowQuery(sql, args, 1);
-        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));
+        return rows.isEmpty() ? Optional.empty() : Optional.of(rows.getFirst());
     }
     public List<Row> doQueryAllNoCache(String sql, Object... args) {
         return runNativeRowQuery(sql, args, -1);
@@ -688,7 +707,7 @@ public class DatabaseService implements IDatabaseService {
     private static final Map<Class<?>, Class<?>> ConcreteEntities = new ConcurrentHashMap<>();
 
     /**
-     * Abstract @Entity roots (ITournament, IMatch...) cannot be the target of a native query: Hibernate skips the
+     * Abstract @Entity roots (Tournament, Match...) cannot be the target of a native query: Hibernate skips the
      * discriminator fetch only for leaf types, so on a root it looks for the @DiscriminatorFormula's label ('0') in
      * a result set that a native SELECT * never carries. Mapping to the single concrete subclass sidesteps it, and
      * the reflective Tuple path cannot instantiate an abstract class either.
@@ -771,7 +790,8 @@ public class DatabaseService implements IDatabaseService {
             T instance = ctor.newInstance();
             Map<String, Field> fields = new HashMap<>();
             for (Class<?> c = clazz; c != null && c != Object.class; c = c.getSuperclass()) {
-                for (Field f : c.getDeclaredFields()) fields.putIfAbsent(f.getName().toLowerCase(), f);
+                // keyed by the column each field owns, not by the field's own name: a result alias is a column name
+                for (Field f : c.getDeclaredFields()) fields.putIfAbsent(DatabaseObject.columnOf(f).toLowerCase(), f);
             }
             for (TupleElement<?> el : tuple.getElements()) {
                 if (el.getAlias() == null) continue;

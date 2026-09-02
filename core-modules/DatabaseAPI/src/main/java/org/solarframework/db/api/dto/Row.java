@@ -26,6 +26,15 @@ public class Row {
         return Optional.ofNullable(columns.get(fieldName));
     }
 
+    /**
+     * The value under this column in whatever case the driver answered with. MariaDB echoes a column as it was
+     * written and SQLite as it was declared, so a caller that asked for "Total" can be handed "total" - which is the
+     * row's own business to sort out rather than every caller's.
+     */
+    public Object valueOf(String column) {
+        return columns.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(column)).map(Map.Entry::getValue).findFirst().orElse(null);
+    }
+
     public Optional<String> getAsStringOptional(String fieldName) {
         Optional<Object> value = get(fieldName);
         if (value.isEmpty()) return Optional.empty();

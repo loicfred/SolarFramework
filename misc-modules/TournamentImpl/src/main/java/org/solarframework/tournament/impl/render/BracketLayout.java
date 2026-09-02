@@ -3,10 +3,10 @@ package org.solarframework.tournament.impl.render;
 import org.solarframework.tournament.api.BracketSide;
 import org.solarframework.tournament.api.MatchState;
 import org.solarframework.tournament.api.dto.BracketTheme;
-import org.solarframework.tournament.impl.seed.Brackets;
-import org.solarframework.tournament.obj.IMatch;
-import org.solarframework.tournament.obj.IPhase;
-import org.solarframework.tournament.obj.IStanding;
+import org.solarframework.tournament.util.Brackets;
+import org.solarframework.tournament.obj.Match;
+import org.solarframework.tournament.obj.Phase;
+import org.solarframework.tournament.obj.Standing;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -32,7 +32,7 @@ import java.util.Objects;
  */
 public class BracketLayout {
 
-    private final IPhase phase;
+    private final Phase phase;
     private final BracketTheme th;
     private final RenderModel model = new RenderModel();
     /** matchID to the (x, y) of its top-left corner. */
@@ -45,7 +45,7 @@ public class BracketLayout {
     /** The y this match was placed at after {@link #build()} - package-visible so layout invariants are testable. */
     Double placedY(Long matchID) { return matchY.get(matchID); }
 
-    public BracketLayout(IPhase phase, BracketTheme theme) {
+    public BracketLayout(Phase phase, BracketTheme theme) {
         this.phase = phase;
         this.th = theme == null ? BracketTheme.dark() : theme;
     }
@@ -76,11 +76,11 @@ public class BracketLayout {
     // ---- bracket ---------------------------------------------------------------------------------
 
     private void layoutBracket(double matchesTop) {
-        List<IMatch> winners = visible(phase.getMatches(BracketSide.WINNERS));
-        List<IMatch> losers = visible(phase.getMatches(BracketSide.LOSERS));
-        List<IMatch> thirdPlace = phase.getMatches(BracketSide.THIRD_PLACE);
-        IMatch grandFinal = phase.getMatches(BracketSide.GRAND_FINAL).stream().findFirst().orElse(null);
-        IMatch reset = phase.getMatches(BracketSide.GRAND_FINAL_RESET).stream().findFirst().orElse(null);
+        List<Match> winners = visible(phase.getMatches(BracketSide.WINNERS));
+        List<Match> losers = visible(phase.getMatches(BracketSide.LOSERS));
+        List<Match> thirdPlace = phase.getMatches(BracketSide.THIRD_PLACE);
+        Match grandFinal = phase.getMatches(BracketSide.GRAND_FINAL).stream().findFirst().orElse(null);
+        Match reset = phase.getMatches(BracketSide.GRAND_FINAL_RESET).stream().findFirst().orElse(null);
 
         // Round numbers keep counting from the full field so "Semifinals" / "Final" stay correct, but
         // columns are indexed off the rounds that actually survived, so a round of nothing but byes
@@ -90,7 +90,7 @@ public class BracketLayout {
         double afterWb = placeRounds(winners, matchesTop, th.getPadding());
 
         if (!thirdPlace.isEmpty()) {
-            IMatch tp = thirdPlace.getFirst();
+            Match tp = thirdPlace.getFirst();
             Double wbFinalY = lastY(winners, wbRounds);
             double under = wbFinalY == null ? afterWb + th.getMatchGap() : wbFinalY + th.matchPitch() + th.headerClearance();
             place(tp, columnX(th.getPadding(), Math.max(1, wbCols.size())), under);
@@ -121,7 +121,7 @@ public class BracketLayout {
             for (int c = 0; c < lbCols.size(); c++) model.text(columnX(th.getPadding(), c + 1), lbHeaderY, lbCols.get(c) == lbRounds ? "Losers Final" : "Losers Round " + lbCols.get(c), th.getHeaderFontSize(), th.getMutedTextColor(), "start", true);
         }
         drawConnectors();
-        for (IMatch m : phase.getMatches()) drawMatch(m);
+        for (Match m : phase.getMatches()) drawMatch(m);
         drawCaption(thirdPlace.isEmpty() ? null : thirdPlace.getFirst());
         drawCaption(grandFinal);
         drawCaption(reset);
@@ -135,7 +135,7 @@ public class BracketLayout {
      * bracket rather than as the match the winners final leads into. A reset (if the phase has one)
      * stacks directly below it, still inside the winners section.
      */
-    private void placeGrandFinal(IMatch grandFinal, IMatch reset, List<IMatch> winners, List<IMatch> losers, int wbRounds, int lbRounds, int gfColumn, double fallbackTop) {
+    private void placeGrandFinal(Match grandFinal, Match reset, List<Match> winners, List<Match> losers, int wbRounds, int lbRounds, int gfColumn, double fallbackTop) {
         if (grandFinal == null) return;
         double gfX = columnX(th.getPadding(), gfColumn);
         Double wbFinalY = lastY(winners, wbRounds), lbFinalY = lastY(losers, lbRounds);
@@ -149,19 +149,19 @@ public class BracketLayout {
      * matches that feed it, falling back to even spacing when a feeder is missing.
      * @return the y of the bottom of the block
      */
-    private double placeRounds(List<IMatch> matches, double top, double left) {
+    private double placeRounds(List<Match> matches, double top, double left) {
         if (matches.isEmpty()) return top;
-        Map<Integer, List<IMatch>> rounds = new LinkedHashMap<>();
-        for (IMatch m : matches) rounds.computeIfAbsent(m.getRound(), _ -> new ArrayList<>()).add(m);
+        Map<Integer, List<Match>> rounds = new LinkedHashMap<>();
+        for (Match m : matches) rounds.computeIfAbsent(m.getRound(), _ -> new ArrayList<>()).add(m);
         List<Integer> keys = new ArrayList<>(rounds.keySet());
         double bottom = top;
         for (int c = 0; c < keys.size(); c++) {
-            List<IMatch> round = rounds.get(keys.get(c));
-            round.sort(Comparator.comparingInt(IMatch::getPosition));
+            List<Match> round = rounds.get(keys.get(c));
+            round.sort(Comparator.comparingInt(Match::getPosition));
             double x = columnX(left, c + 1);
             double prev = top - th.matchPitch();
             for (int i = 0; i < round.size(); i++) {
-                IMatch m = round.get(i);
+                Match m = round.get(i);
                 double y = c == 0 ? top + i * th.matchPitch() : centerBetween(matches, m, top + i * th.matchPitch());
                 y = Math.max(y, prev + th.matchPitch()); // hidden byes can leave two matches wanting the same row
                 place(m, x, prev = y);
@@ -177,9 +177,9 @@ public class BracketLayout {
      * round also receives a dropped winners-bracket loser, but that feed must never pull the row
      * toward the (much higher up) winners bracket, or the whole losers side drifts out of its section.
      */
-    private double centerBetween(List<IMatch> pool, IMatch m, double fallback) {
+    private double centerBetween(List<Match> pool, Match m, double fallback) {
         List<Double> centers = new ArrayList<>();
-        for (IMatch x : pool) {
+        for (Match x : pool) {
             boolean feeds = Objects.equals(x.getNextMatchID(), m.getID()) || Objects.equals(x.getNextLoserMatchID(), m.getID());
             Double y = matchY.get(x.getID());
             if (feeds && y != null) centers.add(y + th.matchHeight() / 2.0);
@@ -191,7 +191,7 @@ public class BracketLayout {
 
     private double columnX(double left, int columnIndex) { return left + (columnIndex - 1) * th.roundPitch(); }
 
-    private void place(IMatch m, double x, double y) {
+    private void place(Match m, double x, double y) {
         matchX.put(m.getID(), x);
         matchY.put(m.getID(), y);
         maxX = Math.max(maxX, x + th.getSlotWidth());
@@ -199,7 +199,7 @@ public class BracketLayout {
     }
 
     /** A small caption above a match's own box - used for the grand final, its reset and third place, since none of them share a round-header column. */
-    private void drawCaption(IMatch m) {
+    private void drawCaption(Match m) {
         if (m == null) return;
         Double x = matchX.get(m.getID()), y = matchY.get(m.getID());
         if (x == null || y == null) return;
@@ -225,14 +225,14 @@ public class BracketLayout {
      * into the grand final, which happens when the phase has no losers bracket at all.
      */
     private void drawConnectors() {
-        for (IMatch m : phase.getMatches()) {
+        for (Match m : phase.getMatches()) {
             connect(m, m.getNextMatchID(), m.getNextMatchSlot());
-            BracketSide to = m.getNextLoserMatchID() == null ? null : phase.getMatch(m.getNextLoserMatchID()).map(IMatch::getBracketSide).orElse(null);
+            BracketSide to = m.getNextLoserMatchID() == null ? null : phase.getMatch(m.getNextLoserMatchID()).map(Match::getBracketSide).orElse(null);
             if (to != null && to != BracketSide.LOSERS && to != BracketSide.THIRD_PLACE) connect(m, m.getNextLoserMatchID(), m.getNextLoserMatchSlot());
         }
     }
 
-    private void connect(IMatch from, Long toID, Integer slot) {
+    private void connect(Match from, Long toID, Integer slot) {
         if (toID == null || slot == null) return;
         Double fx = matchX.get(from.getID()), fy = matchY.get(from.getID());
         Double tx = matchX.get(toID), ty = matchY.get(toID);
@@ -249,7 +249,7 @@ public class BracketLayout {
 
     // ---- match block -----------------------------------------------------------------------------
 
-    private void drawMatch(IMatch m) {
+    private void drawMatch(Match m) {
         Double x = matchX.get(m.getID()), y = matchY.get(m.getID());
         if (x == null || y == null) return;
         drawSlot(m, 1, x, y);
@@ -259,7 +259,7 @@ public class BracketLayout {
         }
     }
 
-    private void drawSlot(IMatch m, int slot, double x, double y) {
+    private void drawSlot(Match m, int slot, double x, double y) {
         Long pid = m.getParticipantID(slot);
         String dataId = pid == null ? null : String.valueOf(pid);
         boolean decided = m.getState().isDecided();
@@ -274,7 +274,7 @@ public class BracketLayout {
         double baseline = y + th.getSlotHeight() / 2.0 + th.getSlotFontSize() * 0.36;
 
         if (th.isShowSeeds()) {
-            int seed = pid == null ? 0 : phase.getStanding(pid).map(IStanding::getSeed).orElse(0);
+            int seed = pid == null ? 0 : phase.getStanding(pid).map(Standing::getSeed).orElse(0);
             if (seed > 0) model.text(textX, baseline, String.valueOf(seed), Math.max(9, th.getSlotFontSize() - 2), th.getMutedTextColor(), "start", false, dataId);
             textX += th.getSeedWidth();
             available -= th.getSeedWidth();
@@ -292,7 +292,7 @@ public class BracketLayout {
         model.text(sx + th.getScoreWidth() / 2.0, baseline, scoreText(m, slot), th.getScoreFontSize(), isWinner ? th.getWinnerBorder() : th.getTextColor(), "middle", isWinner, dataId);
     }
 
-    private String scoreText(IMatch m, int slot) {
+    private String scoreText(Match m, int slot) {
         if (m.getState() == MatchState.BYE) return slot == 1 && m.getParticipantID1() != null || slot == 2 && m.getParticipantID2() != null ? "BYE" : "";
         if (!m.getState().isDecided() && m.getScore1() == 0 && m.getScore2() == 0) return "";
         return String.valueOf(slot == 1 ? m.getScore1() : m.getScore2());
@@ -311,15 +311,15 @@ public class BracketLayout {
             else x += tableWidth() + th.getRoundGap();
         }
         drawMatchColumns(th.getPadding(), tableBottom + th.sectionGap());
-        for (IMatch m : phase.getMatches()) drawMatch(m);
+        for (Match m : phase.getMatches()) drawMatch(m);
     }
 
     private double tableWidth() { return th.getSlotWidth() + 250; }
 
     /** Rank / name / played / W-D-L / game diff / points, one row per entrant. */
     private double drawStandings(double x, double y, int groupIndex, String heading) {
-        List<IStanding> rows = phase.getStandings().stream().filter(s -> s.getGroupIndex() == groupIndex)
-                .sorted(Comparator.comparingInt(IStanding::getRank)).toList();
+        List<Standing> rows = phase.getStandings().stream().filter(s -> s.getGroupIndex() == groupIndex)
+                .sorted(Comparator.comparingInt(Standing::getRank)).toList();
         if (rows.isEmpty()) return y;
         double w = tableWidth(), rowH = th.getSlotHeight();
         model.text(x, y - (th.headerClearance() - th.getHeaderFontSize()), heading, th.getHeaderFontSize(), th.getMutedTextColor(), "start", true);
@@ -329,7 +329,7 @@ public class BracketLayout {
         drawRowText(x, y, cols, headers, th.getMutedTextColor(), true, null);
 
         double cy = y + rowH + 2;
-        for (IStanding s : rows) {
+        for (Standing s : rows) {
             String dataId = String.valueOf(s.getParticipantID());
             boolean qualified = s.isQualified();
             model.box(x, cy, w, rowH, qualified ? th.getWinnerBackground() : th.getSlotBackground(), qualified ? th.getWinnerBorder() : th.getSlotBorder(), th.getCornerRadius(), dataId);
@@ -364,15 +364,15 @@ public class BracketLayout {
 
     /** One column of match blocks per round, to the right of the tables. */
     private void drawMatchColumns(double left, double top) {
-        Map<Integer, List<IMatch>> rounds = new LinkedHashMap<>();
-        for (IMatch m : phase.getMatches()) rounds.computeIfAbsent(m.getRound(), _ -> new ArrayList<>()).add(m);
+        Map<Integer, List<Match>> rounds = new LinkedHashMap<>();
+        for (Match m : phase.getMatches()) rounds.computeIfAbsent(m.getRound(), _ -> new ArrayList<>()).add(m);
         if (rounds.isEmpty()) return;
         List<Integer> keys = new ArrayList<>(rounds.keySet());
         keys.sort(Integer::compareTo);
         double headerGap = th.headerClearance() - th.getHeaderFontSize();
         for (int c = 0; c < keys.size(); c++) {
-            List<IMatch> round = rounds.get(keys.get(c));
-            round.sort(Comparator.comparingInt(IMatch::getPosition));
+            List<Match> round = rounds.get(keys.get(c));
+            round.sort(Comparator.comparingInt(Match::getPosition));
             double x = columnX(left, c + 1);
             if (th.isShowRoundHeaders()) model.text(x, top - headerGap, "Round " + keys.get(c), th.getHeaderFontSize(), th.getMutedTextColor(), "start", true);
             for (int i = 0; i < round.size(); i++) place(round.get(i), x, top + i * th.matchPitch());
@@ -385,21 +385,21 @@ public class BracketLayout {
      * whose other slot reads "TBD" - left out, the entrant simply starts in the round it really plays.
      * Group and swiss phases keep theirs, where a bye is a round a participant actually sat out.
      */
-    private List<IMatch> visible(List<IMatch> in) {
-        List<IMatch> out = new ArrayList<>(in.stream().filter(m -> !m.isBye()).toList());
-        out.sort(Comparator.comparingInt(IMatch::getRound).thenComparingInt(IMatch::getPosition));
+    private List<Match> visible(List<Match> in) {
+        List<Match> out = new ArrayList<>(in.stream().filter(m -> !m.isBye()).toList());
+        out.sort(Comparator.comparingInt(Match::getRound).thenComparingInt(Match::getPosition));
         return out;
     }
 
-    private int lastRound(List<IMatch> in) { return in.stream().mapToInt(IMatch::getRound).max().orElse(0); }
+    private int lastRound(List<Match> in) { return in.stream().mapToInt(Match::getRound).max().orElse(0); }
 
     /** The y of the given round's match on this side, or null when it has none left to draw. */
-    private Double lastY(List<IMatch> side, int round) {
+    private Double lastY(List<Match> side, int round) {
         return side.stream().filter(m -> m.getRound() == round).map(m -> matchY.get(m.getID())).filter(Objects::nonNull).findFirst().orElse(null);
     }
 
     /** The rounds of a side that still have a match, in order - one drawn column each. */
-    private List<Integer> columns(List<IMatch> side) { return side.stream().map(IMatch::getRound).distinct().sorted().toList(); }
+    private List<Integer> columns(List<Match> side) { return side.stream().map(Match::getRound).distinct().sorted().toList(); }
 
     /** Convenience for a whole tournament: stacks each phase's model into one canvas. */
     public static RenderModel stack(List<RenderModel> parts, BracketTheme theme, String background) {

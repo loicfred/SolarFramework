@@ -26,6 +26,11 @@
         </dependency>
         <dependency>
             <groupId>org.solarframework.mu</groupId>
+            <artifactId>core</artifactId>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.solarframework.mu</groupId>
             <artifactId>ProxyServerAPI</artifactId>
         </dependency>
         <dependency>

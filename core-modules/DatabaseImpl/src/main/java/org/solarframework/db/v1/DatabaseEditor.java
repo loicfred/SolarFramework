@@ -34,7 +34,7 @@ public class DatabaseEditor <I> {
         return i;
     }
     public I UpdateSet(String where, Object... o) {
-        if (!Set.isEmpty()) obj = DBM.updateItems(clazz).set(new ArrayList<>(Set)).where(where, o).returning().get(0).mapTo(clazz);
+        if (!Set.isEmpty()) obj = DBM.updateItems(clazz).set(new ArrayList<>(Set)).where(where, o).returning().getFirst().mapTo(clazz);
         Set = new ArrayList<>();
         return obj;
     }

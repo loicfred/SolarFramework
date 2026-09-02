@@ -4,7 +4,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestInstance;
+import org.solarframework.db.api.IEntityInfo;
 import org.solarframework.db.spring.DatabaseObject;
+import org.solarframework.db.spring.EntityInfo;
 import org.solarframework.db.test.obj.Order;
 import org.solarframework.db.test.obj.User;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,6 +16,7 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.solarframework.db.spring.DatabaseRegistry.SolarDBManager;
@@ -205,5 +208,17 @@ class DatabaseBlobTest {
         assertEquals("B", fetchUser(2).getName());
         assertArrayEquals(IMG, storedAvatar(1));
         assertArrayEquals(IMG, storedAvatar(2), "a batch leaves the column as it was - write it with UpdateOnly");
+    }
+
+
+    // ====== NAMING THE BLOB COLUMNS ======
+
+    /** The REST table API builds its own select list, so it has to be able to ask which columns hold a file. */
+    @Test
+    void entityInfoNamesTheBlobColumns() {
+        IEntityInfo info = new EntityInfo(User.class, "test");
+
+        assertEquals(Set.of("Avatar"), info.getBinaryColumns());
+        assertTrue(info.getFields().stream().filter(f -> f.getColumnName().equals("Name")).noneMatch(IEntityInfo.FieldInfo::isBinary), "a text column is not a file");
     }
 }
